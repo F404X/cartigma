@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a1111">
+  <meta name="description" content="GeoDetective: um jogo de dedução geográfica. Decifre pistas, investigue o planeta e encontre a cidade secreta no mapa.">
+  <meta property="og:title" content="GeoDetective — O mundo é a sua cena do crime">
+  <meta property="og:description" content="Uma cidade escondida. Seis tentativas. Um planeta inteiro de pistas.">
+  <title>GeoDetective — Decifre o planeta</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <div class="ambient ambient-one" aria-hidden="true"></div>
+  <div class="ambient ambient-two" aria-hidden="true"></div>
+  <div class="app">
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="GeoDetective, início">
+        <span class="brand-mark"><svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true"><path d="M13 2.5 23.5 13 13 23.5 2.5 13 13 2.5Z" stroke="currentColor" stroke-width="1.8"/><circle cx="13" cy="13" r="4.2" stroke="currentColor" stroke-width="1.8"/><path d="M13 7V2M13 24v-5M7 13H2m22 0h-5" stroke="currentColor" stroke-width="1.8"/></svg></span>
+        <span>GEO<span class="brand-accent">DETECTIVE</span><small>EXPLORE. DEDUCE. DISCOVER.</small></span>
+      </a>
+      <nav class="header-nav" aria-label="Navegação">
+        <a class="nav-link" href="#como-jogar">Como jogar</a>
+        <button type="button" class="icon-button" id="helpBtn" aria-label="Abrir instruções" title="Como jogar">?</button>
+        <a class="github-link" href="https://github.com/F404X/geodetective" target="_blank" rel="noopener noreferrer" aria-label="Repositório no GitHub">
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 .8a11.2 11.2 0 0 0-3.54 21.82c.56.1.77-.24.77-.54v-1.9c-3.12.68-3.78-1.33-3.78-1.33-.5-1.28-1.23-1.62-1.23-1.62-1.02-.7.08-.69.08-.69 1.13.08 1.72 1.16 1.72 1.16 1.01 1.72 2.63 1.22 3.27.94.1-.73.4-1.22.71-1.5-2.5-.28-5.12-1.25-5.12-5.56 0-1.23.44-2.23 1.16-3.02-.12-.28-.5-1.43.11-2.98 0 0 .95-.3 3.08 1.15a10.73 10.73 0 0 1 5.6 0c2.13-1.44 3.07-1.15 3.07-1.15.62 1.55.23 2.7.12 2.98.72.79 1.15 1.79 1.15 3.02 0 4.32-2.63 5.28-5.14 5.55.4.34.75.99.75 2v2.98c0 .3.2.65.78.54A11.2 11.2 0 0 0 12 .8Z"/></svg>
+        </a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="intro">
+        <div class="intro-copy">
+          <div class="eyebrow"><span class="pulse"></span> ARQUIVO DE INVESTIGAÇÃO GEOGRÁFICA <span class="eyebrow-line"></span> 001</div>
+          <h1>O mundo é a sua<br><em>cena do crime.</em></h1>
+          <p>Uma localização secreta. Pistas espalhadas pelo planeta. Use sua intuição geográfica para encontrar o alvo antes que as tentativas acabem.</p>
+          <div class="intro-stats">
+            <span><strong id="placeCount">60+</strong><small>LOCALIDADES</small></span>
+            <i aria-hidden="true"></i>
+            <span><strong>06</strong><small>TENTATIVAS</small></span>
+            <i aria-hidden="true"></i>
+            <span><strong>∞</strong><small>INVESTIGAÇÕES</small></span>
+          </div>
+        </div>
+        <div class="intro-seal" aria-hidden="true">
+          <div class="seal-ring"><span>LAT 00° 00′</span><svg viewBox="0 0 180 180" width="180" height="180" fill="none"><circle cx="90" cy="90" r="67" stroke="currentColor" stroke-opacity=".4" stroke-dasharray="2 6"/><circle cx="90" cy="90" r="48" stroke="currentColor" stroke-opacity=".28"/><path d="M90 6v168M6 90h168M43 43l94 94M137 43l-94 94" stroke="currentColor" stroke-opacity=".24"/><path d="m90 48 42 42-42 42-42-42 42-42Z" fill="currentColor" fill-opacity=".08" stroke="currentColor" stroke-width="1.4"/><circle cx="90" cy="90" r="12" stroke="currentColor" stroke-width="2"/><circle cx="90" cy="90" r="3.5" fill="currentColor"/></svg><span>LONG 000° 00′</span></div>
+          <div class="seal-caption">GLOBAL INTELLIGENCE SYSTEM<br>DECODE THE UNKNOWN</div>
+        </div>
+      </section>
+
+      <section class="investigation" id="jogar" aria-label="Jogo GeoDetective">
+        <div class="mode-bar">
+          <div class="mode-tabs" role="group" aria-label="Modo de jogo">
+            <button type="button" id="dailyBtn" class="mode-tab active" aria-pressed="true"><span class="mode-dot"></span> DESAFIO DIÁRIO</button>
+            <button type="button" id="freeBtn" class="mode-tab" aria-pressed="false">MODO LIVRE <span class="mode-infinity">∞</span></button>
+          </div>
+          <div class="mode-meta"><span id="caseCode">CASO #000</span><span class="meta-divider">/</span><span id="modeCaption">MESMO DESAFIO PARA TODOS</span></div>
+        </div>
+
+        <div class="game-grid">
+          <section class="map-card" aria-label="Mapa de investigação">
+            <div class="map-toolbar">
+              <div class="map-status"><span class="status-icon">◉</span> MAPA DE INVESTIGAÇÃO <small id="mapHint">CLIQUE PARA MARCAR SUA HIPÓTESE</small></div>
+              <button type="button" class="map-reset" id="resetViewBtn" title="Voltar à visão global">↗ <span>Visão global</span></button>
+            </div>
+            <div id="map" role="application" aria-label="Mapa interativo do mundo. Clique para marcar a localização suspeita."></div>
+            <div class="map-bottom">
+              <span><span class="map-dot"></span><span id="coordinates">AGUARDANDO COORDENADAS</span></span>
+              <span id="mapProvider">PROJEÇÃO CARTOGRÁFICA · WGS84</span>
+            </div>
+          </section>
+
+          <aside class="case-card" aria-label="Painel de pistas e palpites">
+            <div class="case-head">
+              <span class="panel-label"><span class="panel-spark">✳</span> DOSSIÊ CONFIDENCIAL</span>
+              <span class="case-open" id="caseStatus">EM ABERTO</span>
+            </div>
+            <div class="case-title-row">
+              <div><div class="case-number" id="caseNumber">CASO #000</div><h2 id="caseTitle">Localização desconhecida</h2></div>
+              <span class="question-mark" aria-hidden="true">?</span>
+            </div>
+            <div class="attempt-line">
+              <span>TENTATIVAS RESTANTES</span>
+              <strong id="attemptCount">6 / 6</strong>
+            </div>
+            <div class="attempt-dots" id="attemptDots" aria-label="Tentativas disponíveis"></div>
+            <div class="divider"></div>
+
+            <div class="section-heading"><span>01 / EVIDÊNCIAS</span><span id="hintCount">2 DE 6</span></div>
+            <ol class="clue-list" id="clueList" aria-live="polite"></ol>
+            <button type="button" id="revealBtn" class="reveal-btn">+ Revelar próxima pista <span class="hint-cost">−300 PTS</span></button>
+            <div class="divider"></div>
+
+            <div class="section-heading"><span>02 / SUA HIPÓTESE</span><span id="guessCounter">0 DE 6</span></div>
+            <label for="citySearch" class="search-label">BUSQUE UM LOCAL OU CLIQUE NO MAPA</label>
+            <div class="search-wrap">
+              <span class="search-icon" aria-hidden="true">⌕</span>
+              <input id="citySearch" type="search" placeholder="Cidade, país ou região..." autocomplete="off" spellcheck="false" aria-autocomplete="list" aria-controls="suggestions">
+              <div class="suggestions hidden" id="suggestions" role="listbox"></div>
+            </div>
+            <div class="selection" id="selection"><span class="selection-target">◎</span><span id="selectedText">Nenhum ponto selecionado</span></div>
+            <button id="guessBtn" type="button" class="primary-btn" disabled>CONFIRMAR PALPITE <span>↗</span></button>
+            <div id="feedback" class="feedback hidden" role="status" aria-live="polite"></div>
+
+            <div class="history-heading"><span>PALPITES ANTERIORES</span><span id="historyCount">00</span></div>
+            <ol id="guessHistory" class="guess-history"><li class="empty-history">Seus palpites aparecerão aqui.</li></ol>
+
+            <div id="resultCard" class="result-card hidden" aria-live="polite">
+              <div class="result-kicker" id="resultKicker">CASO ENCERRADO</div>
+              <h3 id="resultTitle">Localização revelada</h3>
+              <p id="resultDetail"></p>
+              <div class="score-box"><span>PONTUAÇÃO FINAL</span><strong id="finalScore">0</strong><small>/ 5.000</small></div>
+              <div class="result-actions">
+                <button type="button" class="secondary-btn" id="shareBtn">Compartilhar ↗</button>
+                <button type="button" class="primary-btn" id="nextBtn">NOVO CASO →</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="how-section" id="como-jogar">
+        <div class="how-intro"><span class="eyebrow">MANUAL DO INVESTIGADOR / 001</span><h2>Como funciona<br><em>a investigação?</em></h2><p>Observe os padrões, cruze as pistas e use o mapa para testar suas hipóteses. Não é preciso conhecer todas as cidades: cada tentativa ajuda a restringir sua busca.</p></div>
+        <div class="how-steps">
+          <div class="step"><span class="step-n">01</span><div><h3>Decifre as pistas</h3><p>Revele características do relevo, latitude, região e referências geográficas da cidade secreta.</p></div></div>
+          <div class="step"><span class="step-n">02</span><div><h3>Marque o mapa</h3><p>Clique em qualquer ponto do mundo ou pesquise um lugar e confirme sua hipótese.</p></div></div>
+          <div class="step"><span class="step-n">03</span><div><h3>Use o feedback</h3><p>Veja a distância e a direção do alvo. Você tem seis tentativas para chegar a 100 km da localização.</p></div></div>
+        </div>
+      </section>
+      <footer class="site-footer"><span>© <span id="year"></span> GEODETECTIVE · UM EXPERIMENTO GEOGRÁFICO</span><span>FEITO PARA EXPLORAR O PLANETA <span class="footer-star">✳</span></span></footer>
+    </main>
+  </div>
+
+  <dialog id="helpDialog" class="help-dialog" aria-labelledby="helpTitle">
+    <div class="modal-head"><span class="panel-label">MANUAL DO INVESTIGADOR</span><button type="button" id="closeHelpBtn" class="icon-button" aria-label="Fechar">×</button></div>
+    <h2 id="helpTitle">Como jogar o GeoDetective</h2>
+    <p>Há uma cidade secreta em algum lugar do planeta. Use as pistas para descobrir onde ela fica.</p>
+    <ul>
+      <li>Você começa com duas pistas e tem até seis palpites.</li>
+      <li>Após cada erro, uma nova pista é liberada automaticamente.</li>
+      <li>Você também pode antecipar uma pista, mas perde 300 pontos.</li>
+      <li>Selecione um ponto no mapa ou use a busca de cidades para posicionar seu palpite.</li>
+      <li>Um acerto ocorre quando seu palpite fica a até 100 km do alvo.</li>
+      <li>O desafio diário é o mesmo para todos (data UTC) e fica salvo neste navegador. O modo livre é ilimitado.</li>
+    </ul>
+    <button type="button" class="primary-btn" id="startHelpBtn">ENTENDI, VAMOS JOGAR →</button>
+  </dialog>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+</body>
+</html>
