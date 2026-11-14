@@ -242,6 +242,8 @@ test("evidence styling is compact and location pins use the tip as anchor",()=>{
   assert.match(files["styles.css"],/clue-category/);
   assert.match(files["styles.css"],/\.pin::after/);
   assert.match(files["app.js"],/anchor:"bottom"/);
+  assert.match(files["app.js"],/head\.className="pin-head"/);
+  assert.match(files["styles.css"],/maplibregl-marker\.pin/);
   assert.match(files["styles.css"],/height:100dvh/);
   assert.match(files["app.js"],/tiles\.openfreemap\.org\/styles\/dark/);
   assert.match(files["map-bootstrap.js"],/maplibre-gl@6\.18\.0/);
