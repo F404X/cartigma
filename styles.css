@@ -203,3 +203,97 @@ dialog .primary-btn{width:100%}
   .status-bar{height:20px;min-height:20px}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+
+/* Case-board refinements: evidence is a compact dossier list, not six stretched cards. */
+.clue-list{flex:1;display:flex;flex-direction:column;justify-content:flex-start;align-content:start;gap:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+.clue-list::-webkit-scrollbar,.report-body::-webkit-scrollbar{display:none}
+.clue{flex:0 0 auto;display:grid;grid-template-columns:25px minmax(0,1fr);align-items:start;gap:7px;min-height:56px;padding:10px 9px;background:transparent;border:0;border-bottom:1px solid var(--border);border-left:2px solid var(--accent);border-radius:0}
+.clue:first-child{border-top:1px solid var(--border)}
+.clue:nth-child(even):not(.locked){background:#26291e}
+.clue-index{font:600 11px/1.3 var(--mono);padding-top:1px;color:var(--accent)}
+.clue-body{display:flex;flex-direction:column;gap:3px;min-width:0}
+.clue-category{font:600 9px/1.3 var(--mono);letter-spacing:1px;color:#d7bd67;text-transform:uppercase}
+.clue-text{display:block;overflow:visible;-webkit-line-clamp:unset;font:500 13px/1.4 var(--font);letter-spacing:0;word-break:normal;overflow-wrap:anywhere}
+.clue.locked{background:#191c18;border:0;border-bottom:1px dashed #343a30;border-left:2px solid #373f32;opacity:.68}
+.clue.locked:first-child{border-top:1px solid var(--border)}
+.clue.locked .clue-category{color:#8f9688}
+.clue.locked .clue-text{color:#8c9586;font-size:11px;letter-spacing:.8px}
+.clue-panel{min-height:0}
+.section-index{display:inline-grid;place-items:center;min-width:24px;height:20px;margin-right:5px;border:1px solid #65582a;color:var(--accent);font:600 10px var(--mono)}
+.clue-panel .section-heading,.guess-panel .section-heading{flex-shrink:0}
+.reveal-btn{margin-top:8px}
+
+/* Map pins: the teardrop point, rather than the circular body, is the clicked coordinate. */
+.guess-marker{background:transparent!important;border:0!important}
+.pin{--pin-color:var(--accent);position:absolute;left:2px;top:1px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border:1px solid #10130e;border-radius:50%;background:var(--pin-color);box-shadow:0 0 0 1px var(--pin-color);color:#14140c;font:600 9px/1 var(--mono)}
+.pin::after{content:"";position:absolute;top:18px;left:3px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:12px solid var(--pin-color)}
+.pin.past{--pin-color:#a9b0a1}
+.pin.best{--pin-color:#ffb646}
+.pin.target{--pin-color:#f1f4e8}
+.pin::after{filter:none}
+
+/* Post-case detective report. It scrolls internally; the page itself never scrolls. */
+dialog.case-report{padding:0;width:min(760px,calc(100vw - 26px));max-height:min(90dvh,830px);overflow:hidden;border:1px solid #76622c;border-radius:2px;background:#1b1f19;color:var(--text);box-shadow:0 15px 65px #000c}
+dialog.case-report[open]{display:flex;flex-direction:column}
+dialog.case-report::backdrop{background:#060807c9;backdrop-filter:blur(2px)}
+.report-topbar{display:flex;align-items:center;gap:12px;min-height:40px;padding:0 17px;border-bottom:1px solid var(--border-strong);background:#24271c}
+.report-archive{font:600 10px var(--mono);letter-spacing:1.3px;color:var(--accent)}
+.report-code{font:500 11px var(--mono);color:var(--text);margin-left:auto;white-space:nowrap}
+.report-close{background:none;border:1px solid var(--border);color:var(--text);font:500 22px/1 var(--font);width:28px;height:28px}
+.report-close:hover{color:var(--accent);border-color:var(--accent)}
+.report-heading{display:flex;align-items:center;gap:15px;padding:19px 22px;border-bottom:1px solid var(--border)}
+.report-heading>div:first-child{flex:1;min-width:0}
+.report-verdict{font:600 10px var(--mono);color:var(--accent);letter-spacing:1px}
+.report-heading h2{font:600 clamp(23px,3vw,32px)/1.15 var(--font);margin:8px 0 3px;overflow-wrap:anywhere}
+.report-heading p{color:var(--muted);font-size:13px;margin:0}
+.report-stamp{flex-shrink:0;border:2px solid #a38e44;color:#dfc464;padding:10px;font:600 14px var(--mono);letter-spacing:2px;transform:rotate(-7deg);max-width:145px;text-align:center}
+.report-body{flex:1;min-height:0;overflow-y:auto;padding:16px 22px 20px;scrollbar-width:none}
+.report-section{margin-bottom:19px}
+.report-section h3{margin:0 0 9px;color:#cfcbb5;font:600 11px var(--mono);letter-spacing:.7px;text-transform:uppercase;border-bottom:1px solid var(--border);padding-bottom:7px}
+.report-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0}
+.report-grid>div{min-width:0;padding:9px 10px;background:#242820;border-left:2px solid #6d5d33}
+.report-grid dt{font:500 10px var(--font);color:var(--muted);margin-bottom:5px}
+.report-grid dd{margin:0;font:600 12px/1.45 var(--mono);overflow-wrap:anywhere}
+.report-fact{background:#26291e;border-left:3px solid var(--accent);padding:12px 14px}
+.report-fact h3{color:var(--accent);border:0;padding:0}
+.report-fact p{font:500 14px/1.6 var(--font);margin:0}
+.report-timeline,.report-evidence{list-style:none;padding:0;margin:0}
+.report-log-row,.report-evidence-row{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:center;border-bottom:1px solid var(--border);padding:9px 3px;font-size:12px}
+.report-log-row.best{border-left:2px solid var(--accent);background:#2b291b;padding-left:9px}
+.report-log-index,.report-evidence-row>span:first-child{font:600 10px var(--mono);color:var(--accent)}
+.report-log-place{overflow-wrap:anywhere}
+.report-log-row strong{font:600 11px var(--mono);color:#e4cf85;white-space:nowrap}
+.report-evidence-row{grid-template-columns:28px minmax(0,1fr)}
+.report-footer{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:8px;padding:13px 22px;border-top:1px solid var(--border-strong);background:#24271c}
+.report-footer button{min-height:38px;font-size:12px}
+@media(max-width:960px){
+  .clue{min-height:43px;padding:7px 7px;grid-template-columns:22px minmax(0,1fr)}
+  .clue-text{font-size:12px;-webkit-line-clamp:unset}
+  .clue-category{font-size:8px}
+}
+@media(max-width:520px){
+  .clue{min-height:40px;padding:6px 4px;grid-template-columns:17px minmax(0,1fr);gap:3px}
+  .clue-index{font-size:9px}
+  .clue-text{font-size:11px;line-height:1.4;-webkit-line-clamp:unset}
+  .clue-category{font-size:8px;letter-spacing:.4px}
+  .section-index{font-size:9px;min-width:19px;height:18px;margin-right:2px}
+  .report-topbar{padding:0 10px}
+  .report-archive{font-size:8px}
+  .report-code{font-size:9px}
+  .report-heading{padding:13px 12px}
+  .report-stamp{font-size:10px;letter-spacing:1px;padding:7px;max-width:88px}
+  .report-body{padding:12px}
+  .report-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+  .report-footer{padding:9px;gap:5px;grid-template-columns:1fr 1fr}
+  #reportNextBtn{grid-column:1/-1}
+  .report-footer button{font-size:10px;min-height:35px}
+  .report-fact p{font-size:12px}
+  .report-log-row{grid-template-columns:24px minmax(0,1fr);gap:3px;font-size:11px}
+  .report-log-row strong{grid-column:2;white-space:normal}
+}
+@media(max-height:690px){
+  .clue{min-height:39px;padding:6px 5px;grid-template-columns:22px minmax(0,1fr)}
+  .clue-text{font-size:12px;-webkit-line-clamp:unset}
+  .clue-body{gap:2px}
+}
