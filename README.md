@@ -34,7 +34,7 @@ The map automatically frames the **closest guess and the actual city**, with zoo
 
 The game uses a flat, yellow-and-charcoal detective interface. Evidence cards have larger typography, ruled separators, numbered sections and evidence classifications. **Evidence is stacked above the guess panel** on all screen sizes, with internal scrolling where necessary. The whole application fits in the viewport without a browser-page scrollbar; longer clue, log and report sections can scroll **internally** when needed, particularly on small screens.
 
-The UI supports **19 languages**: English (default), Portuguese, Spanish, Simplified Chinese, Japanese, Russian, French, German, Italian, Dutch, Polish, Swedish, Turkish, Arabic, Hebrew, Korean, Thai, Vietnamese and Indonesian. Arabic and Hebrew use RTL layout. The language selector includes a persistent globe icon and representative national flag. Preferences are stored locally. The primary map uses MapLibre vector labels that follow the selected language when translated name fields exist, falling back to the local name otherwise. If WebGL, a CDN or the vector style fails, a keyless Leaflet/OpenStreetMap raster map is loaded automatically (its baked-in map labels are not translated). Interface strings, clue templates, geographic terminology, and report controls are also translated.
+The UI supports **19 languages**: English (default), Portuguese, Spanish, Simplified Chinese, Japanese, Russian, French, German, Italian, Dutch, Polish, Swedish, Turkish, Arabic, Hebrew, Korean, Thai, Vietnamese and Indonesian. Arabic and Hebrew use RTL layout. The language selector is a searchable custom menu with a persistent globe icon, a representative flag image in **every option**, full native-language names, keyboard navigation and a visible selected state (with emoji fallback when a flag image cannot load). Preferences are stored locally. The primary map uses MapLibre vector labels that follow the selected language when translated name fields exist, falling back to the local name otherwise. **Label density is zoom-dependent:** countries appear at world scale, major cities after zooming in, and local streets/points of interest at much closer zoom. This is applied directly to vector style layers; raster fallback tiles have fixed labels. If WebGL, a CDN or the vector style fails, a keyless Leaflet/OpenStreetMap raster map is loaded automatically (its baked-in map labels are not translated). Interface strings, clue templates, geographic terminology, and report controls are also translated.
 
 ## Technology
 
@@ -66,6 +66,7 @@ Open http://localhost:8000. The tests also run automatically on pushes and pull 
 | `references.js` | Local named reference coordinates within a 1,000 km radius |
 | `map-bootstrap.js` | Loads the vector engine from redundant CDNs and selects fallback when needed |
 | `map-fallback.js` | Loads Leaflet and adapts the game map interactions without WebGL |
+| `language-picker.js` | Searchable native-language list with national flags and keyboard support |
 | `facts.js` | 74 English and Portuguese location facts |
 | `i18n.js` | Main user interface translations |
 | `clues-i18n.js` | Geographic clue vocabulary and continent translations |
