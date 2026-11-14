@@ -227,6 +227,7 @@
     $("langSelect").value=lang;
     const FLAGS={en:"🇺🇸",pt:"🇧🇷",es:"🇪🇸",zh:"🇨🇳",ja:"🇯🇵",ru:"🇷🇺",fr:"🇫🇷",de:"🇩🇪",it:"🇮🇹",nl:"🇳🇱",pl:"🇵🇱",sv:"🇸🇪",tr:"🇹🇷",ar:"🇸🇦",he:"🇮🇱",ko:"🇰🇷",th:"🇹🇭",vi:"🇻🇳",id:"🇮🇩"};
     $("languageFlag").textContent=FLAGS[lang]||"🌐";
+    window.GeoLanguagePicker?.sync(lang);
     updateMapLanguage();
     document.querySelectorAll("[data-i18n]").forEach(element=>{element.textContent=t(element.dataset.i18n)});
     $("citySearch").placeholder=t("searchPlaceholder");
@@ -448,6 +449,37 @@
       maxZoom,duration:450,bearing:0,pitch:0});
     return [targetLng,target[0]];
   }
+  function labelMinZoom(layer){
+    if(layer.type!=="symbol" || layer.layout?.["text-field"]===undefined)return null;
+    const id=(layer.id+" "+(layer["source-layer"]||"")).toLowerCase();
+    // Each category progressively appears as the investigator zooms in.
+    // Country labels remain at world scale; street names and POIs require local zoom.
+    if(/(road|street|highway|motorway|rail|transit|route|shield|housenumber|house-number)/.test(id))return 12;
+    if(/(poi|amenity|shop|building|landmark|business|tourism|airport|station)/.test(id))return 11;
+    if(/(neighbou?rhood|suburb|hamlet|village|district|quarter|locality)/.test(id))return 8.2;
+    if(/(town|settlement)/.test(id))return 7;
+    if(/(province|state|region|admin)/.test(id))return 5;
+    if(/(city|capital|place)/.test(id))return 4.6;
+    if(/(river|lake|water|sea|ocean|mountain|hill|peak|park|island|natural)/.test(id))return 6.6;
+    if(/(country|continent)/.test(id))return 1.5;
+    if(/(label|name|text)/.test(id))return 7.2;
+    return 8;
+  }
+  function configureMapLabelDensity(){
+    if(!map||!mapStyleReady||typeof map.setLayerZoomRange!=="function")return;
+    const layers=map.getStyle()?.layers||[];
+    for(const layer of layers){
+      const min=labelMinZoom(layer);
+      if(min===null)continue;
+      const originalMin=Number.isFinite(layer.minzoom)?layer.minzoom:0;
+      const originalMax=Number.isFinite(layer.maxzoom)?layer.maxzoom:24;
+      const targetMin=Math.max(originalMin,min);
+      // Never invert an existing zoom range from the source style.
+      if(targetMin>=originalMax)continue;
+      try{map.setLayerZoomRange(layer.id,targetMin,originalMax)}
+      catch(error){console.warn("Could not adjust label zoom",layer.id,error);}
+    }
+  }
   function updateMapLanguage(){
     if(!map||!mapStyleReady||!map.getStyle())return;
     // OpenFreeMap/OpenMapTiles contain localized place names when available.
@@ -621,6 +653,7 @@
     map.on("style.load",()=>{
       clearTimeout(mapStyleTimeout);
       mapStyleReady=true;
+      configureMapLabelDensity();
       updateMapLanguage();
       if(game)renderMap();
     });
