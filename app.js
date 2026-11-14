@@ -115,23 +115,38 @@
     }
     return {index:best,km:minimum};
   }
-  function anchorDistances(index) {
-    // Never produce an evidence distance to a place over 1,000 km away.
-    // Combine nearby catalogue cities with curated local references for isolated cases.
-    const origin=cityCoords(index);
+  function regionalHintRadius(index, level){
+    // Use the geographic spread of the target's region, not a universal 1,000 km cap.
+    // Sparse/large regions need longer references; dense regions get a smaller radius.
+    const base={europe:2000,africa:2600,asia:2700,oceania:2500,
+      northAmerica:2500,southAmerica:2300};
+    const region=continentKey(index);
+    const center=cityCoords(index);
+    const neighbors=PLACES.map((_,i)=>({
+      i,km:dist(center,cityCoords(i))
+    })).filter(item=>item.i!==index&&continentKey(item.i)===region)
+      .sort((a,b)=>a.km-b.km);
+    const localScale=neighbors[Math.min(2,neighbors.length-1)]?.km||base[region];
+    const normalRadius=Math.max(base[region],base[region]*0.55+localScale*0.65);
+    const modifier=level==="hard"?1.2:1;
+    return Math.round(Math.min(6000,Math.min(5200,normalRadius)*modifier)/100)*100;
+  }
+  function anchorDistances(index,level) {
+    const radius=regionalHintRadius(index,level);
+    const origin=cityCoords(index),region=continentKey(index);
     const items=[];
     for(let i=0;i<PLACES.length;i++){
       if(i===index)continue;
       const km=dist(origin,cityCoords(i));
-      if(km<=1000&&km>=10)
-        items.push({name:cityName(cityAt(i)),country:COUNTRY_CODES[i],km});
+      if(km<=radius&&km>=10)
+        items.push({name:cityName(cityAt(i)),country:COUNTRY_CODES[i],
+          km,regional:continentKey(i)===region});
     }
     for(const [name,country,lat,lng] of NEARBY_REFERENCES[index]||[]){
       const km=dist(origin,[lat,lng]);
-      if(km<=1000&&km>=10)
-        items.push({name,country,km});
+      if(km<=radius&&km>=10)
+        items.push({name,country,km,regional:true});
     }
-    // Avoid duplicating a nearby place with different spellings.
     const unique=new Map();
     for(const item of items) {
       const key=norm(item.name);
@@ -139,18 +154,31 @@
     }
     return [...unique.values()].sort((a,b)=>a.km-b.km);
   }
+  function roundedHintDistance(km,level,radius){
+    const step=level==="hard"?(radius>=3200?500:250):(radius>=3000?200:100);
+    return Math.min(radius,Math.max(step,Math.round(km/step)*step));
+  }
   function referenceName(item){
     return item.name+", "+displayRegion(item.country);
   }
   function cluesFor(index,level){
     const p=cityAt(index);
-    const anchors=anchorDistances(index);
-    if(anchors.length<2)throw Error("Not enough local references for "+p[0]);
-    // Prefer informative references between 120 and 1,000 km when available.
-    const useful=anchors.filter(a=>a.km>=120);
-    const options=useful.length?useful:anchors;
-    const chosen=options[hash("reference-v2:"+p[0])%options.length];
-    const furthest=anchors[anchors.length-1];
+    const radius=regionalHintRadius(index,level);
+    const anchors=anchorDistances(index,level);
+    if(anchors.length<2)throw Error("Not enough regional references for "+p[0]);
+    // Avoid a near-neighbor that instantly reveals the destination.
+    // Prefer places in the same geographical region, about 65% of the local radius away.
+    const regionAnchors=anchors.filter(a=>a.regional&&a.km>=radius*.30);
+    const distantAnchors=anchors.filter(a=>a.km>=radius*.30);
+    const options=regionAnchors.length?regionAnchors:(distantAnchors.length?distantAnchors:anchors);
+    const desired=radius*.65;
+    const chosen=options.reduce((best,item)=>{
+      return Math.abs(item.km-desired)<Math.abs(best.km-desired)?item:best;
+    },options[0]);
+    const regionalComparison=anchors.filter(a=>a.regional&&a.km>=radius*.25);
+    const comparison=regionalComparison.length>=2?regionalComparison:anchors;
+    const nearReference=comparison[Math.floor((comparison.length-1)*.22)];
+    const farReference=comparison[Math.floor((comparison.length-1)*.83)];
     const terrain={key:"terrain",value:locationFeature(index)};
     const zone={key:"zone",value:latitudeZone(p[3])};
     const capital={key:"capital",value:tc(CAPITALS.has(p[0])?"yes":"no")};
@@ -159,14 +187,15 @@
     const opening=hash("opening:"+p[0])%2===0?terrain:zone;
     const third=hash("profile:"+p[0])%3===0&&reliableCapital?capital
       :hash("profile:"+p[0])%3===1?hemisphere:(opening===terrain?zone:terrain);
-    const relationship=hash("relationship-v2:"+p[0])%2===0
-      ?{key:"closer",a:referenceName(anchors[0]),b:referenceName(furthest)}
-      :{key:"nearest",city:referenceName(anchors[0]),km:number(anchors[0].km)};
+    // Comparison replaces the precise "nearest city" clue, which was too revealing.
+    const relationship={
+      key:"closer",a:referenceName(nearReference),b:referenceName(farReference)
+    };
     return [
       opening,
       {key:"continent",value:continentName(index)},
       third,
-      {key:"distance",km:number(chosen.km),city:referenceName(chosen)},
+      {key:"distance",km:number(roundedHintDistance(chosen.km,level,radius)),city:referenceName(chosen)},
       relationship,
       {key:"landmark",name:LANDMARKS[index]}
     ];
