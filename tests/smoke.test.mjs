@@ -34,7 +34,7 @@ class Element {
 }
 const hash=input=>{let h=2166136261;for(const c of input){h ^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0};
 function boot({storage=new Map(),map=false}={}){
-  const nodes=new Map(),window={},mapState={fits:[],eases:[],styles:[],markers:[],layers:new Map(),sources:new Map(),events:{},canvas:new Element("canvas")};
+  const nodes=new Map(),window={},mapState={fits:[],eases:[],styles:[],zoomRanges:[],markers:[],layers:new Map(),sources:new Map(),events:{},canvas:new Element("canvas")};
   const document={
     readyState:"complete",documentElement:{lang:"en",dir:"ltr"},hidden:false,
     getElementById(id){if(!nodes.has(id))nodes.set(id,new Element(id));return nodes.get(id)},
@@ -56,6 +56,7 @@ function boot({storage=new Map(),map=false}={}){
       {id:"road_shield",type:"symbol",layout:{"text-field":["get","ref"]}}
     ]}},
     setLayoutProperty(id,key,expr){mapState.styles.push({id,key,expr})},
+    setLayerZoomRange(id,min,max){mapState.zoomRanges.push({id,min,max})},
     easeTo(options){mapState.eases.push(options);return this},
     fitBounds(bounds,options){mapState.fits.push({bounds,options});return this},
     getZoom(){return 3},
@@ -309,4 +310,20 @@ test("report opens in non-modal side panel without blocking the map",()=>{
   assert.match(files["app.js"],/dialog\.show\(\)/);
   assert.match(files["styles.css"],/dialog\.case-report/);
   assert.match(files["styles.css"],/inset:108px/);
+});
+
+test("map labels appear gradually with zoom instead of all at once",()=>{
+  const g=boot({map:true});
+  const ranges=g.mapState.zoomRanges;
+  const country=ranges.find(x=>x.id==="label_country_1");
+  const city=ranges.find(x=>x.id==="label_city");
+  const road=ranges.find(x=>x.id==="road_shield");
+  assert.ok(country&&city&&road,"Country, city and road layers should have zoom rules");
+  assert.ok(country.min<=2,"Countries remain visible at world scale");
+  assert.ok(city.min>=4,"City names should appear only after zooming in");
+  assert.ok(road.min>=11,"Road labels should appear at local zoom");
+  assert.ok(city.min<road.min,"Different labels need progressively higher zoom");
+  assert.equal(country.max,24);
+  assert.equal(city.max,24);
+  assert.match(files["app.js"],/configureMapLabelDensity/);
 });
