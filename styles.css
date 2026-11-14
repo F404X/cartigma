@@ -372,3 +372,23 @@ dialog.case-report .report-heading h2{font-size:24px}
   dialog.case-report .report-body{padding:10px 12px}
   dialog.case-report .report-footer{padding:8px 11px}
 }
+
+
+/* Final pin geometry: 24×32 including the tail; bottom anchor = exact click. */
+.maplibregl-marker.pin{
+  position:absolute;left:0;top:0;width:24px;height:32px;
+  display:flex;align-items:flex-start;justify-content:center;
+  padding:0;background:transparent;border:0;border-radius:0;box-shadow:none;
+  color:#14140c;font:600 10px var(--mono);
+}
+.maplibregl-marker.pin .pin-head{
+  position:relative;display:grid;place-items:center;
+  width:20px;height:20px;border:1px solid #10130e;
+  border-radius:50%;background:var(--pin-color);
+  box-shadow:0 0 0 1px var(--pin-color);line-height:1;
+}
+.maplibregl-marker.pin::after{
+  content:"";position:absolute;left:6px;top:19px;width:0;height:0;
+  border-left:6px solid transparent;border-right:6px solid transparent;
+  border-top:12px solid var(--pin-color);filter:none;
+}
