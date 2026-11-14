@@ -65,6 +65,7 @@
   let difficulty = DIFFICULTIES[savedDifficulty] ? savedDifficulty : "normal";
   let game = null, selected = null, map = null, marker = null, overlayMarkers = [], freeIndex = -1;
   let activeLine=false, mapStyleReady=false, lastDragAt=0, pointerDown=null, pointerMoved=false;
+  let fallbackSwitching=false, mapStyleTimeout=null;
   let controller = null, debounce = null, toastTimer = null;
 
   function t(key, variables={}) {
@@ -567,27 +568,72 @@
       const ok=document.execCommand("copy");ta.remove();if(!ok)throw Error("copy failed");toast(t("copied"));
     }catch(e){if(e.name!=="AbortError")toast(t("shareError"))}
   }
+  async function switchToFallback(reason){
+    if(fallbackSwitching || window.maplibregl?.isFallback)return;
+    fallbackSwitching=true;
+    clearTimeout(mapStyleTimeout);
+    console.warn("Switching to Leaflet basemap:",reason);
+    try{
+      const leaf=await window.GeoMapFallback.ensure();
+      if(map){
+        try{map.remove();}catch(error){console.warn(error);}
+      }
+      $("map").replaceChildren();
+      map=null;mapStyleReady=false;overlayMarkers=[];marker=null;activeLine=false;
+      window.maplibregl=leaf;
+      initMap();
+    }catch(error){
+      console.error("Leaflet fallback could not initialize:",error);
+      $("map").textContent=t("noMap");
+    }finally{
+      fallbackSwitching=false;
+    }
+  }
   function initMap(){
     const libre=window.maplibregl;
-    if(!libre||!libre.supported?.()){
-      $("map").textContent=t("noMap");
+    // Some supported MapLibre versions omit supported(); its absence is not a failure.
+    if(!libre||typeof libre.Map!=="function"||
+        (typeof libre.supported==="function"&&!libre.supported())){
+      if(window.GeoMapFallback && !fallbackSwitching){
+        switchToFallback("MapLibre unavailable");
+      }else{
+        $("map").textContent=t("noMap");
+      }
       return;
     }
-    map=new libre.Map({
-      container:"map",
-      style:"https://tiles.openfreemap.org/styles/dark",
-      center:[8,15],
-      zoom:1.7,minZoom:1.2,maxZoom:16,
-      attributionControl:true,
-      dragRotate:false,touchPitch:false,pitchWithRotate:false,
-      doubleClickZoom:false
-    });
+    try {
+      map=new libre.Map({
+        container:"map",
+        style:"https://tiles.openfreemap.org/styles/dark",
+        center:[8,15],
+        zoom:1.7,minZoom:1.2,maxZoom:16,
+        attributionControl:true,
+        dragRotate:false,touchPitch:false,pitchWithRotate:false,
+        doubleClickZoom:false
+      });
+    }catch(error){
+      console.error("Map engine could not initialize:",error);
+      if(!libre.isFallback) switchToFallback(error);
+      else $("map").textContent=t("noMap");
+      return;
+    }
     map.addControl(new libre.NavigationControl({showCompass:false}),"bottom-left");
     map.on("style.load",()=>{
+      clearTimeout(mapStyleTimeout);
       mapStyleReady=true;
       updateMapLanguage();
       if(game)renderMap();
     });
+    if(!libre.isFallback){
+      map.on("error",event=>{
+        // Individual missing vector tiles may be transient; only fail over when
+        // the style itself has not loaded.
+        if(!mapStyleReady)switchToFallback(event.error?.message||"Style failed to load");
+      });
+      mapStyleTimeout=setTimeout(()=>{
+        if(!mapStyleReady)switchToFallback("Map style timeout");
+      },9000);
+    }
     map.on("dragstart",()=>{pointerMoved=true;lastDragAt=Date.now()});
     map.on("dragend",()=>{pointerMoved=true;lastDragAt=Date.now()});
     const canvas=map.getCanvas();
