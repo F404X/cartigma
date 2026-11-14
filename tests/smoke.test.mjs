@@ -49,6 +49,7 @@ function boot({storage=new Map(),map=false}={}){
   const mapInstance={
     on(name,fn){mapState.events[name]=fn;if(name==="style.load")fn();return this},
     getCanvas(){return mapState.canvas},
+    addControl(){return this},
     getStyle(){return {layers:[
       {id:"label_country_1",type:"symbol",layout:{"text-field":["get","name"]}},
       {id:"label_city",type:"symbol",layout:{"text-field":["get","name"]}},
@@ -87,7 +88,7 @@ function boot({storage=new Map(),map=false}={}){
     AbortController,console,setTimeout(){return 0},clearTimeout(){},
     fetch:async()=>({ok:true,json:async()=>({results:[]})})
   };
-  for(const n of names.filter(n=>n.endsWith(".js")))
+  for(const n of names.filter(n=>n.endsWith(".js")&&n!=="map-bootstrap.js"))
     runInNewContext(files[n],context,{filename:n});
   const get=id=>document.getElementById(id);
   function select(name){
