@@ -122,6 +122,10 @@
       {key:"capital",value:tc(CAPITALS.has(p[0])?"yes":"no")},
       {key:"hemisphere",value:tc(lat>=0?"north":"south")}
     ];
+    // Some administrative-capital designations are disputed or in transition.
+    // Do not turn those ambiguities into a misleading yes/no clue.
+    if(["Jerusalém","La Paz","Jacarta"].includes(p[0]))
+      early.splice(early.findIndex(clue=>clue.key==="capital"),1);
     // Rotate selection deterministically to vary the opening clues between cities.
     const seed=hash("facts-v3:"+p[0])%early.length;
     const first=[early[seed],early[(seed+2)%early.length],early[(seed+4)%early.length]];
@@ -235,7 +239,7 @@
     $("dailyBtn").classList.toggle("active",daily);$("freeBtn").classList.toggle("active",!daily);
     $("dailyBtn").setAttribute("aria-pressed",String(daily));$("freeBtn").setAttribute("aria-pressed",String(!daily));
     $("difficultySelect").value=difficulty;
-    const code=daily?"#"+today().replaceAll("-","").slice(2):"#F-"+String(game.index+1).padStart(3,"0");
+    const code=daily?"#"+today().replaceAll("-","").slice(2)+"-"+difficulty[0].toUpperCase():"#F-"+String(game.index+1).padStart(3,"0");
     $("caseCode").textContent=t("caseWord")+" "+code;
     $("caseNumber").textContent=t("caseWord")+" "+code;
     $("modeCaption").textContent=t(daily?"modeDaily":"modeFree");
