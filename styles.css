@@ -445,3 +445,78 @@ dialog.case-report .report-heading h2{font-size:24px}
   left:6px;top:19px;border-left:6px solid transparent;border-right:6px solid transparent;
   border-top:12px solid var(--pin-color);
 }
+
+
+/* Language menu v2 — native dropdown replaced by searchable, flag-labelled options. */
+.site-header{position:relative;z-index:1100}
+.header-end{position:relative}
+.language-picker.locale-control{position:relative;display:block;height:auto;padding:0;border:0;border-radius:4px;background:none;direction:ltr}
+.language-picker #langSelect{display:none!important}
+.language-trigger{
+  width:172px;min-height:38px;display:flex;align-items:center;gap:8px;
+  padding:0 11px;border:1px solid #596048;border-radius:4px;
+  background:#252a21;color:var(--text);cursor:pointer;
+  text-align:left;font:600 12px var(--font);transition:background .15s,border-color .15s;
+}
+.language-trigger:hover,.language-trigger[aria-expanded="true"]{background:#30352a;border-color:#e1bc49}
+.language-trigger .language-globe{color:var(--accent);flex-shrink:0}
+.language-trigger .language-flag{display:none}
+.language-trigger .language-flag-image{
+  display:block;width:25px;height:18px;object-fit:cover;flex:0 0 auto;border-radius:2px;border:1px solid #0004
+}
+.language-trigger .language-current{
+  flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:600 12px var(--font)
+}
+.language-trigger .language-caret{position:static;flex-shrink:0;right:auto;color:#c6c9b8;pointer-events:none;transition:transform .15s}
+.language-trigger[aria-expanded="true"] .language-caret{transform:rotate(180deg)}
+.language-menu{
+  position:absolute;top:calc(100% + 7px);right:0;z-index:1250;
+  width:min(302px,calc(100vw - 16px));max-height:min(460px,calc(100dvh - 73px));
+  display:flex;flex-direction:column;overflow:hidden;
+  border:1px solid #62664b;border-radius:5px;
+  background:#1d211b;box-shadow:0 12px 35px #0009
+}
+.language-menu.hidden{display:none!important}
+.language-menu-heading{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:11px 12px 8px;color:#d6bd72;font:600 10px var(--mono);letter-spacing:.65px;
+}
+.language-count{font:600 10px var(--mono);color:#929c83}
+.language-search-wrap{
+  display:flex;align-items:center;gap:8px;margin:0 8px 6px;padding:0 10px;
+  height:36px;flex:0 0 auto;border:1px solid #414936;border-radius:3px;
+  color:var(--accent);background:#131711
+}
+.language-search-wrap:focus-within{border-color:#dbb842}
+.language-search-wrap input{
+  flex:1;min-width:0;width:100%;height:32px;background:none;color:var(--text);
+  border:0;outline:0;font:12px var(--font);direction:ltr
+}
+.language-search-wrap input::placeholder{color:#9b9e8f}
+.language-options{overflow-y:auto;overscroll-behavior:contain;padding:2px 7px 8px;scrollbar-width:thin;scrollbar-color:#5a624d transparent}
+.language-option{
+  display:flex;align-items:center;gap:9px;width:100%;min-height:39px;padding:6px 9px;
+  border:1px solid transparent;border-left:2px solid transparent;border-radius:2px;
+  background:transparent;color:var(--text);cursor:pointer;text-align:left;
+}
+.language-option:hover,.language-option:focus-visible{background:#333b2d;outline:none;border-color:#565c47}
+.language-option.selected{background:#343524;border-left-color:var(--accent);color:#fff4be}
+.language-option-flag{display:block;width:25px;height:18px;object-fit:cover;border-radius:2px;border:1px solid #0006;flex:0 0 auto}
+.language-option-emoji{display:none;min-width:25px;height:18px;align-items:center;font-size:17px;flex:0 0 25px}
+.language-option-name{flex:1;min-width:0;font:500 13px var(--font)}
+.language-option-code{margin-left:auto;color:#9ca38f;font:500 10px var(--mono);letter-spacing:.4px}
+.language-option.selected .language-option-code{color:var(--accent)}
+.language-empty{padding:18px 8px;text-align:center;color:var(--muted);font:12px var(--font)}
+[dir="rtl"] .language-picker,[dir="rtl"] .language-menu,[dir="rtl"] .language-option{direction:ltr}
+@media(max-width:620px){
+  .language-trigger{width:137px;min-height:32px;padding:0 6px;gap:5px}
+  .language-trigger .language-globe{width:15px;height:15px}
+  .language-trigger .language-flag-image{width:22px;height:16px}
+  .language-trigger .language-current{font-size:10px}
+  .language-trigger .language-caret{width:12px;height:12px}
+  .language-menu{top:calc(100% + 5px);max-height:min(400px,calc(100dvh - 57px))}
+}
+@media(max-width:390px){
+  .language-trigger{width:112px;gap:4px}
+  .language-trigger .language-current{font-size:9px}
+}
