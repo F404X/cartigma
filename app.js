@@ -377,9 +377,12 @@
       return;
     }
     map = L.map("map", { center: [12, 8], zoom: 2, minZoom: 2, maxZoom: 16, worldCopyJump: true, zoomControl: false });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>',
-      subdomains: "abcd", maxZoom: 19
+    // Mosaicos padrão OSM não requerem API key. O tema escuro é aplicado via CSS.
+    // Não fazemos pré-carregamento de tiles: o Leaflet só solicita o que está visível.
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',
+      maxNativeZoom: 19,
+      maxZoom: 19
     }).addTo(map);
     L.control.zoom({ position: "bottomleft" }).addTo(map);
     overlay = L.layerGroup().addTo(map);
