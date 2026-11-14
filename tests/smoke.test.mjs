@@ -62,7 +62,7 @@ function boot({storage=new Map(),map=false}={}){
   if(map)window.L=L;
   const math=Object.create(Math);math.random=()=>0;
   const context={
-    window,document,localStorage,navigator:{},Math:math,Number,String,Array,Set,Map,JSON,Date,Intl,
+    window,document,localStorage,navigator:{},L:map?L:undefined,Math:math,Number,String,Array,Set,Map,JSON,Date,Intl,
     AbortController,console,setTimeout(){return 0},clearTimeout(){},
     fetch:async()=>({ok:true,json:async()=>({results:[]})})
   };
@@ -119,7 +119,7 @@ test("Normal and Hard are the only modes and both have six translated clues",()=
   for(let i=0;i<5;i++)$("revealBtn").handlers.click();
   assert.equal($("hintCount").textContent,"6 / 6");
   assert.ok(clueTexts(g).every(x=>x.length));
-  assert.doesNotMatch(clueTexts(g).join(" "),"Country / territory:");
+  assert.doesNotMatch(clueTexts(g).join(" "),/Country \/ territory:/);
   g.difficulty("normal");
   assert.equal($("attemptCount").textContent,"6 / 6");
 });
@@ -175,7 +175,7 @@ test("Normal mode shows direction and switches language without losing the dossi
   }
   g.language("pt");
   assert.equal($("citySearch").placeholder,"Cidade ou região...");
-  assert.match(clueTexts(g).join(" "),"");
+  assert.ok(clueTexts(g).some(text=>text.length>3));
 });
 
 test("final dossier records all guesses, fact, continent, score and coordinate",()=>{
