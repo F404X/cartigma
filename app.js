@@ -334,7 +334,7 @@
     if(!game?.finished)return;
     renderDossier();
     const dialog=$("reportDialog");
-    if(!dialog.open)dialog.showModal();
+    if(!dialog.open)dialog.show(); // Non-modal right-side dossier: the map stays visible.
   }
   function renderResult(){
     $("resultCard").classList.toggle("hidden",!game.finished);
@@ -385,47 +385,107 @@
     renderMap();
   }
   function makeMarker(text,style){
-    const node=document.createElement("span");node.className="pin "+style;
-    node.textContent=String(text);
-    return L.divIcon({className:"guess-marker",html:node.outerHTML,iconSize:[24,32],iconAnchor:[12,31]});
+    const element=document.createElement("span");
+    element.className="pin "+style;
+    element.textContent=String(text);
+    // Never place a new guess when clicking one of the existing map markers.
+    element.addEventListener("click",event=>event.stopPropagation());
+    return new window.maplibregl.Marker({element,anchor:"bottom"});
+  }
+  function clearMapOverlays(){
+    overlayMarkers.forEach(pin=>pin.remove());
+    overlayMarkers=[];
+    if(!map||!mapStyleReady)return;
+    if(map.getLayer("case-distance-line"))map.removeLayer("case-distance-line");
+    if(map.getSource("case-distance-line"))map.removeSource("case-distance-line");
+    activeLine=false;
+  }
+  function addMarker(lat,lng,label,style,popupText=""){
+    const pin=makeMarker(label,style).setLngLat([lng,lat]).addTo(map);
+    if(popupText){
+      const text=document.createElement("div");text.textContent=popupText;
+      pin.setPopup(new window.maplibregl.Popup({offset:22}).setDOMContent(text));
+    }
+    overlayMarkers.push(pin);
+    return pin;
+  }
+  function addResultLine(from,to){
+    if(!mapStyleReady)return;
+    map.addSource("case-distance-line",{type:"geojson",data:{
+      type:"Feature",properties:{},geometry:{type:"LineString",coordinates:[from,to]}
+    }});
+    map.addLayer({id:"case-distance-line",type:"line",source:"case-distance-line",layout:{"line-join":"round","line-cap":"round"},
+      paint:{"line-color":"#ffd449","line-width":2,"line-opacity":0.85,"line-dasharray":[2,3]}});
+    activeLine=true;
+  }
+  function frameResult(best,target){
+    if(!map)return;
+    const targetLng=best
+      ?target[1]+360*Math.round((best.lng-target[1])/360)
+      :target[1];
+    if(!best){
+      map.easeTo({center:[targetLng,target[0]],zoom:4,duration:450});
+      return [targetLng,target[0]];
+    }
+    const gap=dist([best.lat,best.lng],target);
+    const maxZoom=gap<50?6.2:gap<200?5.5:gap<750?4.8:gap<2000?4.1:gap<5000?3.2:2.6;
+    const bounds=[
+      [Math.min(best.lng,targetLng),Math.min(best.lat,target[0])],
+      [Math.max(best.lng,targetLng),Math.max(best.lat,target[0])]
+    ];
+    const root=$("map");
+    const xPadding=Math.max(24,Math.min(90,Math.round((root.clientWidth||700)*0.11)));
+    const yPadding=Math.max(26,Math.min(90,Math.round((root.clientHeight||500)*0.14)));
+    // fitBounds centres the camera between the closest attempt and the target,
+    // while dynamic caps and viewport padding prevent extreme zoom jumps.
+    map.fitBounds(bounds,{padding:{top:yPadding,bottom:yPadding,left:xPadding,right:xPadding},
+      maxZoom,duration:450,bearing:0,pitch:0});
+    return [targetLng,target[0]];
+  }
+  function updateMapLanguage(){
+    if(!map||!mapStyleReady||!map.getStyle())return;
+    // OpenFreeMap/OpenMapTiles contain localized place names when available.
+    // Fallback to each place's native name if a requested translation is missing.
+    const translations=lang==="zh"?["zh-Hans","zh"]:lang==="pt"?["pt-BR","pt"]:[lang];
+    const fields=translations.flatMap(code=>[["get","name:"+code],["get","name_"+code]]);
+    const expression=["coalesce",...fields,["get","name"],["get","name_en"],["get","name:en"]];
+    for(const layer of map.getStyle().layers||[]){
+      if(layer.type!=="symbol"||layer.layout?.["text-field"]===undefined)continue;
+      if(!/(label|place|city|town|village|country|state|province|island|water|poi)/i.test(layer.id))continue;
+      if(/(shield|highway|housenumber|house-number|route|ref-label)/i.test(layer.id))continue;
+      try{map.setLayoutProperty(layer.id,"text-field",expression)}catch(error){
+        console.warn("Could not localize map layer",layer.id,error);
+      }
+    }
   }
   function renderMap(){
     if(!map)return;
-    overlays.clearLayers();
-    if(marker){map.removeLayer(marker);marker=null}
+    clearMapOverlays();
     const target=cityCoords(game.index);
     const best=game.finished?bestGuess():null;
-    game.guesses.forEach((g,i)=>{
-      L.marker([g.lat,g.lng],{icon:makeMarker(i+1,g===best?"best":"past")}).addTo(overlays);
-    });
+    game.guesses.forEach((g,i)=>addMarker(g.lat,g.lng,i+1,g===best?"best":"past"));
     if(game.finished){
-      // Draw the target on the same wrapped world copy as the closest guess.
-      const adjustedTarget=best
-        ?[target[0],target[1]+360*Math.round((best.lng-target[1])/360)]
-        :target;
-      L.marker(adjustedTarget,{icon:makeMarker("★","target")}).addTo(overlays)
-        .bindPopup(cityName(cityAt(game.index))+" · "+countryName(game.index));
+      const adjustedLng=best?target[1]+360*Math.round((best.lng-target[1])/360):target[1];
+      addMarker(target[0],adjustedLng,"★","target",cityName(cityAt(game.index))+" · "+countryName(game.index));
       if(best){
-        // Center on the midpoint of the best guess and the target.
-        // Zoom out enough to see both without pushing in too close.
-        L.polyline([[best.lat,best.lng],adjustedTarget],{
-          color:"#ffd449",weight:2,opacity:.8,dashArray:"5 7"
-        }).addTo(overlays);
-        const bounds=L.latLngBounds([[best.lat,best.lng],adjustedTarget]).pad(.65);
-        map.fitBounds(bounds,{maxZoom:5,padding:[32,32],animate:true});
-      }else map.setView(target,4);
+        addResultLine([best.lng,best.lat],[adjustedLng,target[0]]);
+      }
+      frameResult(best,target);
     }else if(selected){
-      marker=L.marker([selected.lat,selected.lng],{icon:makeMarker("+","")}).addTo(map);
+      marker=addMarker(selected.lat,selected.lng,"+","current");
     }
     $("coordinates").textContent=game.finished
       ?target[0].toFixed(3)+"°, "+target[1].toFixed(3)+"°"
       :selected?selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°":t("noSelection");
   }
-  function resetMapView(){if(map&&!game.finished)map.setView([15,8],2,{animate:false})}
+  function resetMapView(){
+    if(map&&!game.finished)map.easeTo({center:[8,15],zoom:1.7,duration:350});
+  }
   function selectPoint(lat,lng,label){
     if(game.finished)return;
     selected={lat:Number(lat),lng:Number(lng),label:label||""};
-    if(map)map.setView([selected.lat,selected.lng],Math.max(map.getZoom(),4),{animate:true});
+    // A map click only places the pin; city search may recenter without forcing zoom during a drag.
+    if(map&&label)map.easeTo({center:[selected.lng,selected.lat],zoom:Math.max(map.getZoom(),4),duration:350});
     $("guessBtn").disabled=false;
     $("selectedText").textContent=selected.label||selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°";
     $("suggestions").classList.add("hidden");
@@ -449,7 +509,7 @@
     }else game.revealed=Math.min(6,Math.max(game.revealed,DIFFICULTIES[difficulty].initial+game.guesses.length));
     save();selected=null;render();
     if(game.finished){showReport();}
-    else if(map){const g=game.guesses.at(-1);map.setView([g.lat,g.lng],Math.max(map.getZoom(),3))}
+    // Keep the investigator’s chosen zoom after a wrong guess.
   }
   function searchLocal(term){
     const q=norm(term);
@@ -503,16 +563,51 @@
     }catch(e){if(e.name!=="AbortError")toast(t("shareError"))}
   }
   function initMap(){
-    if(!window.L){$("map").textContent=t("noMap");return}
-    map=L.map("map",{center:[15,8],zoom:2,minZoom:2,maxZoom:16,worldCopyJump:true,zoomControl:false});
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{
-      attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',
-      maxNativeZoom:19,maxZoom:19
-    }).addTo(map);
-    L.control.zoom({position:"bottomleft"}).addTo(map);
-    overlays=L.layerGroup().addTo(map);
-    map.on("click",e=>selectPoint(e.latlng.lat,e.latlng.lng,""));
-    setTimeout(()=>map.invalidateSize(),100);
+    const libre=window.maplibregl;
+    if(!libre||!libre.supported?.()){
+      $("map").textContent=t("noMap");
+      return;
+    }
+    map=new libre.Map({
+      container:"map",
+      style:"https://tiles.openfreemap.org/styles/dark",
+      center:[8,15],
+      zoom:1.7,minZoom:1.2,maxZoom:16,
+      attributionControl:true,
+      dragRotate:false,touchPitch:false,pitchWithRotate:false,
+      doubleClickZoom:false
+    });
+    map.addControl(new libre.NavigationControl({showCompass:false}),"bottom-left");
+    map.on("style.load",()=>{
+      mapStyleReady=true;
+      updateMapLanguage();
+      if(game)renderMap();
+    });
+    map.on("dragstart",()=>{pointerMoved=true;lastDragAt=Date.now()});
+    map.on("dragend",()=>{pointerMoved=true;lastDragAt=Date.now()});
+    const canvas=map.getCanvas();
+    canvas.addEventListener("pointerdown",event=>{
+      if(event.button!==0&&event.pointerType==="mouse")return;
+      pointerDown={x:event.clientX,y:event.clientY};
+      pointerMoved=false;
+    });
+    canvas.addEventListener("pointermove",event=>{
+      if(pointerDown&&Math.hypot(event.clientX-pointerDown.x,event.clientY-pointerDown.y)>8)
+        pointerMoved=true;
+    });
+    canvas.addEventListener("pointerup",event=>{
+      if(pointerDown&&Math.hypot(event.clientX-pointerDown.x,event.clientY-pointerDown.y)>8)
+        pointerMoved=true;
+      pointerDown=null;
+    });
+    canvas.addEventListener("pointercancel",()=>{
+      pointerMoved=true;pointerDown=null;lastDragAt=Date.now();
+    });
+    map.on("click",event=>{
+      // A drag release must never be interpreted as a fresh pin.
+      if(game.finished||pointerMoved||Date.now()-lastDragAt<220)return;
+      selectPoint(event.lngLat.lat,event.lngLat.lng,"");
+    });
   }
   function init(){
     if(!PLACES.length||PLACES.length!==FEATURES.length||PLACES.length!==COUNTRY_CODES.length||PLACES.length!==LANDMARKS.length||PLACES.length!==FACTS.length||Object.keys(NEARBY_REFERENCES).length<45)
@@ -527,7 +622,7 @@
     $("langSelect").addEventListener("change",e=>setLanguage(e.target.value));
     $("revealBtn").addEventListener("click",reveal);
     $("guessBtn").addEventListener("click",guess);
-    $("resetViewBtn").addEventListener("click",()=>{if(map)map.setView([15,8],2)});
+    $("resetViewBtn").addEventListener("click",resetMapView);
     $("reportOpenBtn").addEventListener("click",showReport);
     $("shareBtn").addEventListener("click",share);
     $("reportCloseBtn").addEventListener("click",closeReport);
