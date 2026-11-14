@@ -297,3 +297,78 @@ dialog.case-report::backdrop{background:#060807c9;backdrop-filter:blur(2px)}
   .clue-text{font-size:12px;-webkit-line-clamp:unset}
   .clue-body{gap:2px}
 }
+
+
+
+/* GeoDetective map v4 — real multilingual vector labels, no raster inversion. */
+#map{background:#111915;min-height:0}
+.maplibregl-map{font-family:var(--font);background:#111915}
+.maplibregl-canvas{outline:none}
+.maplibregl-ctrl-group{border:1px solid #3d4838!important;border-radius:3px!important;box-shadow:none!important;overflow:hidden}
+.maplibregl-ctrl-group button{background:#232a22!important;width:32px!important;height:32px!important;border-color:#3d4838!important}
+.maplibregl-ctrl-group button:hover{background:#354031!important}
+.maplibregl-ctrl button .maplibregl-ctrl-icon{filter:invert(.85) sepia(.2) saturate(1.4)}
+.maplibregl-ctrl-attrib{font-size:10px!important;background:#172016df!important;color:#b5bcae!important}
+.maplibregl-ctrl-attrib a{color:#ffd449!important}
+.maplibregl-popup-content-wrapper,.maplibregl-popup-tip{background:#262e24!important;color:#f3f1dc!important;border-radius:3px!important;box-shadow:0 4px 12px #0009!important}
+.maplibregl-popup-content{font:500 12px var(--font)!important}
+.maplibregl-marker.guess-marker{z-index:3;cursor:default}
+.maplibregl-marker .pin{position:relative;left:auto;top:auto;display:flex;width:20px;height:20px}
+.maplibregl-marker .pin::after{top:18px}
+.maplibregl-marker .pin.current{--pin-color:#ffd449;cursor:pointer}
+.maplibregl-marker .pin.best{--pin-color:#f8ac44}
+.maplibregl-marker .pin.target{--pin-color:#f5f5df}
+
+/* The selected flag and globe remain visible even with non-Latin locales. */
+.locale-control{height:37px;gap:7px;display:flex;align-items:center;position:relative;
+  background:#22271e;border:1px solid #475139;border-radius:4px;padding:0 10px;
+  transition:border-color .15s ease;direction:ltr;cursor:pointer}
+.locale-control:hover,.locale-control:focus-within{border-color:#d7af39}
+.language-globe{color:var(--accent);flex-shrink:0}
+.language-flag{flex-shrink:0;font:19px/1.1 var(--font);filter:saturate(.98)}
+.locale-control select{appearance:none;-webkit-appearance:none;cursor:pointer;color:var(--text);background:transparent;
+  border:0;outline:0;min-width:82px;max-width:143px;white-space:nowrap;
+  padding:0 17px 0 0;font:600 12px var(--font)}
+.locale-control select option{background:#262b23;color:#f3f0e4;font-size:13px}
+.language-caret{color:#c7cba8;position:absolute;right:9px;pointer-events:none}
+.locale-control select:focus-visible{outline:0}
+[dir="rtl"] .locale-control{direction:ltr}
+
+/* Non-modal, anchored on the right: the investigation map stays visible and interactive. */
+dialog.case-report,dialog.case-report[open]{
+  position:fixed;inset:108px max(0px,calc((100vw - 2100px)/2)) 25px auto;
+  margin:0;width:min(700px,47vw);height:calc(100dvh - 133px);max-height:none;max-width:none;
+  border:1px solid #75642e;border-right:0;box-shadow:-8px 0 28px #030604b5;
+  border-radius:0;z-index:50;
+}
+dialog.case-report[open]{display:flex}
+dialog.case-report .report-body{scrollbar-width:thin;scrollbar-color:#4e563d transparent}
+dialog.case-report .report-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+dialog.case-report .report-heading{padding:14px 18px}
+dialog.case-report .report-body{padding:12px 18px}
+dialog.case-report .report-section{margin-bottom:14px}
+dialog.case-report .report-footer{padding:11px 18px}
+dialog.case-report .report-stamp{font-size:11px;padding:8px}
+dialog.case-report .report-grid>div{padding:7px 9px}
+dialog.case-report .report-heading h2{font-size:24px}
+@media(max-width:960px){
+  dialog.case-report,dialog.case-report[open]{
+    inset:90px 0 25px auto;width:min(560px,58vw);height:calc(100dvh - 115px);
+  }
+}
+@media(max-width:620px){
+  .locale-control{height:31px;padding:0 7px;gap:5px}
+  .language-globe{width:15px;height:15px}
+  .language-flag{font-size:17px}
+  .locale-control select{min-width:60px;max-width:82px;font-size:10px;padding-right:11px}
+  .language-caret{right:5px;width:11px;height:11px}
+  dialog.case-report,dialog.case-report[open]{
+    inset:36dvh 0 0 0;width:100%;height:64dvh;max-height:64dvh;border-right:1px solid #75642e;
+    border-top:2px solid var(--accent);box-shadow:0 -10px 30px #030604af;
+  }
+  dialog.case-report .report-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  dialog.case-report .report-heading{padding:10px 12px}
+  dialog.case-report .report-heading h2{font-size:19px}
+  dialog.case-report .report-body{padding:10px 12px}
+  dialog.case-report .report-footer{padding:8px 11px}
+}
