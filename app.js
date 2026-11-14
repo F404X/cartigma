@@ -181,6 +181,7 @@
       game.serial=nextCaseNumber(game.date);
       save();
     }
+    save();
     selected=null;closeReport();render();resetMapView();
   }
   function startFree(){game=newGame("free",chooseFree());selected=null;closeReport();render();resetMapView()}
