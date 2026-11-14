@@ -103,5 +103,35 @@
     if(!landmark[language]) throw Error("Missing landmark translation for "+language);
     localeData[language].templates.landmark=landmark[language];
   }
+  // Explicit continent labels: Intl.DisplayNames may return raw UN M49 numbers
+  // (e.g. 009) rather than names on some browsers.
+  const continentKeys = ["europe","africa","asia","oceania","northAmerica","southAmerica"];
+  const continentNames = {
+    en:"Europe|Africa|Asia|Oceania|North America|South America",
+    pt:"Europa|África|Ásia|Oceania|América do Norte|América do Sul",
+    es:"Europa|África|Asia|Oceanía|América del Norte|América del Sur",
+    zh:"欧洲|非洲|亚洲|大洋洲|北美洲|南美洲",
+    ja:"ヨーロッパ|アフリカ|アジア|オセアニア|北アメリカ|南アメリカ",
+    ru:"Европа|Африка|Азия|Океания|Северная Америка|Южная Америка",
+    fr:"Europe|Afrique|Asie|Océanie|Amérique du Nord|Amérique du Sud",
+    de:"Europa|Afrika|Asien|Ozeanien|Nordamerika|Südamerika",
+    it:"Europa|Africa|Asia|Oceania|America settentrionale|America meridionale",
+    nl:"Europa|Afrika|Azië|Oceanië|Noord-Amerika|Zuid-Amerika",
+    pl:"Europa|Afryka|Azja|Oceania|Ameryka Północna|Ameryka Południowa",
+    sv:"Europa|Afrika|Asien|Oceanien|Nordamerika|Sydamerika",
+    tr:"Avrupa|Afrika|Asya|Okyanusya|Kuzey Amerika|Güney Amerika",
+    ar:"أوروبا|إفريقيا|آسيا|أوقيانوسيا|أمريكا الشمالية|أمريكا الجنوبية",
+    he:"אירופה|אפריקה|אסיה|אוקיאניה|צפון אמריקה|דרום אמריקה",
+    ko:"유럽|아프리카|아시아|오세아니아|북아메리카|남아메리카",
+    th:"ยุโรป|แอฟริกา|เอเชีย|โอเชียเนีย|อเมริกาเหนือ|อเมริกาใต้",
+    vi:"Châu Âu|Châu Phi|Châu Á|Châu Đại Dương|Bắc Mỹ|Nam Mỹ",
+    id:"Eropa|Afrika|Asia|Oseania|Amerika Utara|Amerika Selatan"
+  };
+  for (const language of Object.keys(localeData)) {
+    const labels = continentNames[language]?.split("|");
+    if (!labels || labels.length !== continentKeys.length)
+      throw new Error("Incomplete continent translation for " + language);
+    localeData[language].continents = Object.fromEntries(continentKeys.map((key,i) => [key,labels[i]]));
+  }
   window.GeoCluesI18n = localeData;
 })();
