@@ -9,6 +9,20 @@
   const WIN_RADIUS = 100, HINT_COST = 300, DAILY_KEY = "geodetective-daily-v3-";
   const COUNTRY_CODES = "IS NO NO NO FI SE DK GB FR PT IT GR TR MA EG SN NG KE ET ZA MG AE JO IL IN IN IN NP BD TH SG ID ID JP JP KR CN CN CN TW MN KZ AU AU AU AU NZ NZ FJ PF CA US US US US MX MX CU GT CO EC PE PE BO BR BR BR BR BR BR AR CL AR CL".split(" ");
   const FEATURES = "volcanic fjord polar fjord coast islands coast river river estuary river valley strait desert desert peninsula delta plateau plateau peninsula plateau desert plateau mountains coast plain delta valley delta delta islands delta islands coast valley river plain delta bay valley plateau mountains harbor coast coast islands volcanic harbor islands volcanic coast estuary bay mountains islands plateau valley coast volcanic plateau mountains desert mountains valley plateau plateau forest bay plateau bay estuary valley islands strait".split(" ");
+  const LANDMARKS = [
+    "Hallgrímskirkja","Arctic Cathedral","Svalbard Global Seed Vault","Vigeland Sculpture Park","Suomenlinna","Gamla Stan","Nyhavn","Tower Bridge",
+    "Eiffel Tower","Belém Tower","Colosseum","Acropolis","Hagia Sophia","Jemaa el-Fnaa","Pyramids of Giza","Gorée Island",
+    "Lekki Conservation Centre","Nairobi National Park","African Union headquarters","Table Mountain","Rova of Antananarivo",
+    "Burj Khalifa","Amman Citadel","Old City of Jerusalem","Gateway of India","India Gate","Victoria Memorial","Swayambhunath",
+    "Lalbagh Fort","Grand Palace","Marina Bay Sands","Monas National Monument","Bajra Sandhi Monument","Tokyo Skytree",
+    "Fushimi Inari Shrine","Gyeongbokgung Palace","Forbidden City","The Bund","Victoria Harbour","Taipei 101",
+    "Sükhbaatar Square","Medeu","Sydney Opera House","Federation Square","Kings Park","kunanyi / Mount Wellington",
+    "Sky Tower","The Beehive","Fiji Museum","Papeete Market","Stanley Park","Statue of Liberty","Golden Gate Bridge",
+    "Flattop Mountain","Waikiki Beach","Palacio de Bellas Artes","Teatro Degollado","Malecón","National Palace of Culture",
+    "Monserrate","Mitad del Mundo","Plaza Mayor","Sacsayhuamán","Mi Teleférico","National Congress","Art Deco architecture",
+    "Meeting of the Waters","Sugarloaf Mountain","Paulista Avenue","Pelourinho","Casa Rosada","Cerro San Cristóbal",
+    "Beagle Channel","Strait of Magellan"
+  ];
   const CAPITALS = new Set("Reykjavík|Oslo|Helsinque|Estocolmo|Copenhague|Londres|Paris|Lisboa|Roma|Atenas|Cairo|Dacar|Nairóbi|Adis Abeba|Antananarivo|Amã|Nova Délhi|Catmandu|Daca|Bangcoc|Singapura|Tóquio|Seul|Pequim|Ulan Bator|Wellington|Suva|Cidade do México|Havana|Cidade da Guatemala|Bogotá|Quito|Lima|Brasília|Buenos Aires|Santiago".split("|"));
   const EN_CITY = {
     "Estocolmo":"Stockholm","Copenhague":"Copenhagen","Londres":"London","Lisboa":"Lisbon",
@@ -116,7 +130,8 @@
     const comparison={key:"closer",a:cityName(cityAt(anchors[0].index)),b:cityName(cityAt(far.index))};
     const nearest={key:"nearest",city:cityName(cityAt(near.index)),km:number(near.km)};
     const fifth=level==="easy"?{key:"country",value:countryName(index)}:comparison;
-    return [...first,distanceClue,fifth,nearest];
+    const finalClue=hash("landmark:"+p[0])%2===0?{key:"landmark",name:LANDMARKS[index]}:nearest;
+    return [...first,distanceClue,fifth,finalClue];
   }
   function clueText(clue){return tc(clue.key,clue)}
   function maximum(){return DIFFICULTIES[difficulty].attempts}
@@ -362,7 +377,7 @@
     setTimeout(()=>map.invalidateSize(),100);
   }
   function init(){
-    if(!PLACES.length||PLACES.length!==FEATURES.length||PLACES.length!==COUNTRY_CODES.length)
+    if(!PLACES.length||PLACES.length!==FEATURES.length||PLACES.length!==COUNTRY_CODES.length||PLACES.length!==LANDMARKS.length)
       throw new Error("Location catalogue and metadata are out of sync");
     document.documentElement.lang="en";
     $("difficultySelect").value=difficulty;
