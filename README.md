@@ -10,7 +10,7 @@ GeoDetective é um jogo de dedução geográfica feito em HTML, CSS e JavaScript
 - **Modo livre:** novos casos ilimitados, sem necessidade de criar conta.
 - **74 localidades** distribuídas por vários continentes e biomas, com pistas geográficas editáveis em [places.js](places.js).
 - **Seis tentativas:** feedback após cada palpite com distância em linha reta e direção cardinal.
-- **Pistas graduais:** relevo/paisagem, faixa de latitude, região, longitude e duração aproximada do dia no solstício de junho, país e referência local.
+- **Pistas graduais:** relevo/paisagem, faixa de latitude, região, longitude, altitude do terreno (quando disponível), duração aproximada do dia no solstício de junho, país e referência local.
 - **Pontuação:** até 5.000 pontos, com penalidade por palpites adicionais e por pistas antecipadas.
 - **Busca de cidades:** sugestões locais e busca opcional pela API de geocodificação da Open-Meteo.
 - **Mapa mundial:** Leaflet com mosaicos CARTO e atribuição OpenStreetMap.
@@ -35,8 +35,8 @@ Também é possível usar uma extensão de servidor local no VS Code.
 1. Conecte o repositório **F404X/geodetective** ao Cloudflare Pages.
 2. Selecione a implantação via Git.
 3. Framework preset: **None**.
-4. Build command: **deixar vazio**.
-5. Build output directory: **/** (raiz do repositório, conforme a interface da Cloudflare).
+4. Build command: **deixar vazio** (ou `exit 0`).
+5. Build output directory: **`.`** (raiz do repositório).
 6. Faça o deploy.
 
 Os arquivos de entrada são [index.html](index.html), [styles.css](styles.css), [places.js](places.js) e [app.js](app.js).
@@ -56,7 +56,7 @@ Os arquivos de entrada são [index.html](index.html), [styles.css](styles.css), 
 - A distância é calculada pelo método **haversine** (menor caminho sobre uma esfera), e não representa distância rodoviária.
 - A duração do dia é **astronômica e aproximada** (solstício de junho, sem refração atmosférica nem horizonte local).
 - As pistas de paisagem e de referências foram redigidas manualmente; podem ser ampliadas e revisadas.
-- As pesquisas de localização usam [Open-Meteo Geocoding API](https://open-meteo.com/en/docs/geocoding-api). A API requer internet e está sujeita a limites e condições de uso.
+- As pesquisas de localização usam [Open-Meteo Geocoding API](https://open-meteo.com/en/docs/geocoding-api). A altitude, quando disponível, é aproximada a partir da [Open-Meteo Elevation API](https://open-meteo.com/en/docs/elevation-api). Essas APIs requerem internet e estão sujeitas a limites e condições de uso.
 - [Leaflet](https://leafletjs.com/), [OpenStreetMap](https://www.openstreetmap.org/copyright) e [CARTO basemaps](https://carto.com/attributions) são serviços/recursos externos. Os mosaicos dependem de rede e das respectivas políticas de uso.
 
 ## Organização
@@ -68,6 +68,8 @@ Os arquivos de entrada são [index.html](index.html), [styles.css](styles.css), 
 ├── places.js       # Base de localidades, pistas culturais e paisagens
 ├── app.js          # Estado, regras, pistas, busca, mapa e resultados
 ├── favicon.svg     # Ícone do projeto
+├── tests/           # Testes automatizados sem dependências
+├── .github/workflows/ci.yml # CI em GitHub Actions
 └── README.md       # Documentação
 ~~~
 
@@ -75,7 +77,7 @@ Os arquivos de entrada são [index.html](index.html), [styles.css](styles.css), 
 
 - Perfis de dificuldade e categorias (capitais, cidades pequenas, ilhas, montanhas).
 - Estatísticas locais de histórico e sequências de vitórias.
-- Altitude estimada de terreno e proximidade do litoral como pistas adicionais.
+- Proximidade do litoral e séries climáticas como pistas adicionais.
 - Suporte para múltiplos idiomas.
 - Testes automatizados e fontes geográficas auditáveis para todo o catálogo.
 
