@@ -7,6 +7,7 @@
   const LANGS = window.GeoI18n?.langNames || {};
   const REPORT_I18N = window.GeoReportI18n || {};
   const FACTS = window.GEODETECTIVE_FACTS || [];
+  const NEARBY_REFERENCES = window.GEODETECTIVE_NEARBY_REFERENCES || {};
   const DIFFICULTIES = {normal:{attempts:6,initial:2},hard:{attempts:4,initial:1}};
   const SERIAL_PREFIX = "geodetective-case-counter-";
   const WIN_RADIUS = 100, HINT_COST = 300, DAILY_KEY = "geodetective-daily-v3-";
@@ -62,7 +63,8 @@
   let lang = typeof savedLang === "string" && TRANSLATIONS[savedLang] ? savedLang : "en";
   const savedDifficulty = store.get("geodetective-difficulty");
   let difficulty = DIFFICULTIES[savedDifficulty] ? savedDifficulty : "normal";
-  let game = null, selected = null, map = null, marker = null, overlays = null, freeIndex = -1;
+  let game = null, selected = null, map = null, marker = null, overlayMarkers = [], freeIndex = -1;
+  let activeLine=false, mapStyleReady=false, lastDragAt=0, pointerDown=null, pointerMoved=false;
   let controller = null, debounce = null, toastTimer = null;
 
   function t(key, variables={}) {
@@ -113,14 +115,40 @@
     return {index:best,km:minimum};
   }
   function anchorDistances(index) {
-    const indexes=[7,14,33,42,51,55,64,70].filter(i=>i!==index);
-    return indexes.map(i=>({index:i,km:dist(cityCoords(index),cityCoords(i))})).sort((a,b)=>a.km-b.km);
+    // Never produce an evidence distance to a place over 1,000 km away.
+    // Combine nearby catalogue cities with curated local references for isolated cases.
+    const origin=cityCoords(index);
+    const items=[];
+    for(let i=0;i<PLACES.length;i++){
+      if(i===index)continue;
+      const km=dist(origin,cityCoords(i));
+      if(km<=1000&&km>=10)
+        items.push({name:cityName(cityAt(i)),country:COUNTRY_CODES[i],km});
+    }
+    for(const [name,country,lat,lng] of NEARBY_REFERENCES[index]||[]){
+      const km=dist(origin,[lat,lng]);
+      if(km<=1000&&km>=10)
+        items.push({name,country,km});
+    }
+    // Avoid duplicating a nearby place with different spellings.
+    const unique=new Map();
+    for(const item of items) {
+      const key=norm(item.name);
+      if(!unique.has(key)||unique.get(key).km>item.km)unique.set(key,item);
+    }
+    return [...unique.values()].sort((a,b)=>a.km-b.km);
+  }
+  function referenceName(item){
+    return item.name+", "+displayRegion(item.country);
   }
   function cluesFor(index,level){
     const p=cityAt(index);
     const anchors=anchorDistances(index);
-    const closest=nearestOther(index);
-    const chosen=anchors[hash("reference:"+p[0])%Math.min(3,anchors.length)];
+    if(anchors.length<2)throw Error("Not enough local references for "+p[0]);
+    // Prefer informative references between 120 and 1,000 km when available.
+    const useful=anchors.filter(a=>a.km>=120);
+    const options=useful.length?useful:anchors;
+    const chosen=options[hash("reference-v2:"+p[0])%options.length];
     const furthest=anchors[anchors.length-1];
     const terrain={key:"terrain",value:locationFeature(index)};
     const zone={key:"zone",value:latitudeZone(p[3])};
@@ -130,14 +158,14 @@
     const opening=hash("opening:"+p[0])%2===0?terrain:zone;
     const third=hash("profile:"+p[0])%3===0&&reliableCapital?capital
       :hash("profile:"+p[0])%3===1?hemisphere:(opening===terrain?zone:terrain);
-    const relationship=hash("relationship:"+p[0])%2===0
-      ?{key:"closer",a:cityName(cityAt(anchors[0].index)),b:cityName(cityAt(furthest.index))}
-      :{key:"nearest",city:cityName(cityAt(closest.index)),km:number(closest.km)};
+    const relationship=hash("relationship-v2:"+p[0])%2===0
+      ?{key:"closer",a:referenceName(anchors[0]),b:referenceName(furthest)}
+      :{key:"nearest",city:referenceName(anchors[0]),km:number(anchors[0].km)};
     return [
       opening,
       {key:"continent",value:continentName(index)},
       third,
-      {key:"distance",km:number(chosen.km),city:cityName(cityAt(chosen.index))},
+      {key:"distance",km:number(chosen.km),city:referenceName(chosen)},
       relationship,
       {key:"landmark",name:LANDMARKS[index]}
     ];
@@ -196,6 +224,9 @@
     document.documentElement.lang=locale();
     document.documentElement.dir=["ar","he"].includes(lang)?"rtl":"ltr";
     $("langSelect").value=lang;
+    const FLAGS={en:"🇺🇸",pt:"🇧🇷",es:"🇪🇸",zh:"🇨🇳",ja:"🇯🇵",ru:"🇷🇺",fr:"🇫🇷",de:"🇩🇪",it:"🇮🇹",nl:"🇳🇱",pl:"🇵🇱",sv:"🇸🇪",tr:"🇹🇷",ar:"🇸🇦",he:"🇮🇱",ko:"🇰🇷",th:"🇹🇭",vi:"🇻🇳",id:"🇮🇩"};
+    $("languageFlag").textContent=FLAGS[lang]||"🌐";
+    updateMapLanguage();
     document.querySelectorAll("[data-i18n]").forEach(element=>{element.textContent=t(element.dataset.i18n)});
     $("citySearch").placeholder=t("searchPlaceholder");
     $("helpBtn").setAttribute("aria-label",t("help"));
@@ -484,7 +515,7 @@
     setTimeout(()=>map.invalidateSize(),100);
   }
   function init(){
-    if(!PLACES.length||PLACES.length!==FEATURES.length||PLACES.length!==COUNTRY_CODES.length||PLACES.length!==LANDMARKS.length||PLACES.length!==FACTS.length)
+    if(!PLACES.length||PLACES.length!==FEATURES.length||PLACES.length!==COUNTRY_CODES.length||PLACES.length!==LANDMARKS.length||PLACES.length!==FACTS.length||Object.keys(NEARBY_REFERENCES).length<45)
       throw new Error("Location catalogue and metadata are out of sync");
     document.documentElement.lang="en";
     $("difficultySelect").value=difficulty;
