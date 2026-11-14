@@ -385,9 +385,14 @@
     renderMap();
   }
   function makeMarker(text,style){
+    // The wrapper includes both the circle and the pointed tail. Its bottom edge
+    // is the actual geographic coordinate used by MapLibre's bottom anchor.
     const element=document.createElement("span");
     element.className="pin "+style;
-    element.textContent=String(text);
+    const head=document.createElement("span");
+    head.className="pin-head";
+    head.textContent=String(text);
+    element.append(head);
     // Never place a new guess when clicking one of the existing map markers.
     element.addEventListener("click",event=>event.stopPropagation());
     return new window.maplibregl.Marker({element,anchor:"bottom"});
