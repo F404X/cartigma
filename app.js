@@ -77,13 +77,17 @@
   }
   function cityName(p) {return lang==="pt"?p[0]:(EN_CITY[p[0]]||p[0]);}
   function countryName(index){return displayRegion(COUNTRY_CODES[index])}
-  function continentCode(index){
-    if(index<=12)return "150";
-    if(index<=20)return "002";
-    if(index<=41)return "142";
-    if(index<=49)return "009";
-    if(index<=58)return "021";
-    return "005";
+  function continentKey(index){
+    if(index<=12)return "europe";
+    if(index<=20)return "africa";
+    if(index<=41)return "asia";
+    if(index<=49)return "oceania";
+    if(index<=58)return "northAmerica";
+    return "southAmerica";
+  }
+  function continentName(index){
+    const key=continentKey(index);
+    return CLUE_I18N[lang]?.continents?.[key] || CLUE_I18N.en?.continents?.[key] || key;
   }
   function locationFeature(index) {
     const key = FEATURES[index] || "plain";
@@ -117,7 +121,7 @@
     const far=anchors[anchors.length-1];
     const early=[
       {key:"terrain",value:locationFeature(index)},
-      {key:"continent",value:displayRegion(continentCode(index))},
+      {key:"continent",value:continentName(index)},
       {key:"zone",value:latitudeZone(lat)},
       {key:"capital",value:tc(CAPITALS.has(p[0])?"yes":"no")},
       {key:"hemisphere",value:tc(lat>=0?"north":"south")}
