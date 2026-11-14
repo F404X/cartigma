@@ -31,7 +31,7 @@ jobs:
       - name: Preparar arquivos estáticos
         run: |
           mkdir -p dist
-          cp index.html styles.css app.js places.js i18n.js clues-i18n.js report-i18n.js facts.js favicon.svg dist/
+          cp index.html styles.css app.js map-bootstrap.js places.js references.js i18n.js clues-i18n.js report-i18n.js facts.js favicon.svg dist/
           touch dist/.nojekyll
 
       - name: Configurar GitHub Pages
