@@ -368,13 +368,15 @@
       L.marker([g.lat,g.lng],{icon:makeMarker(i+1,g===best?"best":"past")}).addTo(overlays);
     });
     if(game.finished){
-      L.marker(target,{icon:makeMarker("★","target")}).addTo(overlays)
+      // Draw the target on the same wrapped world copy as the closest guess.
+      const adjustedTarget=best
+        ?[target[0],target[1]+360*Math.round((best.lng-target[1])/360)]
+        :target;
+      L.marker(adjustedTarget,{icon:makeMarker("★","target")}).addTo(overlays)
         .bindPopup(cityName(cityAt(game.index))+" · "+countryName(game.index));
       if(best){
-        // Always frame the closest guess and the target, not the most recent guess.
-        // Wrap longitude so nearby points across the date line fit correctly.
-        const longitude=target[1]+360*Math.round((best.lng-target[1])/360);
-        const adjustedTarget=[target[0],longitude];
+        // Center on the midpoint of the best guess and the target.
+        // Zoom out enough to see both without pushing in too close.
         L.polyline([[best.lat,best.lng],adjustedTarget],{
           color:"#ffd449",weight:2,opacity:.8,dashArray:"5 7"
         }).addTo(overlays);
