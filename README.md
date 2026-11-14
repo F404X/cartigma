@@ -1,71 +1,77 @@
 # GeoDetective
 
-A daily geography deduction game. Find a hidden city using geographic clues, a world map and distance feedback.
+A browser-based geographic detective game. Read the evidence, place pins on a world map, and identify a hidden city in a limited number of attempts.
 
 **Play:** https://f404x.github.io/geodetective/
 
-## Gameplay
+## Game rules
 
-- **Daily case:** one shared location per date (UTC) and difficulty. Progress is stored in the browser independently for each difficulty.
-- **Free play:** unlimited random cases.
-- **Easy:** 8 guesses, 3 clues at the start, country/territory as the fifth clue.
-- **Normal:** 6 guesses, 2 clues at the start, no country reveal.
-- **Hard:** 4 guesses, 1 clue at the start, no country reveal.
-- **Win condition:** guess within 100 km (great-circle distance) of the target city center.
-- **Scoring:** up to 5,000 points, adjusted for guesses and accuracy. You can reveal hints early for a 300-point penalty each.
+- **Daily case:** one shared location for each difficulty on each UTC date. The daily progress and case ID are saved locally.
+- **Free play:** new random investigations without an account.
+- **Normal:** 6 guesses, 2 starting clues, distance **and cardinal direction** after an incorrect guess.
+- **Hard:** 4 guesses, 1 starting clue, **only the distance** after an incorrect guess. Direction remains hidden even in the final case report.
+- Win when a guess falls within **100 km straight-line distance** of the city's approximate coordinates.
+- Six evidence cards: physical landscape or latitude zone, continent, regional profile, distance from a known reference city, geographic proximity comparison, and a distinctive local landmark. The initial and comparative facts vary per city; the country name is not a clue.
+- Extra hints cost **300 points** each. A successful investigation earns up to **5,000 points**, depending on guess count, accuracy and penalties.
 
-Evidence is assembled for each city from a variety of geographical facts: landscape, continent, latitude belt, national-capital status, hemisphere, distance to reference cities, comparative proximity, nearest other city in the catalogue and curated landmarks associated with each of the 74 locations. Evidence order varies by location. The old broad longitude/daylight clue is removed, and the country clue is restricted to Easy.
+### Case numbering
 
-The catalogue contains 74 cities with approximate coordinates. Geographic and country names are localized when available using browser internationalization features.
+Case identifiers follow **`#N-YYYYMMDD-01`** or **`#H-YYYYMMDD-01`**. The first letter uses the **English** difficulty name (Normal or Hard). The date is UTC and the final segment is the ordinal number of the case **opened in that browser on that UTC date**, starting at 01. Switching difficulty and starting free-play cases count as new investigations; revisiting an existing daily case preserves its original ID. The hidden daily location, however, is the same for every player of a given difficulty.
 
-## Interface
+## Completed case file
 
-The responsive game fills the available viewport with no page scrollbar: map on the left and evidence/guess columns alongside each other on desktop. On narrower screens the map moves above the two columns; the guess history can scroll internally when necessary. Yellow is the primary accent; borders are squared and background glows and the introductory landing section have been removed.
+When an investigation ends, an interactive detective dossier is displayed with:
 
-**Languages:** English (default), Portuguese, Spanish, Simplified Chinese, Japanese, Russian, French, German, Italian, Dutch, Polish, Swedish, Turkish, Arabic, Hebrew, Korean, Thai, Vietnamese and Indonesian. Arabic and Hebrew use right-to-left text direction. Language and difficulty preferences are saved locally. Geographic clue templates and terrain categories are translated; proper city names use a readable localized or international form.
+- Case ID, outcome, city, country or territory, and continent.
+- Approximate target coordinates, mode, difficulty, guesses used, extra hints and score.
+- The **closest** attempt, all guess distances, and the final evidence list.
+- A location-specific **did-you-know** fact for every city, curated in English and Portuguese; in other languages, a localized note identifying an important landmark is used.
+- Buttons to share the result, examine the final map and begin a new case.
+
+The map automatically frames the **closest guess and the actual city**, with restrained zoom and a line connecting both. Click markers are small pointed pins anchored at the exact selected coordinate. The map also handles points that straddle the international date line.
+
+## Design and languages
+
+The game uses a flat, yellow-and-charcoal detective interface. Evidence cards have larger typography, ruled separators, numbered sections and evidence classifications. The whole application fits in the viewport without a browser-page scrollbar; longer clue, log and report sections can scroll **internally** when needed, particularly on small screens.
+
+The UI supports **19 languages**: English (default), Portuguese, Spanish, Simplified Chinese, Japanese, Russian, French, German, Italian, Dutch, Polish, Swedish, Turkish, Arabic, Hebrew, Korean, Thai, Vietnamese and Indonesian. Arabic and Hebrew use RTL layout. Preferences are stored locally. Interface strings, clue templates, geographic terminology, and report controls are translated; geographical proper names may use internationally recognized spellings.
 
 ## Technology
 
-No build tools, account or API keys are required:
+- Plain HTML, CSS, JavaScript, no build step or account.
+- Leaflet + OpenStreetMap public tiles (keyless; comply with the [tile usage policy](https://operations.osmfoundation.org/policies/tiles/)).
+- Open-Meteo Geocoding API for optional search suggestions.
+- Browser `Intl.DisplayNames` for country names; six continents have explicit localized names.
+- `localStorage` for daily results, sequence numbers and preferences.
 
-- HTML, CSS, and JavaScript
-- Leaflet with OpenStreetMap tiles (keyless, [public tile usage policy](https://operations.osmfoundation.org/policies/tiles/))
-- Open-Meteo Geocoding API for optional city search
-- Browser `Intl.DisplayNames` for localized countries/continents
-- `localStorage` for daily game progress and preferences
+Because this is entirely static, the answers and clues exist on the client; it is a casual game rather than a secure competition. No proprietary API secrets are required.
 
-Because this is a static site, the hidden city and game data are present in the browser; the game is intended as a casual knowledge challenge, not a tamper-proof competition.
-
-## Running locally
-
-Serve the repository root over HTTP, for example:
+## Run and test
 
 ```bash
 python -m http.server 8000
-```
-
-Then open http://localhost:8000.
-
-## Tests
-
-```bash
+# In another terminal:
 node --test tests/*.test.mjs
 ```
 
-GitHub Actions runs the tests on every push and pull request. The [Pages deployment workflow](.github/workflows/pages.yml) also executes the tests and publishes the static files on every commit to `main`.
+Open http://localhost:8000. The tests also run automatically on pushes and pull requests via GitHub Actions.
 
-## Source layout
+## Files
 
-| File | Purpose |
+| File | Content |
 | --- | --- |
-| `index.html` | Compact interface and accessible controls |
-| `styles.css` | Yellow/dark theme and responsive viewport layout |
-| `places.js` | Coordinates and original city catalogue |
-| `i18n.js` | 19-language UI messages |
-| `clues-i18n.js` | 19-language clue text and geography vocabulary |
-| `app.js` | Game engine, map, difficulty rules, persistence and geocoding |
-| `tests/smoke.test.mjs` | Automated gameplay and translation checks |
+| `index.html` | Single-screen UI and case report |
+| `styles.css` | Flat dark/yellow layout, lined evidence, map pins and report |
+| `places.js` | 74 cities with approximate locations |
+| `facts.js` | 74 English and Portuguese location facts |
+| `i18n.js` | Main user interface translations |
+| `clues-i18n.js` | Geographic clue vocabulary and continent translations |
+| `report-i18n.js` | Case report and updated game-rule translations |
+| `app.js` | State, date-specific case IDs, clues, map, gameplay, reports |
+| `tests/smoke.test.mjs` | Automated gameplay and data integrity checks |
 
-## Accuracy notes
+The [GitHub Pages deployment workflow](.github/workflows/pages.yml) publishes the files to `https://f404x.github.io/geodetective/` after passing the automated tests.
 
-Distances use the haversine formula; the 100 km win radius is not a driving distance. Landscape categories are simplified and are not a replacement for a detailed physical geography source. The extra comparisons are computed from catalogue coordinates, not live GPS data. External map tiles and geocoding require internet and are governed by their providers' usage policies.
+## Data accuracy
+
+The city center coordinates are approximate. Distances use the haversine formula, which describes straight-line distance on a sphere, **not** road distance. Physical landscape labels are simplified. Reference-city and nearest-city comparisons use the project's own catalogue. Location facts are educational descriptions, not live measurements.
