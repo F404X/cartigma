@@ -155,3 +155,20 @@ test("map uses keyless OpenStreetMap raster tiles",()=>{
   assert.match(files["app.js"],/tile\.openstreetmap\.org/);
   assert.doesNotMatch(files["app.js"],/basemaps\.cartocdn\.com/);
 });
+
+
+test("all six continents are readable in every language, never UN M49 numeric codes",()=>{
+  const g=boot();
+  const keys=["europe","africa","asia","oceania","northAmerica","southAmerica"];
+  for(const [lang,pack] of Object.entries(g.window.GeoCluesI18n)){
+    assert.deepEqual(Object.keys(pack.continents).sort(),[...keys].sort(),lang);
+    for(const key of keys){
+      assert.ok(pack.continents[key].length>=2,lang+" / "+key);
+      assert.doesNotMatch(pack.continents[key],/^\d+$/,lang+" / "+key);
+    }
+  }
+  assert.equal(g.window.GeoCluesI18n.en.continents.oceania,"Oceania");
+  assert.equal(g.window.GeoCluesI18n.pt.continents.oceania,"Oceania");
+  assert.match(files["app.js"],/value:continentName\(index\)/);
+  assert.doesNotMatch(files["app.js"],/continentCode\(index\)/);
+});
