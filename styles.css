@@ -392,3 +392,56 @@ dialog.case-report .report-heading h2{font-size:24px}
   border-left:6px solid transparent;border-right:6px solid transparent;
   border-top:12px solid var(--pin-color);filter:none;
 }
+
+
+/* Investigation reading order: evidence immediately above the hypothesis. */
+.case-columns{
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  grid-template-rows:minmax(0,51%) minmax(0,49%);
+  min-height:0;
+}
+.case-columns>.clue-panel{
+  border-right:0;
+  border-bottom:1px solid var(--border-strong);
+  min-height:0;
+}
+.case-columns>.guess-panel{
+  min-height:0;
+}
+.case-columns .clue-list{overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#51523b transparent}
+.case-columns .clue-list::-webkit-scrollbar{width:5px;display:block}
+.case-columns .clue-list::-webkit-scrollbar-thumb{background:#51523b}
+.case-columns .guess-history{overflow-y:auto}
+@media(max-width:960px){
+  .case-columns{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,47%) minmax(0,53%)}
+}
+@media(max-width:620px){
+  .case-columns{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,44%) minmax(0,56%)}
+  .case-columns .clue-list{scrollbar-width:none}
+  .case-columns .clue-list::-webkit-scrollbar{display:none}
+}
+
+/* The raster fallback is still dark and keeps the pin tip at its coordinate. */
+.leaflet-container{background:#111915;outline:none}
+.leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(1.08) saturate(.45)}
+.geodetective-leaflet-pin{background:transparent;border:0}
+.geodetective-leaflet-pin .pin{
+  --pin-color:var(--accent);
+  position:relative;top:0;left:0;width:24px;height:32px;
+  padding:0;border:0;border-radius:0;box-shadow:none;
+  background:transparent;display:flex;justify-content:center;align-items:flex-start;
+}
+.geodetective-leaflet-pin .pin.past{--pin-color:#a9b0a1}
+.geodetective-leaflet-pin .pin.best{--pin-color:#f8ac44}
+.geodetective-leaflet-pin .pin.target{--pin-color:#f5f5df}
+.geodetective-leaflet-pin .pin-head{
+  display:grid;place-items:center;position:relative;
+  width:20px;height:20px;border:1px solid #10130e;border-radius:50%;
+  background:var(--pin-color);box-shadow:0 0 0 1px var(--pin-color);
+  color:#12140c;font:600 10px/1 var(--mono);
+}
+.geodetective-leaflet-pin .pin::after{
+  left:6px;top:19px;border-left:6px solid transparent;border-right:6px solid transparent;
+  border-top:12px solid var(--pin-color);
+}
