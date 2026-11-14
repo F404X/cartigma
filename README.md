@@ -14,7 +14,7 @@ A daily geography deduction game. Find a hidden city using geographic clues, a w
 - **Win condition:** guess within 100 km (great-circle distance) of the target city center.
 - **Scoring:** up to 5,000 points, adjusted for guesses and accuracy. You can reveal hints early for a 300-point penalty each.
 
-Evidence is assembled for each city from a variety of geographical facts: landscape, continent, latitude belt, national-capital status, hemisphere, distance to reference cities, comparative proximity and nearest other city in the catalogue. Evidence order varies by location. The old broad longitude/daylight clue is removed, and the country clue is restricted to Easy.
+Evidence is assembled for each city from a variety of geographical facts: landscape, continent, latitude belt, national-capital status, hemisphere, distance to reference cities, comparative proximity, nearest other city in the catalogue and curated landmarks associated with each of the 74 locations. Evidence order varies by location. The old broad longitude/daylight clue is removed, and the country clue is restricted to Easy.
 
 The catalogue contains 74 cities with approximate coordinates. Geographic and country names are localized when available using browser internationalization features.
 
