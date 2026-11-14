@@ -5,7 +5,10 @@
   const TRANSLATIONS = window.GeoI18n?.PACKS || {};
   const CLUE_I18N = window.GeoCluesI18n || {};
   const LANGS = window.GeoI18n?.langNames || {};
-  const DIFFICULTIES = {easy: {attempts:8,initial:3},normal:{attempts:6,initial:2},hard:{attempts:4,initial:1}};
+  const REPORT_I18N = window.GeoReportI18n || {};
+  const FACTS = window.GEODETECTIVE_FACTS || [];
+  const DIFFICULTIES = {normal:{attempts:6,initial:2},hard:{attempts:4,initial:1}};
+  const SERIAL_PREFIX = "geodetective-case-counter-";
   const WIN_RADIUS = 100, HINT_COST = 300, DAILY_KEY = "geodetective-daily-v3-";
   const COUNTRY_CODES = "IS NO NO NO FI SE DK GB FR PT IT GR TR MA EG SN NG KE ET ZA MG AE JO IL IN IN IN NP BD TH SG ID ID JP JP KR CN CN CN TW MN KZ AU AU AU AU NZ NZ FJ PF CA US US US US MX MX CU GT CO EC PE PE BO BR BR BR BR BR BR AR CL AR CL".split(" ");
   const FEATURES = "volcanic fjord polar fjord coast islands coast river river estuary river valley strait desert desert peninsula delta plateau plateau peninsula plateau desert plateau mountains coast plain delta valley delta delta islands delta islands coast valley river plain delta bay valley plateau mountains harbor coast coast islands volcanic harbor islands volcanic coast estuary bay mountains islands plateau valley coast volcanic plateau mountains desert mountains valley plateau plateau forest bay plateau bay estuary valley islands strait".split(" ");
@@ -63,7 +66,7 @@
   let controller = null, debounce = null, toastTimer = null;
 
   function t(key, variables={}) {
-    const template = TRANSLATIONS[lang]?.[key] ?? TRANSLATIONS.en?.[key] ?? key;
+    const template = REPORT_I18N[lang]?.[key] ?? TRANSLATIONS[lang]?.[key] ?? REPORT_I18N.en?.[key] ?? TRANSLATIONS.en?.[key] ?? key;
     return template.replace(/\{(\w+)\}/g,(_,name)=>String(variables[name]??""));
   }
   function tc(key,variables={}) {
@@ -114,32 +117,30 @@
     return indexes.map(i=>({index:i,km:dist(cityCoords(index),cityCoords(i))})).sort((a,b)=>a.km-b.km);
   }
   function cluesFor(index,level){
-    const p=cityAt(index), lat=p[3];
+    const p=cityAt(index);
     const anchors=anchorDistances(index);
-    const near=nearestOther(index);
-    const selectedAnchor=anchors[hash("anchor"+p[0])%Math.min(2,anchors.length)];
-    const far=anchors[anchors.length-1];
-    const early=[
-      {key:"terrain",value:locationFeature(index)},
+    const closest=nearestOther(index);
+    const chosen=anchors[hash("reference:"+p[0])%Math.min(3,anchors.length)];
+    const furthest=anchors[anchors.length-1];
+    const terrain={key:"terrain",value:locationFeature(index)};
+    const zone={key:"zone",value:latitudeZone(p[3])};
+    const capital={key:"capital",value:tc(CAPITALS.has(p[0])?"yes":"no")};
+    const hemisphere={key:"hemisphere",value:tc(p[3]>=0?"north":"south")};
+    const reliableCapital=!["Jerusalém","La Paz","Jacarta"].includes(p[0]);
+    const opening=hash("opening:"+p[0])%2===0?terrain:zone;
+    const third=hash("profile:"+p[0])%3===0&&reliableCapital?capital
+      :hash("profile:"+p[0])%3===1?hemisphere:(opening===terrain?zone:terrain);
+    const relationship=hash("relationship:"+p[0])%2===0
+      ?{key:"closer",a:cityName(cityAt(anchors[0].index)),b:cityName(cityAt(furthest.index))}
+      :{key:"nearest",city:cityName(cityAt(closest.index)),km:number(closest.km)};
+    return [
+      opening,
       {key:"continent",value:continentName(index)},
-      {key:"zone",value:latitudeZone(lat)},
-      {key:"capital",value:tc(CAPITALS.has(p[0])?"yes":"no")},
-      {key:"hemisphere",value:tc(lat>=0?"north":"south")}
+      third,
+      {key:"distance",km:number(chosen.km),city:cityName(cityAt(chosen.index))},
+      relationship,
+      {key:"landmark",name:LANDMARKS[index]}
     ];
-    // Some administrative-capital designations are disputed or in transition.
-    // Do not turn those ambiguities into a misleading yes/no clue.
-    if(["Jerusalém","La Paz","Jacarta"].includes(p[0]))
-      early.splice(early.findIndex(clue=>clue.key==="capital"),1);
-    // Rotate selection deterministically to vary the opening clues between cities.
-    const seed=hash("facts-v3:"+p[0])%early.length;
-    const first=[early[seed],early[(seed+2)%early.length],early[(seed+4)%early.length]];
-    // The fourth clue is a concrete, measurable geographical reference.
-    const distanceClue={key:"distance",km:number(selectedAnchor.km),city:cityName(cityAt(selectedAnchor.index))};
-    const comparison={key:"closer",a:cityName(cityAt(anchors[0].index)),b:cityName(cityAt(far.index))};
-    const nearest={key:"nearest",city:cityName(cityAt(near.index)),km:number(near.km)};
-    const fifth=level==="easy"?{key:"country",value:countryName(index)}:comparison;
-    const finalClue=hash("landmark:"+p[0])%2===0?{key:"landmark",name:LANDMARKS[index]}:nearest;
-    return [...first,distanceClue,fifth,finalClue];
   }
   function clueText(clue){return tc(clue.key,clue)}
   function maximum(){return DIFFICULTIES[difficulty].attempts}
@@ -147,9 +148,19 @@
     return hash("GEODETECTIVE-v3|"+today()+"|"+difficulty)%PLACES.length;
   }
   function dailyStorageKey(){return DAILY_KEY+today()+"-"+difficulty}
+  function nextCaseNumber(date=today()){
+    const key=SERIAL_PREFIX+date;
+    const previous=Number(store.get(key))||0;
+    const count=Math.max(0,previous)+1;
+    store.set(key,count);
+    return count;
+  }
   function newGame(mode,index) {
-    return {mode,index,difficulty,date:mode==="daily"?today():null,guesses:[],
+    return {mode,index,difficulty,date:today(),serial:nextCaseNumber(),guesses:[],
       revealed:DIFFICULTIES[difficulty].initial,penalty:0,finished:false,won:false,score:0};
+  }
+  function caseCode(){
+    return "#"+difficulty[0].toUpperCase()+"-"+game.date.replaceAll("-","")+"-"+String(game.serial).padStart(2,"0");
   }
   function savedDaily(){
     const s=store.get(dailyStorageKey());
@@ -164,8 +175,15 @@
     freeIndex=options[Math.floor(Math.random()*options.length)];
     return freeIndex;
   }
-  function startDaily(){game=savedDaily()||newGame("daily",dailyIndex());selected=null;render();resetMapView()}
-  function startFree(){game=newGame("free",chooseFree());selected=null;render();resetMapView()}
+  function startDaily(){
+    game=savedDaily()||newGame("daily",dailyIndex());
+    if(!Number.isInteger(game.serial)||game.serial<1){
+      game.serial=nextCaseNumber(game.date);
+      save();
+    }
+    selected=null;closeReport();render();resetMapView();
+  }
+  function startFree(){game=newGame("free",chooseFree());selected=null;closeReport();render();resetMapView()}
   function setDifficulty(level){
     if(!DIFFICULTIES[level]||level===difficulty)return;
     difficulty=level;store.set("geodetective-difficulty",level);
@@ -195,10 +213,18 @@
     clues.forEach((clue,i)=>{
       const row=document.createElement("li");row.className="clue"+(i>=game.revealed?" locked":"");
       const idx=document.createElement("span");idx.className="clue-index";idx.textContent=String(i+1).padStart(2,"0");
+      const body=document.createElement("span");body.className="clue-body";
+      const category=document.createElement("span");category.className="clue-category";
+      const categoryKey={
+        terrain:"clueTerrain",continent:"clueRegion",zone:"clueClimate",
+        hemisphere:"clueRegion",capital:"clueCivic",distance:"clueDistance",
+        closer:"clueDistance",nearest:"clueDistance",landmark:"clueLandmark"
+      }[clue.key]||"clueRegion";
+      category.textContent=t(categoryKey);
       const value=document.createElement("span");value.className="clue-text";
       value.textContent=i<game.revealed?clueText(clue):t("locked");
       value.title=i<game.revealed?clueText(clue):t("locked");
-      row.append(idx,value);list.append(row);
+      body.append(category,value);row.append(idx,body);list.append(row);
     });
     $("revealBtn").disabled=game.finished||game.revealed>=6;
     $("revealBtn").classList.toggle("hidden",game.finished);
@@ -214,9 +240,69 @@
       const label=document.createElement("span");
       const idx=document.createElement("span");idx.className="history-number";idx.textContent=String(game.guesses.length-reversed).padStart(2,"0");
       label.append(idx,document.createTextNode(g.label||g.lat.toFixed(2)+"°, "+g.lng.toFixed(2)+"°"));
-      const distance=document.createElement("strong");distance.textContent=number(g.distance)+" km · "+direction(g.bearing);
+      const distance=document.createElement("strong");distance.textContent=number(g.distance)+" km"+(difficulty==="hard"?"":" · "+direction(g.bearing));
       row.append(label,distance);list.append(row);
     });
+  }
+  function bestGuess(){
+    if(!game.guesses.length)return null;
+    return game.guesses.reduce((best,g)=>g.distance<best.distance?g:best,game.guesses[0]);
+  }
+  function factFor(index){
+    const fact=FACTS[index];
+    if(fact&&lang==="pt")return fact[1];
+    if(fact&&lang==="en")return fact[0];
+    return t("reportFactFallback",{landmark:LANDMARKS[index]});
+  }
+  function renderDossier(){
+    if(!game.finished)return;
+    const best=bestGuess();
+    const place=cityAt(game.index);
+    $("reportCode").textContent=caseCode();
+    $("reportVerdict").textContent=t(game.won?"caseSolved":"caseClosed");
+    $("reportHeading").textContent=cityName(place);
+    $("reportCountry").textContent=countryName(game.index);
+    $("reportStamp").textContent=t(game.won?"reportSuccess":"reportFailure");
+    $("reportMode").textContent=t(game.mode==="daily"?"daily":"free");
+    $("reportDifficulty").textContent=t(difficulty);
+    $("reportAttempts").textContent=game.guesses.length+" / "+maximum();
+    $("reportBest").textContent=best?number(best.distance)+" km":"—";
+    $("reportHints").textContent=number(Math.round(game.penalty/HINT_COST));
+    $("reportScore").textContent=number(game.score)+" / 5,000";
+    $("reportCoordinates").textContent=place[3].toFixed(4)+"°, "+place[4].toFixed(4)+"°";
+    $("reportContinent").textContent=continentName(game.index);
+    $("reportFact").textContent=factFor(game.index);
+    const log=$("reportTimeline");log.replaceChildren();
+    for(const [i,g] of game.guesses.entries()){
+      const row=document.createElement("li");row.className="report-log-row";
+      if(g===best)row.classList.add("best");
+      const n=document.createElement("span");n.className="report-log-index";n.textContent=String(i+1).padStart(2,"0");
+      const label=document.createElement("span");label.className="report-log-place";
+      label.textContent=g.label||g.lat.toFixed(3)+"°, "+g.lng.toFixed(3)+"°";
+      const metric=document.createElement("strong");metric.textContent=number(g.distance)+" km"
+        +(difficulty==="hard"?"":" · "+direction(g.bearing));
+      row.append(n,label,metric);log.append(row);
+    }
+    if(!game.guesses.length){
+      const item=document.createElement("li");item.textContent=t("reportNoGuesses");log.append(item);
+    }
+    const evidence=$("reportEvidenceList");evidence.replaceChildren();
+    cluesFor(game.index,difficulty).forEach((clue,i)=>{
+      const item=document.createElement("li");item.className="report-evidence-row";
+      const n=document.createElement("span");n.textContent=String(i+1).padStart(2,"0");
+      const value=document.createElement("span");value.textContent=clueText(clue);
+      item.append(n,value);evidence.append(item);
+    });
+  }
+  function closeReport(){
+    const dialog=$("reportDialog");
+    if(dialog?.open)dialog.close();
+  }
+  function showReport(){
+    if(!game?.finished)return;
+    renderDossier();
+    const dialog=$("reportDialog");
+    if(!dialog.open)dialog.showModal();
   }
   function renderResult(){
     $("resultCard").classList.toggle("hidden",!game.finished);
@@ -225,16 +311,16 @@
     $("resultKicker").textContent=t(game.won?"solved":"closed");
     $("resultTitle").textContent=name;
     $("resultDetail").textContent=game.won
-      ?t("foundText",{city:name,count:game.guesses.length,km:number(game.guesses.at(-1).distance)})
+      ?t("foundText",{city:name,count:game.guesses.length,km:number(bestGuess().distance)})
       :t("lostText",{city:name});
     $("finalScore").textContent=number(game.score);
-    $("nextBtn").textContent=t(game.mode==="daily"?"toFree":"newCase");
+    renderDossier();
   }
   function feedback(){
     const el=$("feedback");
     if(!game.guesses.length||game.finished){el.classList.add("hidden");return}
     const last=game.guesses.at(-1);
-    el.textContent=t("feedback",{km:number(last.distance),dir:direction(last.bearing)});
+    el.textContent=difficulty==="hard" ?t("hardDistance",{km:number(last.distance)}) :t("feedback",{km:number(last.distance),dir:direction(last.bearing)});
     el.className="feedback";
   }
   function render(){
@@ -243,8 +329,8 @@
     $("dailyBtn").classList.toggle("active",daily);$("freeBtn").classList.toggle("active",!daily);
     $("dailyBtn").setAttribute("aria-pressed",String(daily));$("freeBtn").setAttribute("aria-pressed",String(!daily));
     $("difficultySelect").value=difficulty;
-    const code=daily?"#"+today().replaceAll("-","").slice(2)+"-"+difficulty[0].toUpperCase():"#F-"+String(game.index+1).padStart(3,"0");
-    $("caseCode").textContent=t("caseWord")+" "+code;
+    const code=caseCode();
+    $("caseCode").textContent=code;
     $("caseNumber").textContent=t("caseWord")+" "+code;
     $("modeCaption").textContent=t(daily?"modeDaily":"modeFree");
     $("caseTitle").textContent=game.finished?cityName(cityAt(game.index)):t("unknown");
@@ -267,23 +353,33 @@
     renderMap();
   }
   function makeMarker(text,style){
-    const node=document.createElement("span");node.className="pin "+style;node.textContent=String(text);
-    return L.divIcon({className:"guess-marker",html:node.outerHTML,iconSize:[27,27],iconAnchor:[13,13]});
+    const node=document.createElement("span");node.className="pin "+style;
+    node.textContent=String(text);
+    return L.divIcon({className:"guess-marker",html:node.outerHTML,iconSize:[24,32],iconAnchor:[12,31]});
   }
   function renderMap(){
     if(!map)return;
     overlays.clearLayers();
     if(marker){map.removeLayer(marker);marker=null}
     const target=cityCoords(game.index);
-    game.guesses.forEach((g,i)=>L.marker([g.lat,g.lng],{icon:makeMarker(i+1,"past")}).addTo(overlays));
+    const best=game.finished?bestGuess():null;
+    game.guesses.forEach((g,i)=>{
+      L.marker([g.lat,g.lng],{icon:makeMarker(i+1,g===best?"best":"past")}).addTo(overlays);
+    });
     if(game.finished){
       L.marker(target,{icon:makeMarker("★","target")}).addTo(overlays)
         .bindPopup(cityName(cityAt(game.index))+" · "+countryName(game.index));
-      if(game.guesses.length){
-        const last=game.guesses.at(-1);
-        L.polyline([[last.lat,last.lng],target],{color:"#ffd449",weight:2,opacity:.8,dashArray:"5 7"}).addTo(overlays);
-        map.fitBounds(L.latLngBounds([[last.lat,last.lng],target]).pad(.25),{maxZoom:8,padding:[15,15],animate:true});
-      }else map.setView(target,5);
+      if(best){
+        // Always frame the closest guess and the target, not the most recent guess.
+        // Wrap longitude so nearby points across the date line fit correctly.
+        const longitude=target[1]+360*Math.round((best.lng-target[1])/360);
+        const adjustedTarget=[target[0],longitude];
+        L.polyline([[best.lat,best.lng],adjustedTarget],{
+          color:"#ffd449",weight:2,opacity:.8,dashArray:"5 7"
+        }).addTo(overlays);
+        const bounds=L.latLngBounds([[best.lat,best.lng],adjustedTarget]).pad(.65);
+        map.fitBounds(bounds,{maxZoom:5,padding:[32,32],animate:true});
+      }else map.setView(target,4);
     }else if(selected){
       marker=L.marker([selected.lat,selected.lng],{icon:makeMarker("+","")}).addTo(map);
     }
@@ -309,7 +405,7 @@
     if(!selected||game.finished)return;
     const pos=[selected.lat,selected.lng],to=cityCoords(game.index),distance=dist(pos,to);
     game.guesses.push({lat:selected.lat,lng:selected.lng,label:selected.label,
-      distance:Math.round(distance),bearing:Math.round(heading(pos,to))});
+      at:new Date().toISOString(),distance:Math.round(distance),bearing:Math.round(heading(pos,to))});
     game.won=distance<=WIN_RADIUS;
     if(game.won||game.guesses.length>=maximum()){
       game.finished=true;game.revealed=6;
@@ -318,7 +414,7 @@
         :0;
     }else game.revealed=Math.min(6,Math.max(game.revealed,DIFFICULTIES[difficulty].initial+game.guesses.length));
     save();selected=null;render();
-    if(game.finished)toast(t(game.won?"foundToast":"lostToast"));
+    if(game.finished){showReport();}
     else if(map){const g=game.guesses.at(-1);map.setView([g.lat,g.lng],Math.max(map.getZoom(),3))}
   }
   function searchLocal(term){
@@ -362,7 +458,7 @@
   }
   async function share(){
     const symbols=game.guesses.map(g=>g.distance<=WIN_RADIUS?"🟨":g.distance<500?"🟧":"⬛").join("");
-    const txt="GeoDetective "+(game.mode==="daily"?today()+" "+difficulty:"Free "+difficulty)
+    const txt="GeoDetective "+caseCode()
       +"\n"+(game.won?"✓ "+game.guesses.length+"/"+maximum():"×")+" · "+number(game.score)+" pts\n"+symbols
       +"\nhttps://f404x.github.io/geodetective/";
     try{
@@ -385,7 +481,7 @@
     setTimeout(()=>map.invalidateSize(),100);
   }
   function init(){
-    if(!PLACES.length||PLACES.length!==FEATURES.length||PLACES.length!==COUNTRY_CODES.length||PLACES.length!==LANDMARKS.length)
+    if(!PLACES.length||PLACES.length!==FEATURES.length||PLACES.length!==COUNTRY_CODES.length||PLACES.length!==LANDMARKS.length||PLACES.length!==FACTS.length)
       throw new Error("Location catalogue and metadata are out of sync");
     document.documentElement.lang="en";
     $("difficultySelect").value=difficulty;
@@ -398,8 +494,12 @@
     $("revealBtn").addEventListener("click",reveal);
     $("guessBtn").addEventListener("click",guess);
     $("resetViewBtn").addEventListener("click",()=>{if(map)map.setView([15,8],2)});
-    $("nextBtn").addEventListener("click",startFree);
+    $("reportOpenBtn").addEventListener("click",showReport);
     $("shareBtn").addEventListener("click",share);
+    $("reportCloseBtn").addEventListener("click",closeReport);
+    $("reportMapBtn").addEventListener("click",closeReport);
+    $("reportNextBtn").addEventListener("click",()=>{closeReport();startFree()});
+    $("reportShareBtn").addEventListener("click",share);
     $("helpBtn").addEventListener("click",()=>$("helpDialog").showModal());
     $("closeHelpBtn").addEventListener("click",()=>$("helpDialog").close());
     $("startHelpBtn").addEventListener("click",()=>$("helpDialog").close());
