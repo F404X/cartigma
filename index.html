@@ -50,7 +50,6 @@
       <div class="toolbar-right">
         <label for="difficultySelect" class="label-muted" data-i18n="difficulty">Difficulty</label>
         <select id="difficultySelect" aria-label="Difficulty">
-          <option value="easy" data-i18n="easy">Easy</option>
           <option value="normal" selected data-i18n="normal">Normal</option>
           <option value="hard" data-i18n="hard">Hard</option>
         </select>
@@ -89,7 +88,7 @@
         <div class="case-columns">
           <section class="clue-panel" aria-labelledby="evidenceHeading">
             <div class="section-heading">
-              <h2 id="evidenceHeading">01 / <span data-i18n="evidence">Evidence</span></h2>
+              <h2 id="evidenceHeading"><span class="section-index">01</span> <span data-i18n="evidence">Evidence</span></h2>
               <span id="hintCount">2 / 6</span>
             </div>
             <ol class="clue-list" id="clueList" aria-live="polite"></ol>
@@ -98,7 +97,7 @@
 
           <section class="guess-panel" aria-labelledby="guessHeading">
             <div class="section-heading">
-              <h2 id="guessHeading">02 / <span data-i18n="yourGuess">Your guess</span></h2>
+              <h2 id="guessHeading"><span class="section-index">02</span> <span data-i18n="yourGuess">Your guess</span></h2>
               <span id="guessCounter">0 / 6</span>
             </div>
             <label class="search-label" for="citySearch" data-i18n="searchLabel">Search or select on the map</label>
@@ -121,7 +120,7 @@
               <div class="score-box"><span data-i18n="score">Score</span><strong id="finalScore">0</strong><small>/ 5,000</small></div>
               <div class="result-actions">
                 <button id="shareBtn" type="button" class="secondary-btn" data-i18n="share">Share</button>
-                <button id="nextBtn" type="button" class="primary-btn" data-i18n="newCase">New case</button>
+                <button id="reportOpenBtn" type="button" class="primary-btn" data-i18n="openReport">View case file</button>
               </div>
             </div>
           </section>
@@ -137,12 +136,59 @@
   <p data-i18n="helpIntro">Find the hidden city from a series of geographic clues.</p>
   <ol>
     <li data-i18n="rule1">Read the evidence and place a pin on the map or search for a city.</li>
-    <li data-i18n="rule2">Each incorrect guess gives you distance, direction, and another clue.</li>
+    <li data-i18n="rule2">Each incorrect guess gives you distance and a new clue. Direction is hidden on Hard.</li>
     <li data-i18n="rule3">Win by getting within 100 km of the target. Extra hints cost 300 points.</li>
-    <li data-i18n="rule4">Easy: 8 guesses, Normal: 6, Hard: 4. Country clues appear only on Easy.</li>
+    <li data-i18n="rule4">Normal: 6 guesses with direction. Hard: 4 guesses without direction.</li>
     <li data-i18n="rule5">Daily cases are shared worldwide per difficulty and reset at 00:00 UTC.</li>
   </ol>
   <button id="startHelpBtn" type="button" class="primary-btn" data-i18n="gotIt">Got it</button>
+</dialog>
+<dialog id="reportDialog" class="case-report" aria-labelledby="reportHeading">
+  <div class="report-topbar">
+    <span class="report-archive" data-i18n="reportArchive">GEODETECTIVE / CASE FILE</span>
+    <span id="reportCode" class="report-code">#N-20261114-01</span>
+    <button id="reportCloseBtn" type="button" class="report-close" aria-label="Close report">×</button>
+  </div>
+  <div class="report-heading">
+    <div>
+      <span id="reportVerdict" class="report-verdict">CASE CLOSED</span>
+      <h2 id="reportHeading">Unknown location</h2>
+      <p id="reportCountry"></p>
+    </div>
+    <div class="report-stamp" id="reportStamp" aria-hidden="true">CLOSED</div>
+  </div>
+  <div class="report-body">
+    <section class="report-section">
+      <h3 data-i18n="investigationRecord">Investigation record</h3>
+      <dl class="report-grid">
+        <div><dt data-i18n="reportMode">Mode</dt><dd id="reportMode"></dd></div>
+        <div><dt data-i18n="difficulty">Difficulty</dt><dd id="reportDifficulty"></dd></div>
+        <div><dt data-i18n="reportAttempts">Guesses</dt><dd id="reportAttempts"></dd></div>
+        <div><dt data-i18n="reportBest">Closest guess</dt><dd id="reportBest"></dd></div>
+        <div><dt data-i18n="reportHints">Extra hints</dt><dd id="reportHints"></dd></div>
+        <div><dt data-i18n="score">Score</dt><dd id="reportScore"></dd></div>
+        <div><dt data-i18n="reportCoordinates">Coordinates</dt><dd id="reportCoordinates"></dd></div>
+        <div><dt data-i18n="reportContinent">Continent</dt><dd id="reportContinent"></dd></div>
+      </dl>
+    </section>
+    <section class="report-section report-fact">
+      <h3 data-i18n="reportTrivia">Did you know?</h3>
+      <p id="reportFact"></p>
+    </section>
+    <section class="report-section">
+      <h3 data-i18n="reportTimeline">Guess log</h3>
+      <ol id="reportTimeline" class="report-timeline"></ol>
+    </section>
+    <section class="report-section">
+      <h3 data-i18n="reportEvidence">Evidence collected</h3>
+      <ol id="reportEvidenceList" class="report-evidence"></ol>
+    </section>
+  </div>
+  <div class="report-footer">
+    <button id="reportMapBtn" type="button" class="secondary-btn" data-i18n="showMap">Back to map</button>
+    <button id="reportShareBtn" type="button" class="secondary-btn" data-i18n="share">Share</button>
+    <button id="reportNextBtn" type="button" class="primary-btn" data-i18n="newCase">New case</button>
+  </div>
 </dialog>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 </body>
