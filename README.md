@@ -1,90 +1,71 @@
 # GeoDetective
 
-**Uma cidade secreta. Seis tentativas. Um planeta inteiro de pistas.**
+A daily geography deduction game. Find a hidden city using geographic clues, a world map and distance feedback.
 
-GeoDetective é um jogo de dedução geográfica feito em HTML, CSS e JavaScript. O jogador investiga uma localização real com pistas progressivas e marca palpites em um mapa mundial interativo.
+**Play:** https://f404x.github.io/geodetective/
 
-## Funcionalidades
+## Gameplay
 
-- **Desafio diário global:** a localização é selecionada deterministicamente pela data **UTC**, sendo a mesma para todas as pessoas que utilizam a mesma versão do catálogo.
-- **Modo livre:** novos casos ilimitados, sem necessidade de criar conta.
-- **74 localidades** distribuídas por vários continentes e biomas, com pistas geográficas editáveis em [places.js](places.js).
-- **Seis tentativas:** feedback após cada palpite com distância em linha reta e direção cardinal.
-- **Pistas graduais:** relevo/paisagem, faixa de latitude, região, longitude, altitude do terreno (quando disponível), duração aproximada do dia no solstício de junho, país e referência local.
-- **Pontuação:** até 5.000 pontos, com penalidade por palpites adicionais e por pistas antecipadas.
-- **Busca de cidades:** sugestões locais e busca opcional pela API de geocodificação da Open-Meteo.
-- **Mapa mundial:** Leaflet com mosaicos públicos OpenStreetMap, estilizados em modo escuro via CSS, sem chave de API.
-- **Progresso diário no navegador:** salvo em localStorage, sem dados pessoais enviados a um servidor próprio.
-- **Compartilhamento:** resultado textual sem revelar diretamente a resposta do desafio.
-- **Interface responsiva:** tema escuro com destaques verde-lima, adaptada para celular.
+- **Daily case:** one shared location per date (UTC) and difficulty. Progress is stored in the browser independently for each difficulty.
+- **Free play:** unlimited random cases.
+- **Easy:** 8 guesses, 3 clues at the start, country/territory as the fifth clue.
+- **Normal:** 6 guesses, 2 clues at the start, no country reveal.
+- **Hard:** 4 guesses, 1 clue at the start, no country reveal.
+- **Win condition:** guess within 100 km (great-circle distance) of the target city center.
+- **Scoring:** up to 5,000 points, adjusted for guesses and accuracy. You can reveal hints early for a 300-point penalty each.
 
-## Executar localmente
+Evidence is assembled for each city from a variety of geographical facts: landscape, continent, latitude belt, national-capital status, hemisphere, distance to reference cities, comparative proximity and nearest other city in the catalogue. Evidence order varies by location. The old broad longitude/daylight clue is removed, and the country clue is restricted to Easy.
 
-Não é necessário instalar dependências nem executar uma etapa de build. Basta servir os arquivos por HTTP:
+The catalogue contains 74 cities with approximate coordinates. Geographic and country names are localized when available using browser internationalization features.
 
-~~~bash
+## Interface
+
+The responsive game fills the available viewport with no page scrollbar: map on the left and evidence/guess columns alongside each other on desktop. On narrower screens the map moves above the two columns; the guess history can scroll internally when necessary. Yellow is the primary accent; borders are squared and background glows and the introductory landing section have been removed.
+
+**Languages:** English (default), Portuguese, Spanish, Simplified Chinese, Japanese, Russian, French, German, Italian, Dutch, Polish, Swedish, Turkish, Arabic, Hebrew, Korean, Thai, Vietnamese and Indonesian. Arabic and Hebrew use right-to-left text direction. Language and difficulty preferences are saved locally. Geographic clue templates and terrain categories are translated; proper city names use a readable localized or international form.
+
+## Technology
+
+No build tools, account or API keys are required:
+
+- HTML, CSS, and JavaScript
+- Leaflet with OpenStreetMap tiles (keyless, [public tile usage policy](https://operations.osmfoundation.org/policies/tiles/))
+- Open-Meteo Geocoding API for optional city search
+- Browser `Intl.DisplayNames` for localized countries/continents
+- `localStorage` for daily game progress and preferences
+
+Because this is a static site, the hidden city and game data are present in the browser; the game is intended as a casual knowledge challenge, not a tamper-proof competition.
+
+## Running locally
+
+Serve the repository root over HTTP, for example:
+
+```bash
 python -m http.server 8000
-~~~
+```
 
-Depois acesse http://localhost:8000.
+Then open http://localhost:8000.
 
-Também é possível usar uma extensão de servidor local no VS Code.
+## Tests
 
-## Publicar no Cloudflare Pages
+```bash
+node --test tests/*.test.mjs
+```
 
-1. Conecte o repositório **F404X/geodetective** ao Cloudflare Pages.
-2. Selecione a implantação via Git.
-3. Framework preset: **None**.
-4. Build command: **deixar vazio** (ou `exit 0`).
-5. Build output directory: **`.`** (raiz do repositório).
-6. Faça o deploy.
+GitHub Actions runs the tests on every push and pull request. The [Pages deployment workflow](.github/workflows/pages.yml) also executes the tests and publishes the static files on every commit to `main`.
 
-Os arquivos de entrada são [index.html](index.html), [styles.css](styles.css), [places.js](places.js) e [app.js](app.js).
+## Source layout
 
-## Regras
+| File | Purpose |
+| --- | --- |
+| `index.html` | Compact interface and accessible controls |
+| `styles.css` | Yellow/dark theme and responsive viewport layout |
+| `places.js` | Coordinates and original city catalogue |
+| `i18n.js` | 19-language UI messages |
+| `clues-i18n.js` | 19-language clue text and geography vocabulary |
+| `app.js` | Game engine, map, difficulty rules, persistence and geocoding |
+| `tests/smoke.test.mjs` | Automated gameplay and translation checks |
 
-- Um palpite vence quando a posição selecionada fica a até **100 km em linha reta** do centro da localidade-alvo.
-- Você tem **6 tentativas**.
-- Duas pistas são mostradas inicialmente. Novas pistas são liberadas após erros, ou podem ser reveladas antecipadamente por **300 pontos** cada.
-- A pontuação decresce conforme as tentativas e a distância final.
-- Ao terminar, a localização é mostrada no mapa.
-- A resposta do desafio diário depende da data UTC (não do fuso do navegador).
+## Accuracy notes
 
-## Fonte e precisão dos dados
-
-- As coordenadas do catálogo são **aproximações dos centros das localidades**, não limites administrativos.
-- A distância é calculada pelo método **haversine** (menor caminho sobre uma esfera), e não representa distância rodoviária.
-- A duração do dia é **astronômica e aproximada** (solstício de junho, sem refração atmosférica nem horizonte local).
-- As pistas de paisagem e de referências foram redigidas manualmente; podem ser ampliadas e revisadas.
-- As pesquisas de localização usam [Open-Meteo Geocoding API](https://open-meteo.com/en/docs/geocoding-api). A altitude, quando disponível, é aproximada a partir da [Open-Meteo Elevation API](https://open-meteo.com/en/docs/elevation-api). Essas APIs requerem internet e estão sujeitas a limites e condições de uso.
-- [Leaflet](https://leafletjs.com/) e [OpenStreetMap](https://www.openstreetmap.org/copyright) são serviços/recursos externos. Os mosaicos OSM não requerem API key, mas dependem de internet e da [política de uso dos servidores públicos](https://operations.osmfoundation.org/policies/tiles/). Não implementar pré-carregamento, scraping ou cache-busting de tiles. Para tráfego elevado, migrar para hospedagem própria ou fornecedor com capacidade apropriada.
-
-## GitHub Pages
-
-O site é publicado automaticamente na branch `main` pelo workflow [pages.yml](.github/workflows/pages.yml) em `https://f404x.github.io/geodetective/`. Não é necessário secret para os mosaicos do mapa; o GitHub Actions recebe automaticamente seu token temporário de implantação.
-
-## Organização
-
-~~~text
-.
-├── index.html      # Interface semântica
-├── styles.css      # Tema, mapa e layout responsivo
-├── places.js       # Base de localidades, pistas culturais e paisagens
-├── app.js          # Estado, regras, pistas, busca, mapa e resultados
-├── favicon.svg     # Ícone do projeto
-├── tests/           # Testes automatizados sem dependências
-├── .github/workflows/ci.yml # CI em GitHub Actions
-└── README.md       # Documentação
-~~~
-
-## Próximas ideias
-
-- Perfis de dificuldade e categorias (capitais, cidades pequenas, ilhas, montanhas).
-- Estatísticas locais de histórico e sequências de vitórias.
-- Proximidade do litoral e séries climáticas como pistas adicionais.
-- Suporte para múltiplos idiomas.
-- Testes automatizados e fontes geográficas auditáveis para todo o catálogo.
-
----
-
-Projeto desenvolvido para **F404X**.
+Distances use the haversine formula; the 100 km win radius is not a driving distance. Landscape categories are simplified and are not a replacement for a detailed physical geography source. The extra comparisons are computed from catalogue coordinates, not live GPS data. External map tiles and geocoding require internet and are governed by their providers' usage policies.
