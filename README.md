@@ -11,7 +11,7 @@ A browser-based geographic detective game. Read the evidence, place pins on a wo
 - **Normal:** 6 guesses, 2 starting clues, distance **and cardinal direction** after an incorrect guess.
 - **Hard:** 4 guesses, 1 starting clue, **only the distance** after an incorrect guess. Direction remains hidden even in the final case report.
 - Win when a guess falls within **100 km straight-line distance** of the city's approximate coordinates.
-- Six evidence cards: physical landscape or latitude zone, continent, regional profile, distance from a known reference city, geographic proximity comparison, and a distinctive local landmark. The initial and comparative facts vary per city; the country name is not a clue.
+- Six evidence cards: physical landscape or latitude zone, continent, regional profile, distance from a nearby reference city, geographic proximity comparison, and a distinctive local landmark. Distance references are always **at most 1,000 km** from the target; isolated locations have additional curated neighbors. References include country or territory names in the selected language.
 - Extra hints cost **300 points** each. A successful investigation earns up to **5,000 points**, depending on guess count, accuracy and penalties.
 
 ### Case numbering
@@ -28,18 +28,18 @@ When an investigation ends, an interactive detective dossier is displayed with:
 - A location-specific **did-you-know** fact for every city, curated in English and Portuguese; in other languages, a localized note identifying an important landmark is used.
 - Buttons to share the result, examine the final map and begin a new case.
 
-The map automatically frames the **closest guess and the actual city**, with restrained zoom and a line connecting both. Click markers are small pointed pins anchored at the exact selected coordinate. The map also handles points that straddle the international date line.
+The map automatically frames the **closest guess and the actual city**, with zoom caps adjusted to their separation, viewport padding and a line connecting both. The map also handles points that straddle the international date line. The case file opens as a **non-modal side panel on the right**, keeping the map visible (on phones it becomes a bottom panel).
 
 ## Design and languages
 
 The game uses a flat, yellow-and-charcoal detective interface. Evidence cards have larger typography, ruled separators, numbered sections and evidence classifications. The whole application fits in the viewport without a browser-page scrollbar; longer clue, log and report sections can scroll **internally** when needed, particularly on small screens.
 
-The UI supports **19 languages**: English (default), Portuguese, Spanish, Simplified Chinese, Japanese, Russian, French, German, Italian, Dutch, Polish, Swedish, Turkish, Arabic, Hebrew, Korean, Thai, Vietnamese and Indonesian. Arabic and Hebrew use RTL layout. Preferences are stored locally. Interface strings, clue templates, geographic terminology, and report controls are translated; geographical proper names may use internationally recognized spellings.
+The UI supports **19 languages**: English (default), Portuguese, Spanish, Simplified Chinese, Japanese, Russian, French, German, Italian, Dutch, Polish, Swedish, Turkish, Arabic, Hebrew, Korean, Thai, Vietnamese and Indonesian. Arabic and Hebrew use RTL layout. The language selector includes a persistent globe icon and representative national flag. Preferences are stored locally. The map uses MapLibre vector labels that follow the selected language when translated name fields exist, falling back to the local name otherwise. Interface strings, clue templates, geographic terminology, and report controls are also translated.
 
 ## Technology
 
 - Plain HTML, CSS, JavaScript, no build step or account.
-- Leaflet + OpenStreetMap public tiles (keyless; comply with the [tile usage policy](https://operations.osmfoundation.org/policies/tiles/)).
+- **MapLibre GL JS 6.18.0** with [OpenFreeMap](https://openfreemap.org/) dark vector tiles, no API key. Map labels update via localized OpenMapTiles `name:*` fields. Viewport gestures are distinguished from deliberate clicks (8 px pointer threshold plus drag suppression).
 - Open-Meteo Geocoding API for optional search suggestions.
 - Browser `Intl.DisplayNames` for country names; six continents have explicit localized names.
 - `localStorage` for daily results, sequence numbers and preferences.
@@ -63,6 +63,8 @@ Open http://localhost:8000. The tests also run automatically on pushes and pull 
 | `index.html` | Single-screen UI and case report |
 | `styles.css` | Flat dark/yellow layout, lined evidence, map pins and report |
 | `places.js` | 74 cities with approximate locations |
+| `references.js` | Local named reference coordinates within a 1,000 km radius |
+| `map-bootstrap.js` | Loads the MapLibre mapping engine from CDN |
 | `facts.js` | 74 English and Portuguese location facts |
 | `i18n.js` | Main user interface translations |
 | `clues-i18n.js` | Geographic clue vocabulary and continent translations |
@@ -74,4 +76,4 @@ The [GitHub Pages deployment workflow](.github/workflows/pages.yml) publishes th
 
 ## Data accuracy
 
-The city center coordinates are approximate. Distances use the haversine formula, which describes straight-line distance on a sphere, **not** road distance. Physical landscape labels are simplified. Reference-city and nearest-city comparisons use the project's own catalogue. Location facts are educational descriptions, not live measurements.
+The city center coordinates are approximate. Distances use the haversine formula, which describes straight-line distance on a sphere, **not** road distance. Physical landscape labels are simplified. Geographic comparison references draw from both the city catalogue and a separately validated local reference dataset. Location facts are educational descriptions, not live measurements. Maps require WebGL and internet access; not every map feature has names translated into all 19 languages.
