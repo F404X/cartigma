@@ -13,7 +13,7 @@ GeoDetective é um jogo de dedução geográfica feito em HTML, CSS e JavaScript
 - **Pistas graduais:** relevo/paisagem, faixa de latitude, região, longitude, altitude do terreno (quando disponível), duração aproximada do dia no solstício de junho, país e referência local.
 - **Pontuação:** até 5.000 pontos, com penalidade por palpites adicionais e por pistas antecipadas.
 - **Busca de cidades:** sugestões locais e busca opcional pela API de geocodificação da Open-Meteo.
-- **Mapa mundial:** Leaflet com mosaicos CARTO e atribuição OpenStreetMap.
+- **Mapa mundial:** Leaflet com mosaicos públicos OpenStreetMap, estilizados em modo escuro via CSS, sem chave de API.
 - **Progresso diário no navegador:** salvo em localStorage, sem dados pessoais enviados a um servidor próprio.
 - **Compartilhamento:** resultado textual sem revelar diretamente a resposta do desafio.
 - **Interface responsiva:** tema escuro com destaques verde-lima, adaptada para celular.
@@ -57,7 +57,11 @@ Os arquivos de entrada são [index.html](index.html), [styles.css](styles.css), 
 - A duração do dia é **astronômica e aproximada** (solstício de junho, sem refração atmosférica nem horizonte local).
 - As pistas de paisagem e de referências foram redigidas manualmente; podem ser ampliadas e revisadas.
 - As pesquisas de localização usam [Open-Meteo Geocoding API](https://open-meteo.com/en/docs/geocoding-api). A altitude, quando disponível, é aproximada a partir da [Open-Meteo Elevation API](https://open-meteo.com/en/docs/elevation-api). Essas APIs requerem internet e estão sujeitas a limites e condições de uso.
-- [Leaflet](https://leafletjs.com/), [OpenStreetMap](https://www.openstreetmap.org/copyright) e [CARTO basemaps](https://carto.com/attributions) são serviços/recursos externos. Os mosaicos dependem de rede e das respectivas políticas de uso.
+- [Leaflet](https://leafletjs.com/) e [OpenStreetMap](https://www.openstreetmap.org/copyright) são serviços/recursos externos. Os mosaicos OSM não requerem API key, mas dependem de internet e da [política de uso dos servidores públicos](https://operations.osmfoundation.org/policies/tiles/). Não implementar pré-carregamento, scraping ou cache-busting de tiles. Para tráfego elevado, migrar para hospedagem própria ou fornecedor com capacidade apropriada.
+
+## GitHub Pages
+
+O site é publicado automaticamente na branch `main` pelo workflow [pages.yml](.github/workflows/pages.yml) em `https://f404x.github.io/geodetective/`. Não é necessário secret para os mosaicos do mapa; o GitHub Actions recebe automaticamente seu token temporário de implantação.
 
 ## Organização
 
