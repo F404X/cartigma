@@ -148,3 +148,9 @@ test("pista extra cobra penalidade e desbloqueia mais uma evidência", () => {
   assert.equal(get("clueList").children.filter((x) => !x.className.includes("locked")).length, 3);
   assert.equal(get("hintCount").textContent, "3 DE 6");
 });
+test("mapa usa mosaicos públicos sem chave de API", () => {
+  const css = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
+  assert.match(appSource, /tile\.openstreetmap\.org/);
+  assert.doesNotMatch(appSource, /basemaps\.cartocdn\.com/);
+  assert.match(css, /leaflet-tile-pane\{filter:/);
+});
