@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {runInNewContext} from "node:vm";
 
-const names=["places.js","i18n.js","clues-i18n.js","report-i18n.js","facts.js","app.js","index.html","styles.css"];
+const names=["places.js","references.js","i18n.js","clues-i18n.js","report-i18n.js","facts.js","app.js","index.html","styles.css","map-bootstrap.js"];
 const files=Object.fromEntries(names.map(n=>[n,readFileSync(new URL("../"+n,import.meta.url),"utf8")]));
 
 class Element {
@@ -28,12 +28,13 @@ class Element {
   querySelector(selector){if(selector==="button.suggestion")return this.children.find(x=>x.className==="suggestion")||null;return null}
   scrollIntoView(){}
   showModal(){this._open=true}
+  show(){this._open=true}
   close(){this._open=false}
   closest(){return null}
 }
 const hash=input=>{let h=2166136261;for(const c of input){h ^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0};
 function boot({storage=new Map(),map=false}={}){
-  const nodes=new Map(),window={},mapState={fits:[],setViews:[]};
+  const nodes=new Map(),window={},mapState={fits:[],eases:[],styles:[],markers:[],layers:new Map(),sources:new Map(),events:{},canvas:new Element("canvas")};
   const document={
     readyState:"complete",documentElement:{lang:"en",dir:"ltr"},hidden:false,
     getElementById(id){if(!nodes.has(id))nodes.set(id,new Element(id));return nodes.get(id)},
@@ -45,24 +46,44 @@ function boot({storage=new Map(),map=false}={}){
     getItem:k=>storage.get(k)||null,
     setItem:(k,v)=>storage.set(k,v)
   };
-  const L={
-    map(){return {
-      setView(...args){mapState.setViews.push(args);return this},
-      fitBounds(bounds,options){mapState.fits.push({bounds,options});return this},
-      removeLayer(){},invalidateSize(){},on(){},getZoom(){return 3}
-    }},
-    tileLayer(){return {addTo(){return this}}},
-    control:{zoom(){return {addTo(){return this}}}},
-    layerGroup(){return {addTo(){return this},clearLayers(){}}},
-    marker(){return {addTo(){return this},bindPopup(){return this}}},
-    polyline(){return {addTo(){return this}}},
-    latLngBounds(points){return {points,pad(value){this.padding=value;return this}}},
-    divIcon(o){return o}
+  const mapInstance={
+    on(name,fn){mapState.events[name]=fn;if(name==="style.load")fn();return this},
+    getCanvas(){return mapState.canvas},
+    getStyle(){return {layers:[
+      {id:"label_country_1",type:"symbol",layout:{"text-field":["get","name"]}},
+      {id:"label_city",type:"symbol",layout:{"text-field":["get","name"]}},
+      {id:"road_shield",type:"symbol",layout:{"text-field":["get","ref"]}}
+    ]}},
+    setLayoutProperty(id,key,expr){mapState.styles.push({id,key,expr})},
+    easeTo(options){mapState.eases.push(options);return this},
+    fitBounds(bounds,options){mapState.fits.push({bounds,options});return this},
+    getZoom(){return 3},
+    getLayer(id){return mapState.layers.get(id)||null},
+    removeLayer(id){mapState.layers.delete(id)},
+    addLayer(layer){mapState.layers.set(layer.id,layer)},
+    getSource(id){return mapState.sources.get(id)||null},
+    removeSource(id){mapState.sources.delete(id)},
+    addSource(id,source){mapState.sources.set(id,source)}
   };
-  if(map)window.L=L;
+  const libre={
+    supported(){return true},
+    Map:class{constructor(){return mapInstance}},
+    NavigationControl:class{},
+    Marker:class{
+      constructor(options){this.element=options.element}
+      setLngLat(coordinate){this.coordinate=coordinate;return this}
+      addTo(){mapState.markers.push(this);return this}
+      remove(){mapState.markers=mapState.markers.filter(m=>m!==this);return this}
+      setPopup(){return this}
+    },
+    Popup:class{
+      setDOMContent(){return this}
+    }
+  };
+  if(map)window.maplibregl=libre;
   const math=Object.create(Math);math.random=()=>0;
   const context={
-    window,document,localStorage,navigator:{},L:map?L:undefined,Math:math,Number,String,Array,Set,Map,JSON,Date,Intl,
+    window,document,localStorage,navigator:{},Math:math,Number,String,Array,Set,Map,JSON,Date,Intl,
     AbortController,console,setTimeout(){return 0},clearTimeout(){},
     fetch:async()=>({ok:true,json:async()=>({results:[]})})
   };
@@ -191,7 +212,7 @@ test("final dossier records all guesses, fact, continent, score and coordinate",
   assert.equal($("reportEvidenceList").children.length,6);
   assert.equal($("reportTimeline").children.length,1);
   assert.equal($("reportBest").textContent,"0 km");
-  assert.equal(g.mapState.fits.at(-1).options.maxZoom,5);
+  assert.ok(g.mapState.fits.at(-1).options.maxZoom>=6);
   $("reportMapBtn").handlers.click();
   assert.equal($("reportDialog").open,false);
   $("reportOpenBtn").handlers.click();
@@ -209,9 +230,9 @@ test("on loss the map frames best guess and the correct target, not the final gu
   assert.equal($("reportDialog").open,true);
   const fit=g.mapState.fits.at(-1);
   assert.ok(fit);
-  assert.ok(Math.abs(fit.bounds.points[0][0]-59.9139)<.05,"best guess should be Oslo");
-  assert.ok(Math.abs(fit.bounds.points[1][0]-64.1466)<.05,"target should be Reykjavík");
-  assert.equal(fit.options.maxZoom,5);
+  assert.ok(Math.abs(fit.bounds[0][1]-59.9139)<.05,"best guess should be Oslo");
+  assert.ok(Math.abs(fit.bounds[1][1]-64.1466)<.05,"target should be Reykjavík");
+  assert.ok(fit.options.maxZoom>=4&&fit.options.maxZoom<=6.2);
   assert.equal($("reportBest").textContent.match(/km/)!==null,true);
 });
 
@@ -219,8 +240,70 @@ test("evidence styling is compact and location pins use the tip as anchor",()=>{
   assert.match(files["styles.css"],/clue\{flex:0 0 auto/);
   assert.match(files["styles.css"],/clue-category/);
   assert.match(files["styles.css"],/\.pin::after/);
-  assert.match(files["app.js"],/iconAnchor:\[12,31\]/);
+  assert.match(files["app.js"],/anchor:"bottom"/);
   assert.match(files["styles.css"],/height:100dvh/);
-  assert.match(files["app.js"],/tile\.openstreetmap\.org/);
+  assert.match(files["app.js"],/tiles\.openfreemap\.org\/styles\/dark/);
+  assert.match(files["map-bootstrap.js"],/maplibre-gl@6\.18\.0/);
   assert.doesNotMatch(files["app.js"],/basemaps\.cartocdn\.com/);
+});
+
+
+const distanceKm=(a,b)=>{
+  const rad=n=>n*Math.PI/180;
+  const dlat=rad(b[0]-a[0]),dlon=rad(b[1]-a[1]);
+  const h=Math.sin(dlat/2)**2+Math.cos(rad(a[0]))*Math.cos(rad(b[0]))*Math.sin(dlon/2)**2;
+  return 6371.0088*2*Math.asin(Math.sqrt(h));
+};
+test("all 74 cities have at least two named reference locations within 1,000 km",()=>{
+  const g=boot(),p=g.window.GEODETECTIVE_PLACES,refs=g.window.GEODETECTIVE_NEARBY_REFERENCES;
+  assert.equal(p.length,74);
+  for(let i=0;i<p.length;i++){
+    const origin=[p[i][3],p[i][4]];
+    const catalog=p.filter((q,j)=>j!==i&&distanceKm(origin,[q[3],q[4]])<=1000
+      &&distanceKm(origin,[q[3],q[4]])>=10).length;
+    const additional=(refs[i]||[]).filter(r=>distanceKm(origin,[r[2],r[3]])<=1000
+      &&distanceKm(origin,[r[2],r[3]])>=10);
+    assert.ok(catalog+additional.length>=2,p[i][0]+" has too few nearby references");
+    for(const ref of additional)
+      assert.ok(distanceKm(origin,[ref[2],ref[3]])<=1000,p[i][0]+" -> "+ref[0]);
+  }
+  assert.ok((refs[13]||[]).some(x=>x[0]==="Casablanca"),"Marrakech should reference nearby Moroccan cities");
+  assert.match(files["app.js"],/km<=1000/);
+});
+test("map labels react to all language changes and fall back to native names",()=>{
+  const g=boot({map:true});
+  assert.ok(g.mapState.styles.some(x=>x.id==="label_city"));
+  g.language("ja");
+  const field=g.mapState.styles.filter(x=>x.id==="label_city").at(-1).expr;
+  assert.ok(JSON.stringify(field).includes("name:ja"));
+  assert.ok(JSON.stringify(field).includes('"name"'));
+  assert.ok(g.mapState.styles.every(x=>x.id!=="road_shield"));
+  g.language("pt");
+  assert.equal(g.get("languageFlag").textContent,"🇧🇷");
+  g.language("en");
+  assert.equal(g.get("languageFlag").textContent,"🇺🇸");
+  assert.match(files["index.html"],/language-globe/);
+});
+test("drag gestures do not create a pin, while a clean click does",()=>{
+  const g=boot({map:true});
+  assert.equal(g.get("guessBtn").disabled,true);
+  const canvas=g.mapState.canvas;
+  canvas.handlers.pointerdown({button:0,pointerType:"mouse",clientX:100,clientY:100});
+  canvas.handlers.pointermove({clientX:150,clientY:100});
+  canvas.handlers.pointerup({clientX:150,clientY:100});
+  g.mapState.events.click({lngLat:{lat:32,lng:-5}});
+  assert.equal(g.get("guessBtn").disabled,true);
+  canvas.handlers.pointerdown({button:0,pointerType:"mouse",clientX:100,clientY:100});
+  canvas.handlers.pointerup({clientX:101,clientY:101});
+  g.mapState.events.click({lngLat:{lat:31.62,lng:-7.98}});
+  assert.equal(g.get("guessBtn").disabled,false);
+});
+test("report opens in non-modal side panel without blocking the map",()=>{
+  const g=boot({map:true});
+  g.get("freeBtn").handlers.click();
+  g.select("Reykjavík");g.get("guessBtn").handlers.click();
+  assert.equal(g.get("reportDialog").open,true);
+  assert.match(files["app.js"],/dialog\.show\(\)/);
+  assert.match(files["styles.css"],/dialog\.case-report/);
+  assert.match(files["styles.css"],/inset:108px/);
 });
