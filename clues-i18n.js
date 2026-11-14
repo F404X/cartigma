@@ -77,5 +77,31 @@
       zones: Object.fromEntries(ZONE_KEYS.map((key,i)=>[key,zones[i]]))
     };
   }
+  // Place names remain proper nouns; the explanatory clue is translated.
+  const landmark = {
+    en:"Associated landmark: {name}",
+    pt:"Referência conhecida: {name}",
+    es:"Lugar emblemático: {name}",
+    zh:"当地著名地标：{name}",
+    ja:"有名な名所：{name}",
+    ru:"Известная достопримечательность: {name}",
+    fr:"Lieu emblématique : {name}",
+    de:"Bekanntes Wahrzeichen: {name}",
+    it:"Luogo simbolo: {name}",
+    nl:"Bekend herkenningspunt: {name}",
+    pl:"Znany punkt orientacyjny: {name}",
+    sv:"Känt landmärke: {name}",
+    tr:"Bilinen simge yapı: {name}",
+    ar:"معلم شهير: {name}",
+    he:"אתר מפורסם: {name}",
+    ko:"잘 알려진 명소: {name}",
+    th:"สถานที่สำคัญ: {name}",
+    vi:"Địa danh nổi tiếng: {name}",
+    id:"Landmark terkenal: {name}"
+  };
+  for(const language of Object.keys(localeData)) {
+    if(!landmark[language]) throw Error("Missing landmark translation for "+language);
+    localeData[language].templates.landmark=landmark[language];
+  }
   window.GeoCluesI18n = localeData;
 })();
