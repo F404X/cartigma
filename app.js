@@ -36,11 +36,13 @@
   }
   function cluesFor(p) {
     const lat = p[3], lon = p[4], lowLat = Math.floor(Math.abs(lat) / 10) * 10, lowLon = Math.floor(Math.abs(lon) / 20) * 20;
+    const altitude = elevationCache.get(p[0]);
+    const altitudeHint = Number.isFinite(altitude) ? "Altitude estimada do terreno: cerca de " + Math.round(altitude / 10) * 10 + " m. " : "";
     return [
       "A paisagem ao redor inclui " + p[5] + ".",
       "O alvo está no hemisfério " + (lat >= 0 ? "norte" : "sul") + ", entre " + lowLat + "° e " + (lowLat + 10) + "° de latitude.",
       "Procure na região: " + p[2] + ".",
-      "Longitude entre " + lowLon + "° e " + (lowLon + 20) + "° " + (lon >= 0 ? "leste" : "oeste") + ". No solstício de junho, o dia dura cerca de " + sunlight(lat).toFixed(1).replace(".", ",") + " horas.",
+      altitudeHint + "Longitude entre " + lowLon + "° e " + (lowLon + 20) + "° " + (lon >= 0 ? "leste" : "oeste") + ". No solstício de junho, o dia dura cerca de " + sunlight(lat).toFixed(1).replace(".", ",") + " horas.",
       "País ou território: " + p[1] + ".",
       "Referência decisiva: " + p[6] + "."
     ];
@@ -60,6 +62,7 @@
 
   let game, selected = null, map = null, selectedMarker = null, overlay = null, freeIndex = -1;
   let fetchAbort = null, searchTimer = null, toastTimer = null;
+  const elevationCache = new Map(), loadingElevation = new Set();
   function activePlace() { return PLACES[game.index]; }
   function save() { if (game.mode === "daily") storage.set(DAILY_PREFIX + today(), game); }
   function randomIndex() {
@@ -73,12 +76,31 @@
     selected = null;
     render();
     resetMapView();
+    loadElevation();
   }
   function startFree() {
     game = newState("free", randomIndex());
     selected = null;
     render();
     resetMapView();
+    loadElevation();
+  }
+  async function loadElevation() {
+    const place = activePlace(), key = place[0];
+    if (elevationCache.has(key) || loadingElevation.has(key)) return;
+    loadingElevation.add(key);
+    try {
+      const url = "https://api.open-meteo.com/v1/elevation?latitude=" + encodeURIComponent(place[3]) + "&longitude=" + encodeURIComponent(place[4]);
+      const response = await fetch(url);
+      if (!response.ok) return;
+      const data = await response.json();
+      const altitude = Array.isArray(data.elevation) ? data.elevation[0] : null;
+      if (typeof altitude === "number" && Number.isFinite(altitude)) {
+        elevationCache.set(key, altitude);
+        if (activePlace()[0] === key) renderClues();
+      }
+    } catch { /* A pista funciona mesmo sem a API. */ }
+    finally { loadingElevation.delete(key); }
   }
   function showToast(message) {
     const el = $("toast");
