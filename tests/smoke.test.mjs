@@ -139,7 +139,7 @@ test("modo livre aceita acerto exato e calcula 5.000 pontos", () => {
   assert.equal(get("finalScore").textContent, "5.000");
   assert.equal(get("guessHistory").children.length, 1);
   get("nextBtn").handlers.click();
-  assert.equal(get("guessHistory").children.length, 0);
+  assert.equal(get("guessHistory").children[0].textContent, "Seus palpites aparecerão aqui.");
 });
 
 test("pista extra cobra penalidade e desbloqueia mais uma evidência", () => {
