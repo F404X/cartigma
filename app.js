@@ -1,434 +1,408 @@
-/* GeoDetective — jogo geográfico em JavaScript puro. */
+/* GeoDetective — game engine · no framework, no account, no API key. */
 (() => {
   "use strict";
-
   const PLACES = window.GEODETECTIVE_PLACES || [];
-  const MAX_GUESSES = 6;
-  const WIN_RADIUS_KM = 100;
-  const DAILY_PREFIX = "geodetective-daily-v1-";
-  const $ = (id) => document.getElementById(id);
-  const pad = (n) => String(n).padStart(2, "0");
-  const number = (n) => Math.round(n).toLocaleString("pt-BR");
-  const today = () => new Date().toISOString().slice(0, 10);
-  const rad = (deg) => deg * Math.PI / 180;
-  const deg = (radians) => radians * 180 / Math.PI;
-  const hash = (s) => { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
-  const normalize = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-  const storage = {
-    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
-    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+  const TRANSLATIONS = window.GeoI18n?.PACKS || {};
+  const CLUE_I18N = window.GeoCluesI18n || {};
+  const LANGS = window.GeoI18n?.langNames || {};
+  const DIFFICULTIES = {easy: {attempts:8,initial:3},normal:{attempts:6,initial:2},hard:{attempts:4,initial:1}};
+  const WIN_RADIUS = 100, HINT_COST = 300, DAILY_KEY = "geodetective-daily-v3-";
+  const COUNTRY_CODES = "IS NO NO NO FI SE DK GB FR PT IT GR TR MA EG SN NG KE ET ZA MG AE JO IL IN IN IN NP BD TH SG ID ID JP JP KR CN CN CN TW MN KZ AU AU AU AU NZ NZ FJ PF CA US US US US MX MX CU GT CO EC PE PE BO BR BR BR BR BR BR AR CL AR CL".split(" ");
+  const FEATURES = "volcanic fjord polar fjord coast islands coast river river estuary river valley strait desert desert peninsula delta plateau plateau peninsula plateau desert plateau mountains coast plain delta valley delta delta islands delta islands coast valley river plain delta bay valley plateau mountains harbor coast coast islands volcanic harbor islands volcanic coast estuary bay mountains islands plateau valley coast volcanic plateau mountains desert mountains valley plateau plateau forest bay plateau bay estuary valley islands strait".split(" ");
+  const CAPITALS = new Set("Reykjavík|Oslo|Helsinque|Estocolmo|Copenhague|Londres|Paris|Lisboa|Roma|Atenas|Cairo|Dacar|Nairóbi|Adis Abeba|Antananarivo|Amã|Nova Délhi|Catmandu|Daca|Bangcoc|Singapura|Tóquio|Seul|Pequim|Ulan Bator|Wellington|Suva|Cidade do México|Havana|Cidade da Guatemala|Bogotá|Quito|Lima|Brasília|Buenos Aires|Santiago".split("|"));
+  const EN_CITY = {
+    "Estocolmo":"Stockholm","Copenhague":"Copenhagen","Londres":"London","Lisboa":"Lisbon",
+    "Roma":"Rome","Atenas":"Athens","Istambul":"Istanbul","Cidade do Cabo":"Cape Town",
+    "Nairóbi":"Nairobi","Adis Abeba":"Addis Ababa","Amã":"Amman",
+    "Nova Délhi":"New Delhi","Calcutá":"Kolkata","Catmandu":"Kathmandu","Daca":"Dhaka",
+    "Bangcoc":"Bangkok","Singapura":"Singapore","Jacarta":"Jakarta","Tóquio":"Tokyo",
+    "Quioto":"Kyoto","Seul":"Seoul","Pequim":"Beijing","Xangai":"Shanghai",
+    "Taipé":"Taipei","Ulan Bator":"Ulaanbaatar","Nova York":"New York",
+    "São Francisco":"San Francisco","Cidade do México":"Mexico City",
+    "Cidade da Guatemala":"Guatemala City"
   };
-  const kmDistance = (a, b) => {
-    const dLat = rad(b[0] - a[0]), dLng = rad(b[1] - a[1]);
-    const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a[0])) * Math.cos(rad(b[0])) * Math.sin(dLng / 2) ** 2;
-    return 6371.0088 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(Math.max(0, 1 - h)));
+  const $ = id => document.getElementById(id);
+  const hash = input => {let h=2166136261;for(const char of input){h ^=char.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0;};
+  const norm = s => String(s).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
+  const rad = n => n*Math.PI/180;
+  const dist = (a,b) => {
+    const la=rad(b[0]-a[0]),lo=rad(b[1]-a[1]);
+    const h=Math.sin(la/2)**2+Math.cos(rad(a[0]))*Math.cos(rad(b[0]))*Math.sin(lo/2)**2;
+    return 6371.0088*2*Math.atan2(Math.sqrt(h),Math.sqrt(Math.max(0,1-h)));
   };
-  function bearing(a, b) {
-    const x = Math.sin(rad(b[1] - a[1])) * Math.cos(rad(b[0]));
-    const y = Math.cos(rad(a[0])) * Math.sin(rad(b[0])) - Math.sin(rad(a[0])) * Math.cos(rad(b[0])) * Math.cos(rad(b[1] - a[1]));
-    return (deg(Math.atan2(x, y)) + 360) % 360;
-  }
-  const compass = (heading) => ["N", "NE", "L", "SE", "S", "SO", "O", "NO"][Math.round(heading / 45) % 8];
-  function sunlight(latitude) {
-    // Duração astronômica teórica no solstício de junho; ignora refração e horizonte.
-    const cosine = -Math.tan(rad(latitude)) * Math.tan(rad(23.44));
-    return cosine <= -1 ? 24 : cosine >= 1 ? 0 : 24 / Math.PI * Math.acos(cosine);
-  }
-  function cluesFor(p) {
-    const lat = p[3], lon = p[4], lowLat = Math.floor(Math.abs(lat) / 10) * 10, lowLon = Math.floor(Math.abs(lon) / 20) * 20;
-    const altitude = elevationCache.get(p[0]);
-    const altitudeHint = Number.isFinite(altitude) ? "Altitude estimada do terreno: cerca de " + Math.round(altitude / 10) * 10 + " m. " : "";
-    return [
-      "A paisagem ao redor inclui " + p[5] + ".",
-      "O alvo está no hemisfério " + (lat >= 0 ? "norte" : "sul") + ", entre " + lowLat + "° e " + (lowLat + 10) + "° de latitude.",
-      "Procure na região: " + p[2] + ".",
-      altitudeHint + "Longitude entre " + lowLon + "° e " + (lowLon + 20) + "° " + (lon >= 0 ? "leste" : "oeste") + ". No solstício de junho, o dia dura cerca de " + sunlight(lat).toFixed(1).replace(".", ",") + " horas.",
-      "País ou território: " + p[1] + ".",
-      "Referência decisiva: " + p[6] + "."
-    ];
-  }
-  const dailyIndex = () => hash("GEODETECTIVE|" + today()) % PLACES.length;
-  const newState = (mode, index) => ({
-    mode, index, date: mode === "daily" ? today() : null,
-    guesses: [], revealed: 2, penalty: 0, finished: false, won: false, score: 0
-  });
-  const savedDaily = () => {
-    const saved = storage.get(DAILY_PREFIX + today());
-    return saved && saved.mode === "daily" && saved.date === today() && saved.index === dailyIndex() &&
-      Array.isArray(saved.guesses) && saved.guesses.length <= MAX_GUESSES &&
-      saved.guesses.every((g) => Number.isFinite(g.lat) && Number.isFinite(g.lng) && Number.isFinite(g.distance))
-      ? saved : null;
+  const heading = (a,b) => {
+    const y=Math.sin(rad(b[1]-a[1]))*Math.cos(rad(b[0]));
+    const x=Math.cos(rad(a[0]))*Math.sin(rad(b[0]))-Math.sin(rad(a[0]))*Math.cos(rad(b[0]))*Math.cos(rad(b[1]-a[1]));
+    return (Math.atan2(y,x)*180/Math.PI+360)%360;
   };
+  const direction = bearing => ["N","NE","E","SE","S","SW","W","NW"][Math.round(bearing/45)%8];
+  const today = () => new Date().toISOString().slice(0,10);
+  const store = {
+    get(k){try{return JSON.parse(localStorage.getItem(k))}catch{return null}},
+    set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}
+  };
+  const savedLang = store.get("geodetective-language");
+  let lang = typeof savedLang === "string" && TRANSLATIONS[savedLang] ? savedLang : "en";
+  const savedDifficulty = store.get("geodetective-difficulty");
+  let difficulty = DIFFICULTIES[savedDifficulty] ? savedDifficulty : "normal";
+  let game = null, selected = null, map = null, marker = null, overlays = null, freeIndex = -1;
+  let controller = null, debounce = null, toastTimer = null;
 
-  let game, selected = null, map = null, selectedMarker = null, overlay = null, freeIndex = -1;
-  let fetchAbort = null, searchTimer = null, toastTimer = null;
-  const elevationCache = new Map(), loadingElevation = new Set();
-  function activePlace() { return PLACES[game.index]; }
-  function save() { if (game.mode === "daily") storage.set(DAILY_PREFIX + today(), game); }
-  function randomIndex() {
-    const all = PLACES.map((_, i) => i).filter((i) => i !== freeIndex);
-    const index = all[Math.floor(Math.random() * all.length)];
-    freeIndex = index;
-    return index;
+  function t(key, variables={}) {
+    const template = TRANSLATIONS[lang]?.[key] ?? TRANSLATIONS.en?.[key] ?? key;
+    return template.replace(/\{(\w+)\}/g,(_,name)=>String(variables[name]??""));
   }
-  function startDaily() {
-    game = savedDaily() || newState("daily", dailyIndex());
-    selected = null;
-    render();
-    resetMapView();
-    loadElevation();
+  function tc(key,variables={}) {
+    const template = CLUE_I18N[lang]?.templates?.[key] ?? CLUE_I18N.en?.templates?.[key] ?? key;
+    return template.replace(/\{(\w+)\}/g,(_,name)=>String(variables[name]??""));
   }
-  function startFree() {
-    game = newState("free", randomIndex());
-    selected = null;
-    render();
-    resetMapView();
-    loadElevation();
+  function locale() {return LANGS[lang] || "en";}
+  function number(value){return Math.round(value).toLocaleString(locale())}
+  function displayRegion(code){
+    try{return new Intl.DisplayNames([locale()],{type:"region"}).of(code)}catch{return code}
   }
-  async function loadElevation() {
-    const place = activePlace(), key = place[0];
-    if (elevationCache.has(key) || loadingElevation.has(key)) return;
-    loadingElevation.add(key);
-    try {
-      const url = "https://api.open-meteo.com/v1/elevation?latitude=" + encodeURIComponent(place[3]) + "&longitude=" + encodeURIComponent(place[4]);
-      const response = await fetch(url);
-      if (!response.ok) return;
-      const data = await response.json();
-      const altitude = Array.isArray(data.elevation) ? data.elevation[0] : null;
-      if (typeof altitude === "number" && Number.isFinite(altitude)) {
-        elevationCache.set(key, altitude);
-        if (activePlace()[0] === key) renderClues();
-      }
-    } catch { /* A pista funciona mesmo sem a API. */ }
-    finally { loadingElevation.delete(key); }
+  function cityName(p) {return lang==="pt"?p[0]:(EN_CITY[p[0]]||p[0]);}
+  function countryName(index){return displayRegion(COUNTRY_CODES[index])}
+  function continentCode(index){
+    if(index<=12)return "150";
+    if(index<=20)return "002";
+    if(index<=41)return "142";
+    if(index<=49)return "009";
+    if(index<=58)return "021";
+    return "005";
   }
-  function showToast(message) {
-    const el = $("toast");
-    el.textContent = message;
-    el.classList.remove("hidden");
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.add("hidden"), 3200);
+  function locationFeature(index) {
+    const key = FEATURES[index] || "plain";
+    return CLUE_I18N[lang]?.features?.[key] || CLUE_I18N.en?.features?.[key] || key;
   }
-  function renderClues() {
-    const clues = cluesFor(activePlace());
-    $("hintCount").textContent = game.revealed + " DE " + clues.length;
-    $("clueList").replaceChildren();
-    clues.forEach((content, i) => {
-      const li = document.createElement("li");
-      li.className = "clue" + (i >= game.revealed ? " locked" : "");
-      const index = document.createElement("span");
-      index.className = "clue-index";
-      index.textContent = pad(i + 1);
-      const body = document.createElement("span");
-      body.className = "clue-text";
-      body.textContent = i < game.revealed ? content : "EVIDÊNCIA BLOQUEADA";
-      li.append(index, body);
-      $("clueList").append(li);
+  function latitudeZone(latitude) {
+    const a=Math.abs(latitude);
+    const key=a<10?"equatorial":a<23.5?"tropical":a<35?"subtropical":a<55?"temperate":a<66.5?"subpolar":"polar";
+    return CLUE_I18N[lang]?.zones?.[key] || CLUE_I18N.en?.zones?.[key] || key;
+  }
+  function cityAt(index){return PLACES[index]}
+  function cityCoords(index){return [PLACES[index][3],PLACES[index][4]]}
+  function nearestOther(index) {
+    let best=-1,minimum=Infinity;
+    for(let i=0;i<PLACES.length;i++){
+      if(i===index)continue;
+      const d=dist(cityCoords(index),cityCoords(i));
+      if(d<minimum){best=i;minimum=d}
+    }
+    return {index:best,km:minimum};
+  }
+  function anchorDistances(index) {
+    const indexes=[7,14,33,42,51,55,64,70].filter(i=>i!==index);
+    return indexes.map(i=>({index:i,km:dist(cityCoords(index),cityCoords(i))})).sort((a,b)=>a.km-b.km);
+  }
+  function cluesFor(index,level){
+    const p=cityAt(index), lat=p[3];
+    const anchors=anchorDistances(index);
+    const near=nearestOther(index);
+    const selectedAnchor=anchors[hash("anchor"+p[0])%Math.min(2,anchors.length)];
+    const far=anchors[anchors.length-1];
+    const early=[
+      {key:"terrain",value:locationFeature(index)},
+      {key:"continent",value:displayRegion(continentCode(index))},
+      {key:"zone",value:latitudeZone(lat)},
+      {key:"capital",value:tc(CAPITALS.has(p[0])?"yes":"no")},
+      {key:"hemisphere",value:tc(lat>=0?"north":"south")}
+    ];
+    // Rotate selection deterministically to vary the opening clues between cities.
+    const seed=hash("facts-v3:"+p[0])%early.length;
+    const first=[early[seed],early[(seed+2)%early.length],early[(seed+4)%early.length]];
+    // The fourth clue is a concrete, measurable geographical reference.
+    const distanceClue={key:"distance",km:number(selectedAnchor.km),city:cityName(cityAt(selectedAnchor.index))};
+    const comparison={key:"closer",a:cityName(cityAt(anchors[0].index)),b:cityName(cityAt(far.index))};
+    const nearest={key:"nearest",city:cityName(cityAt(near.index)),km:number(near.km)};
+    const fifth=level==="easy"?{key:"country",value:countryName(index)}:comparison;
+    return [...first,distanceClue,fifth,nearest];
+  }
+  function clueText(clue){return tc(clue.key,clue)}
+  function maximum(){return DIFFICULTIES[difficulty].attempts}
+  function dailyIndex(){
+    return hash("GEODETECTIVE-v3|"+today()+"|"+difficulty)%PLACES.length;
+  }
+  function dailyStorageKey(){return DAILY_KEY+today()+"-"+difficulty}
+  function newGame(mode,index) {
+    return {mode,index,difficulty,date:mode==="daily"?today():null,guesses:[],
+      revealed:DIFFICULTIES[difficulty].initial,penalty:0,finished:false,won:false,score:0};
+  }
+  function savedDaily(){
+    const s=store.get(dailyStorageKey());
+    return s&&s.mode==="daily"&&s.date===today()&&s.difficulty===difficulty&&s.index===dailyIndex()
+      &&Array.isArray(s.guesses)&&s.guesses.length<=maximum()&&Number.isFinite(s.revealed)
+      &&s.guesses.every(g=>Number.isFinite(g.lat)&&Number.isFinite(g.lng)&&Number.isFinite(g.distance))
+      ?s:null;
+  }
+  function save(){if(game?.mode==="daily")store.set(dailyStorageKey(),game)}
+  function chooseFree(){
+    const options=PLACES.map((_,i)=>i).filter(i=>i!==freeIndex);
+    freeIndex=options[Math.floor(Math.random()*options.length)];
+    return freeIndex;
+  }
+  function startDaily(){game=savedDaily()||newGame("daily",dailyIndex());selected=null;render();resetMapView()}
+  function startFree(){game=newGame("free",chooseFree());selected=null;render();resetMapView()}
+  function setDifficulty(level){
+    if(!DIFFICULTIES[level]||level===difficulty)return;
+    difficulty=level;store.set("geodetective-difficulty",level);
+    if(game.mode==="daily")startDaily();else startFree();
+  }
+  function setLanguage(value){
+    if(!TRANSLATIONS[value])return;
+    lang=value;store.set("geodetective-language",lang);
+    document.documentElement.lang=locale();
+    document.documentElement.dir=["ar","he"].includes(lang)?"rtl":"ltr";
+    $("langSelect").value=lang;
+    document.querySelectorAll("[data-i18n]").forEach(element=>{element.textContent=t(element.dataset.i18n)});
+    $("citySearch").placeholder=t("searchPlaceholder");
+    $("helpBtn").setAttribute("aria-label",t("help"));
+    $("resetViewBtn").title=t("reset");
+    $("difficultySelect").value=difficulty;
+    if(game)render();
+  }
+  function toast(text){
+    const element=$("toast");element.textContent=text;element.classList.remove("hidden");
+    clearTimeout(toastTimer);toastTimer=setTimeout(()=>element.classList.add("hidden"),2800);
+  }
+  function renderClues(){
+    const clues=cluesFor(game.index,difficulty);
+    $("hintCount").textContent=game.revealed+" / "+clues.length;
+    const list=$("clueList");list.replaceChildren();
+    clues.forEach((clue,i)=>{
+      const row=document.createElement("li");row.className="clue"+(i>=game.revealed?" locked":"");
+      const idx=document.createElement("span");idx.className="clue-index";idx.textContent=String(i+1).padStart(2,"0");
+      const value=document.createElement("span");value.className="clue-text";
+      value.textContent=i<game.revealed?clueText(clue):t("locked");
+      value.title=i<game.revealed?clueText(clue):t("locked");
+      row.append(idx,value);list.append(row);
     });
-    $("revealBtn").disabled = game.finished || game.revealed >= clues.length;
-    $("revealBtn").classList.toggle("hidden", game.finished);
+    $("revealBtn").disabled=game.finished||game.revealed>=6;
+    $("revealBtn").classList.toggle("hidden",game.finished);
   }
-  function renderHistory() {
-    const list = $("guessHistory");
-    list.replaceChildren();
-    $("historyCount").textContent = pad(game.guesses.length);
-    if (!game.guesses.length) {
-      const li = document.createElement("li");
-      li.className = "empty-history";
-      li.textContent = "Seus palpites aparecerão aqui.";
-      list.append(li);
-      return;
+  function renderHistory(){
+    const list=$("guessHistory");list.replaceChildren();
+    $("historyCount").textContent=String(game.guesses.length).padStart(2,"0");
+    if(!game.guesses.length){
+      const li=document.createElement("li");li.className="empty-history";li.textContent=t("empty");list.append(li);return;
     }
-    for (const [i, g] of game.guesses.entries()) {
-      const li = document.createElement("li");
-      li.className = "history-item";
-      const left = document.createElement("span");
-      const idx = document.createElement("span");
-      idx.className = "history-number";
-      idx.textContent = pad(i + 1);
-      const label = document.createTextNode(g.label || g.lat.toFixed(2) + "°, " + g.lng.toFixed(2) + "°");
-      const small = document.createElement("small");
-      small.textContent = g.lat.toFixed(2) + "°, " + g.lng.toFixed(2) + "°";
-      left.append(idx, label, small);
-      const right = document.createElement("strong");
-      right.textContent = g.distance <= WIN_RADIUS_KM ? "ACERTO" : number(g.distance) + " km · " + compass(g.bearing);
-      li.append(left, right);
-      list.append(li);
-    }
+    [...game.guesses].reverse().forEach((g,reversed)=>{
+      const row=document.createElement("li");row.className="history-item";
+      const label=document.createElement("span");
+      const idx=document.createElement("span");idx.className="history-number";idx.textContent=String(game.guesses.length-reversed).padStart(2,"0");
+      label.append(idx,document.createTextNode(g.label||g.lat.toFixed(2)+"°, "+g.lng.toFixed(2)+"°"));
+      const distance=document.createElement("strong");distance.textContent=number(g.distance)+" km · "+direction(g.bearing);
+      row.append(label,distance);list.append(row);
+    });
   }
-  function renderResult() {
-    $("resultCard").classList.toggle("hidden", !game.finished);
-    if (!game.finished) return;
-    const p = activePlace();
-    $("resultKicker").textContent = game.won ? "✓ CASO RESOLVIDO" : "◉ CASO ENCERRADO";
-    $("resultTitle").textContent = p[0] + ", " + p[1];
-    $("resultDetail").textContent = game.won
-      ? "Excelente investigação! Você encontrou a cidade a " + number(game.guesses.at(-1).distance) + " km do ponto-alvo."
-      : "As seis tentativas acabaram. A cidade secreta era " + p[0] + ", " + p[1] + ". Analise as pistas e tente novamente.";
-    $("finalScore").textContent = number(game.score);
-    $("nextBtn").textContent = game.mode === "daily" ? "JOGAR MODO LIVRE →" : "NOVO CASO →";
+  function renderResult(){
+    $("resultCard").classList.toggle("hidden",!game.finished);
+    if(!game.finished)return;
+    const name=cityName(cityAt(game.index))+", "+countryName(game.index);
+    $("resultKicker").textContent=t(game.won?"solved":"closed");
+    $("resultTitle").textContent=name;
+    $("resultDetail").textContent=game.won
+      ?t("foundText",{city:name,count:game.guesses.length,km:number(game.guesses.at(-1).distance)})
+      :t("lostText",{city:name});
+    $("finalScore").textContent=number(game.score);
+    $("nextBtn").textContent=t(game.mode==="daily"?"toFree":"newCase");
   }
-  function render() {
-    const daily = game.mode === "daily", remaining = MAX_GUESSES - game.guesses.length;
-    $("year").textContent = String(new Date().getFullYear());
-    $("placeCount").textContent = String(PLACES.length);
-    $("dailyBtn").classList.toggle("active", daily);
-    $("freeBtn").classList.toggle("active", !daily);
-    $("dailyBtn").setAttribute("aria-pressed", String(daily));
-    $("freeBtn").setAttribute("aria-pressed", String(!daily));
-    const caseNumber = daily ? "#" + today().replaceAll("-", "").slice(2) : "#F-" + String(game.index + 1).padStart(3, "0");
-    $("caseCode").textContent = "CASO " + caseNumber;
-    $("caseNumber").textContent = "CASO " + caseNumber;
-    $("modeCaption").textContent = daily ? "DESAFIO GLOBAL · DATA UTC" : "CASOS ILIMITADOS";
-    $("caseStatus").textContent = game.finished ? (game.won ? "RESOLVIDO" : "ENCERRADO") : "EM ABERTO";
-    $("caseStatus").classList.toggle("closed", game.finished);
-    $("caseTitle").textContent = game.finished ? activePlace()[0] : "Localização desconhecida";
-    $("attemptCount").textContent = remaining + " / " + MAX_GUESSES;
-    $("guessCounter").textContent = game.guesses.length + " DE " + MAX_GUESSES;
-    $("attemptDots").replaceChildren();
-    for (let i = 0; i < MAX_GUESSES; i++) {
-      const dot = document.createElement("i");
-      dot.classList.toggle("live", i < remaining);
-      $("attemptDots").append(dot);
+  function feedback(){
+    const el=$("feedback");
+    if(!game.guesses.length||game.finished){el.classList.add("hidden");return}
+    const last=game.guesses.at(-1);
+    el.textContent=t("feedback",{km:number(last.distance),dir:direction(last.bearing)});
+    el.className="feedback";
+  }
+  function render(){
+    const daily=game.mode==="daily";
+    const max=maximum(),remaining=max-game.guesses.length;
+    $("dailyBtn").classList.toggle("active",daily);$("freeBtn").classList.toggle("active",!daily);
+    $("dailyBtn").setAttribute("aria-pressed",String(daily));$("freeBtn").setAttribute("aria-pressed",String(!daily));
+    $("difficultySelect").value=difficulty;
+    const code=daily?"#"+today().replaceAll("-","").slice(2):"#F-"+String(game.index+1).padStart(3,"0");
+    $("caseCode").textContent=t("caseWord")+" "+code;
+    $("caseNumber").textContent=t("caseWord")+" "+code;
+    $("modeCaption").textContent=t(daily?"modeDaily":"modeFree");
+    $("caseTitle").textContent=game.finished?cityName(cityAt(game.index)):t("unknown");
+    $("caseStatus").textContent=t(game.finished?(game.won?"solved":"closed"):"active");
+    $("caseStatus").classList.toggle("closed",game.finished);
+    $("attemptCount").textContent=remaining+" / "+max;
+    $("guessCounter").textContent=game.guesses.length+" / "+max;
+    const dots=$("attemptDots");dots.replaceChildren();
+    dots.style.setProperty("--attempt-total",max);
+    for(let i=0;i<max;i++){const dot=document.createElement("i");dot.classList.toggle("live",i<remaining);dots.append(dot)}
+    $("placeCount").textContent=String(PLACES.length);
+    renderClues();renderHistory();renderResult();feedback();
+    $("guessBtn").disabled=game.finished||!selected;
+    $("citySearch").disabled=game.finished;
+    $("citySearch").value="";
+    $("suggestions").classList.add("hidden");
+    $("selection").classList.toggle("hidden",game.finished);
+    $("selectedText").textContent=selected?(selected.label||selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°"):t("noSelection");
+    $("mapHint").textContent=t(game.finished?"mapRevealed":"mapHint");
+    renderMap();
+  }
+  function makeMarker(text,style){
+    const node=document.createElement("span");node.className="pin "+style;node.textContent=String(text);
+    return L.divIcon({className:"guess-marker",html:node.outerHTML,iconSize:[27,27],iconAnchor:[13,13]});
+  }
+  function renderMap(){
+    if(!map)return;
+    overlays.clearLayers();
+    if(marker){map.removeLayer(marker);marker=null}
+    const target=cityCoords(game.index);
+    game.guesses.forEach((g,i)=>L.marker([g.lat,g.lng],{icon:makeMarker(i+1,"past")}).addTo(overlays));
+    if(game.finished){
+      L.marker(target,{icon:makeMarker("★","target")}).addTo(overlays)
+        .bindPopup(cityName(cityAt(game.index))+" · "+countryName(game.index));
+      if(game.guesses.length){
+        const last=game.guesses.at(-1);
+        L.polyline([[last.lat,last.lng],target],{color:"#ffd449",weight:2,opacity:.8,dashArray:"5 7"}).addTo(overlays);
+        map.fitBounds(L.latLngBounds([[last.lat,last.lng],target]).pad(.25),{maxZoom:8,padding:[15,15],animate:true});
+      }else map.setView(target,5);
+    }else if(selected){
+      marker=L.marker([selected.lat,selected.lng],{icon:makeMarker("+","")}).addTo(map);
     }
-    renderClues();
-    renderHistory();
-    renderResult();
-    $("guessBtn").disabled = game.finished || !selected;
-    $("citySearch").disabled = game.finished;
-    $("citySearch").value = "";
-    $("selection").classList.toggle("hidden", game.finished);
-    $("selectedText").textContent = selected ? (selected.label || selected.lat.toFixed(3) + "°, " + selected.lng.toFixed(3) + "°") : "Nenhum ponto selecionado";
-    $("mapHint").textContent = game.finished ? "LOCALIZAÇÃO REVELADA" : "CLIQUE PARA MARCAR SUA HIPÓTESE";
-    $("feedback").classList.add("hidden");
+    $("coordinates").textContent=game.finished
+      ?target[0].toFixed(3)+"°, "+target[1].toFixed(3)+"°"
+      :selected?selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°":t("noSelection");
+  }
+  function resetMapView(){if(map&&!game.finished)map.setView([15,8],2,{animate:false})}
+  function selectPoint(lat,lng,label){
+    if(game.finished)return;
+    selected={lat:Number(lat),lng:Number(lng),label:label||""};
+    if(map)map.setView([selected.lat,selected.lng],Math.max(map.getZoom(),4),{animate:true});
+    $("guessBtn").disabled=false;
+    $("selectedText").textContent=selected.label||selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°";
     $("suggestions").classList.add("hidden");
     renderMap();
   }
-  function createIcon(content, style) {
-    const html = '<span class="pin ' + style + '">' + String(content) + '</span>';
-    return L.divIcon({ className: "guess-marker", html, iconSize: [28, 28], iconAnchor: [14, 14] });
+  function reveal(){
+    if(game.finished||game.revealed>=6)return;
+    game.revealed++;game.penalty+=HINT_COST;save();renderClues();toast(t("hintUsed"));
   }
-  function renderMap() {
-    if (!map) return;
-    overlay.clearLayers();
-    if (selectedMarker) {
-      map.removeLayer(selectedMarker);
-      selectedMarker = null;
+  function guess(){
+    if(!selected||game.finished)return;
+    const pos=[selected.lat,selected.lng],to=cityCoords(game.index),distance=dist(pos,to);
+    game.guesses.push({lat:selected.lat,lng:selected.lng,label:selected.label,
+      distance:Math.round(distance),bearing:Math.round(heading(pos,to))});
+    game.won=distance<=WIN_RADIUS;
+    if(game.won||game.guesses.length>=maximum()){
+      game.finished=true;game.revealed=6;
+      game.score=game.won
+        ?Math.max(250,Math.round(5000*Math.pow(.78,game.guesses.length-1)*Math.max(.76,1-distance/425)-game.penalty))
+        :0;
+    }else game.revealed=Math.min(6,Math.max(game.revealed,DIFFICULTIES[difficulty].initial+game.guesses.length));
+    save();selected=null;render();
+    if(game.finished)toast(t(game.won?"foundToast":"lostToast"));
+    else if(map){const g=game.guesses.at(-1);map.setView([g.lat,g.lng],Math.max(map.getZoom(),3))}
+  }
+  function searchLocal(term){
+    const q=norm(term);
+    return PLACES.filter(p=>norm(p[0]+" "+(EN_CITY[p[0]]||"")+" "+p[1]).includes(q)).slice(0,5)
+      .map((p)=>({name:cityName(p),description:countryName(PLACES.indexOf(p)),lat:p[3],lon:p[4]}));
+  }
+  function suggestions(items){
+    const list=$("suggestions");list.replaceChildren();
+    if(!items.length){
+      const empty=document.createElement("div");empty.className="suggestion-empty";empty.textContent=t("noResults");list.append(empty);
     }
-    const p = activePlace(), target = [p[3], p[4]];
-    for (const [i, g] of game.guesses.entries()) {
-      L.marker([g.lat, g.lng], { icon: createIcon(i + 1, "past") }).addTo(overlay);
-    }
-    if (game.finished) {
-      L.marker(target, { icon: createIcon("★", "target") }).addTo(overlay).bindPopup(p[0] + " · " + p[1]);
-      if (game.guesses.length) {
-        const g = game.guesses.at(-1);
-        L.polyline([[g.lat, g.lng], target], { color: "#d5f77a", weight: 2, opacity: .75, dashArray: "6 8" }).addTo(overlay);
-        map.fitBounds(L.latLngBounds([[g.lat, g.lng], target]).pad(.35), { maxZoom: 8, animate: true, padding: [30, 30] });
-      } else map.setView(target, 5);
-    } else if (selected) {
-      selectedMarker = L.marker([selected.lat, selected.lng], { icon: createIcon("+", "") }).addTo(map);
-    }
-    $("coordinates").textContent = selected && !game.finished
-      ? Math.abs(selected.lat).toFixed(3) + "° " + (selected.lat >= 0 ? "N" : "S") + " · " + Math.abs(selected.lng).toFixed(3) + "° " + (selected.lng >= 0 ? "L" : "O")
-      : game.finished ? "ALVO " + target[0].toFixed(3) + "°, " + target[1].toFixed(3) + "°" : "AGUARDANDO COORDENADAS";
-  }
-  function resetMapView() { if (map && !game.finished) map.setView([12, 8], 2, { animate: false }); }
-  function selectPoint(lat, lng, label) {
-    if (game.finished) return;
-    selected = { lat: Number(lat), lng: Number(lng), label: label || "" };
-    if (map) map.setView([selected.lat, selected.lng], Math.max(map.getZoom(), 4), { animate: true });
-    $("guessBtn").disabled = false;
-    $("selectedText").textContent = label || selected.lat.toFixed(3) + "°, " + selected.lng.toFixed(3) + "°";
-    $("feedback").classList.add("hidden");
-    $("suggestions").classList.add("hidden");
-    renderMap();
-  }
-  function reveal() {
-    if (game.finished || game.revealed >= 6) return;
-    game.revealed++;
-    game.penalty += 300;
-    save();
-    renderClues();
-    showToast("Nova evidência revelada. Penalidade: 300 pontos.");
-  }
-  function guess() {
-    if (!selected || game.finished) return;
-    const target = [activePlace()[3], activePlace()[4]], pos = [selected.lat, selected.lng];
-    const distance = kmDistance(pos, target), direction = bearing(pos, target);
-    game.guesses.push({
-      lat: selected.lat, lng: selected.lng, label: selected.label,
-      distance: Math.round(distance), bearing: Math.round(direction)
-    });
-    game.won = distance <= WIN_RADIUS_KM;
-    if (game.won || game.guesses.length >= MAX_GUESSES) {
-      game.finished = true;
-      game.revealed = 6;
-      game.score = game.won ? Math.max(250, Math.round(
-        5000 * Math.pow(.77, game.guesses.length - 1) * Math.max(.76, 1 - distance / 425) - game.penalty
-      )) : 0;
-    } else {
-      game.revealed = Math.min(6, Math.max(game.revealed, game.guesses.length + 2));
-    }
-    save();
-    selected = null;
-    render();
-    const feedback = $("feedback");
-    if (!game.finished) {
-      feedback.textContent = "Distância: " + number(distance) + " km · Direção do alvo: " + compass(direction) + ". Nova pista desbloqueada.";
-      feedback.className = "feedback";
-      if (map) {
-        const g = game.guesses.at(-1);
-        map.setView([g.lat, g.lng], Math.max(map.getZoom(), 3));
-      }
-    } else if (game.won) showToast("Caso resolvido. Excelente trabalho!");
-    else showToast("Caso encerrado. O alvo foi revelado no mapa.");
-  }
-  function resultsFor(term) {
-    const q = normalize(term);
-    return PLACES.filter((p) => normalize(p[0] + " " + p[1] + " " + p[2]).includes(q))
-      .slice(0, 5).map((p) => ({ name: p[0], sub: p[1], latitude: p[3], longitude: p[4] }));
-  }
-  function listSuggestions(items) {
-    const list = $("suggestions");
-    list.replaceChildren();
-    if (!items.length) {
-      const empty = document.createElement("div");
-      empty.className = "suggestion-empty";
-      empty.textContent = "Nenhum lugar encontrado. Você também pode clicar no mapa.";
-      list.append(empty);
-    }
-    for (const item of items.slice(0, 7)) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "suggestion";
-      button.setAttribute("role", "option");
-      button.textContent = item.name;
-      const small = document.createElement("small");
-      small.textContent = item.sub;
-      button.append(small);
-      button.addEventListener("click", () => {
-        selectPoint(item.latitude, item.longitude, item.name);
-        $("citySearch").value = item.name;
-      });
+    for(const item of items.slice(0,7)){
+      const button=document.createElement("button");button.type="button";button.className="suggestion";button.setAttribute("role","option");
+      button.textContent=item.name;
+      const desc=document.createElement("small");desc.textContent=item.description;button.append(desc);
+      button.addEventListener("click",()=>{selectPoint(item.lat,item.lon,item.name);$("citySearch").value=item.name});
       list.append(button);
     }
     list.classList.remove("hidden");
   }
-  async function performSearch(term) {
-    if (term.length < 3 || game.finished) return;
-    const local = resultsFor(term);
-    listSuggestions(local);
-    if (fetchAbort) fetchAbort.abort();
-    const controller = new AbortController();
-    fetchAbort = controller;
-    try {
-      const url = "https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(term) + "&count=8&language=pt&format=json";
-      const response = await fetch(url, { signal: controller.signal });
-      if (!response.ok) throw new Error("API indisponível");
-      const data = await response.json();
-      if (controller !== fetchAbort || game.finished || $("citySearch").value.trim() !== term) return;
-      const remote = (data.results || []).map((p) => ({
-        name: p.name, sub: [p.admin1, p.country].filter(Boolean).join(", "),
-        latitude: p.latitude, longitude: p.longitude
-      }));
-      const all = [...local];
-      for (const p of remote) {
-        if (!all.some((existing) => kmDistance([existing.latitude, existing.longitude], [p.latitude, p.longitude]) < 10)) all.push(p);
+  async function searchRemote(term){
+    if(term.length<3||game.finished)return;
+    const local=searchLocal(term);suggestions(local);
+    if(controller)controller.abort();
+    const signaler=new AbortController();controller=signaler;
+    try{
+      const supported=["en","pt","es","fr","de","it","ru","zh","ja","nl","pl","tr"].includes(lang)?lang:"en";
+      const url="https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(term)+"&count=8&language="+supported+"&format=json";
+      const response=await fetch(url,{signal:signaler.signal});
+      if(!response.ok)throw Error("search failed");
+      const data=await response.json();
+      if(signaler!==controller||game.finished||$("citySearch").value.trim()!==term)return;
+      const all=[...local];
+      for(const p of data.results||[]){
+        if(!all.some(item=>dist([item.lat,item.lon],[p.latitude,p.longitude])<10))
+          all.push({name:p.name,description:[p.admin1,p.country].filter(Boolean).join(", "),lat:p.latitude,lon:p.longitude});
       }
-      listSuggestions(all);
-    } catch (error) {
-      if (error.name !== "AbortError" && !local.length) listSuggestions([]);
-    }
+      suggestions(all);
+    }catch(e){if(e.name!=="AbortError"&&!local.length)suggestions([])}
   }
-  function shareText() {
-    const symbols = game.guesses.map((g) => g.distance <= WIN_RADIUS_KM ? "🟩" : g.distance < 500 ? "🟨" : "⬛").join("");
-    return "GeoDetective " + (game.mode === "daily" ? today() : "Modo Livre") + "\n"
-      + (game.won ? "Resolvido em " + game.guesses.length + "/" + MAX_GUESSES + " tentativas" : "Caso não resolvido")
-      + " · " + number(game.score) + " pts\n" + symbols
-      + "\nhttps://github.com/F404X/geodetective";
+  async function share(){
+    const symbols=game.guesses.map(g=>g.distance<=WIN_RADIUS?"🟨":g.distance<500?"🟧":"⬛").join("");
+    const txt="GeoDetective "+(game.mode==="daily"?today()+" "+difficulty:"Free "+difficulty)
+      +"\n"+(game.won?"✓ "+game.guesses.length+"/"+maximum():"×")+" · "+number(game.score)+" pts\n"+symbols
+      +"\nhttps://f404x.github.io/geodetective/";
+    try{
+      if(navigator.share){await navigator.share({text:txt});return}
+      if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(txt);toast(t("copied"));return}
+      const ta=document.createElement("textarea");ta.value=txt;ta.style.position="fixed";ta.style.opacity="0";document.body.append(ta);ta.select();
+      const ok=document.execCommand("copy");ta.remove();if(!ok)throw Error("copy failed");toast(t("copied"));
+    }catch(e){if(e.name!=="AbortError")toast(t("shareError"))}
   }
-  async function share() {
-    const content = shareText();
-    try {
-      if (navigator.share) { await navigator.share({ text: content }); return; }
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(content);
-        showToast("Resultado copiado para compartilhar.");
-        return;
-      }
-      const field = document.createElement("textarea");
-      field.value = content;
-      field.style.position = "fixed";
-      field.style.opacity = "0";
-      document.body.append(field);
-      field.select();
-      const success = document.execCommand("copy");
-      field.remove();
-      if (!success) throw new Error("Falha ao copiar");
-      showToast("Resultado copiado.");
-    } catch (error) {
-      if (error.name !== "AbortError") showToast("Não foi possível compartilhar automaticamente.");
-    }
-  }
-  function initMap() {
-    if (!window.L) {
-      $("map").innerHTML = '<div style="padding:30px;color:#a9c1af">Não foi possível carregar o mapa. Verifique a conexão. A busca de lugares ainda pode ser utilizada.</div>';
-      return;
-    }
-    map = L.map("map", { center: [12, 8], zoom: 2, minZoom: 2, maxZoom: 16, worldCopyJump: true, zoomControl: false });
-    // Mosaicos padrão OSM não requerem API key. O tema escuro é aplicado via CSS.
-    // Não fazemos pré-carregamento de tiles: o Leaflet só solicita o que está visível.
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',
-      maxNativeZoom: 19,
-      maxZoom: 19
+  function initMap(){
+    if(!window.L){$("map").textContent=t("noMap");return}
+    map=L.map("map",{center:[15,8],zoom:2,minZoom:2,maxZoom:16,worldCopyJump:true,zoomControl:false});
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{
+      attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',
+      maxNativeZoom:19,maxZoom:19
     }).addTo(map);
-    L.control.zoom({ position: "bottomleft" }).addTo(map);
-    overlay = L.layerGroup().addTo(map);
-    map.on("click", (e) => selectPoint(e.latlng.lat, e.latlng.lng, ""));
-    setTimeout(() => map.invalidateSize(), 100);
+    L.control.zoom({position:"bottomleft"}).addTo(map);
+    overlays=L.layerGroup().addTo(map);
+    map.on("click",e=>selectPoint(e.latlng.lat,e.latlng.lng,""));
+    setTimeout(()=>map.invalidateSize(),100);
   }
-  function init() {
-    if (!PLACES.length) {
-      $("map").textContent = "Não foi possível carregar as localidades. Atualize a página.";
-      return;
-    }
+  function init(){
+    if(!PLACES.length||PLACES.length!==FEATURES.length||PLACES.length!==COUNTRY_CODES.length)
+      throw new Error("Location catalogue and metadata are out of sync");
+    document.documentElement.lang="en";
+    $("difficultySelect").value=difficulty;
+    $("langSelect").value=lang;
     initMap();
-    $("dailyBtn").addEventListener("click", startDaily);
-    $("freeBtn").addEventListener("click", startFree);
-    $("revealBtn").addEventListener("click", reveal);
-    $("guessBtn").addEventListener("click", guess);
-    $("resetViewBtn").addEventListener("click", () => { if (map) map.setView([12, 8], 2); });
-    $("nextBtn").addEventListener("click", () => {
-      startFree();
-      document.querySelector("#jogar").scrollIntoView({ behavior: "smooth", block: "start" });
+    $("dailyBtn").addEventListener("click",startDaily);
+    $("freeBtn").addEventListener("click",startFree);
+    $("difficultySelect").addEventListener("change",e=>setDifficulty(e.target.value));
+    $("langSelect").addEventListener("change",e=>setLanguage(e.target.value));
+    $("revealBtn").addEventListener("click",reveal);
+    $("guessBtn").addEventListener("click",guess);
+    $("resetViewBtn").addEventListener("click",()=>{if(map)map.setView([15,8],2)});
+    $("nextBtn").addEventListener("click",startFree);
+    $("shareBtn").addEventListener("click",share);
+    $("helpBtn").addEventListener("click",()=>$("helpDialog").showModal());
+    $("closeHelpBtn").addEventListener("click",()=>$("helpDialog").close());
+    $("startHelpBtn").addEventListener("click",()=>$("helpDialog").close());
+    $("helpDialog").addEventListener("click",e=>{if(e.target===$("helpDialog"))$("helpDialog").close()});
+    $("citySearch").addEventListener("input",e=>{
+      const term=e.target.value.trim();
+      if(controller)controller.abort();
+      clearTimeout(debounce);
+      if(term.length<3){$("suggestions").classList.add("hidden");return}
+      suggestions(searchLocal(term));
+      debounce=setTimeout(()=>searchRemote(term),450);
     });
-    $("shareBtn").addEventListener("click", share);
-    $("helpBtn").addEventListener("click", () => $("helpDialog").showModal());
-    $("closeHelpBtn").addEventListener("click", () => $("helpDialog").close());
-    $("startHelpBtn").addEventListener("click", () => $("helpDialog").close());
-    $("helpDialog").addEventListener("click", (e) => { if (e.target === $("helpDialog")) $("helpDialog").close(); });
-    $("citySearch").addEventListener("input", (e) => {
-      const term = e.target.value.trim();
-      if (fetchAbort) fetchAbort.abort();
-      clearTimeout(searchTimer);
-      if (term.length < 3) { $("suggestions").classList.add("hidden"); return; }
-      listSuggestions(resultsFor(term));
-      searchTimer = setTimeout(() => performSearch(term), 420);
-    });
-    $("citySearch").addEventListener("keydown", (e) => {
-      if (e.key === "Escape") $("suggestions").classList.add("hidden");
-      if (e.key === "Enter") {
-        const option = $("suggestions").querySelector("button.suggestion");
-        if (option && !$("suggestions").classList.contains("hidden")) { e.preventDefault(); option.click(); }
+    $("citySearch").addEventListener("keydown",e=>{
+      if(e.key==="Escape")$("suggestions").classList.add("hidden");
+      if(e.key==="Enter"){
+        const option=$("suggestions").querySelector("button.suggestion");
+        if(option&&!$("suggestions").classList.contains("hidden")){e.preventDefault();option.click()}
       }
     });
-    document.addEventListener("click", (e) => {
-      if (!e.target.closest(".search-wrap")) $("suggestions").classList.add("hidden");
-    });
+    document.addEventListener("click",e=>{if(!e.target.closest(".search-wrap"))$("suggestions").classList.add("hidden")});
     startDaily();
+    setLanguage(lang);
+    document.addEventListener("visibilitychange",()=>{
+      if(!document.hidden&&game?.mode==="daily"&&game.date!==today())startDaily();
+    });
   }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);
   else init();
 })();
