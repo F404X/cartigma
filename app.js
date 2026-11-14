@@ -177,8 +177,10 @@
     },options[0]);
     const regionalComparison=anchors.filter(a=>a.regional&&a.km>=radius*.25);
     const comparison=regionalComparison.length>=2?regionalComparison:anchors;
-    const nearReference=comparison[Math.floor((comparison.length-1)*.22)];
-    const farReference=comparison[Math.floor((comparison.length-1)*.83)];
+    const nearIndex=Math.floor((comparison.length-1)*.22);
+    const farIndex=Math.max(nearIndex+1,Math.ceil((comparison.length-1)*.83));
+    const nearReference=comparison[nearIndex];
+    const farReference=comparison[farIndex];
     const terrain={key:"terrain",value:locationFeature(index)};
     const zone={key:"zone",value:latitudeZone(p[3])};
     const capital={key:"capital",value:tc(CAPITALS.has(p[0])?"yes":"no")};
