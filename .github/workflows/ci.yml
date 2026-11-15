@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: cartigma-checks-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Testar jogo e catálogo
