@@ -4,6 +4,7 @@
 (() => {
   "use strict";
   let loading = null;
+  let adapter = null;
   const sources = [
     "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js",
     "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -19,13 +20,13 @@
     });
   }
   async function ensure() {
-    if(window.L)return createAdapter(window.L);
+    if(window.L)return adapter||(adapter=createAdapter(window.L));
     if(!loading)loading=(async()=>{
       for(const url of sources) {
         try{await loadScript(url);if(window.L)break;}catch(error){console.warn(error);}
       }
       if(!window.L)throw new Error("Neither Leaflet provider is available");
-      return createAdapter(window.L);
+      return adapter||(adapter=createAdapter(window.L));
     })();
     try{return await loading;}catch(error){loading=null;throw error;}
   }
