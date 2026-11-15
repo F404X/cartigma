@@ -104,7 +104,7 @@
     button.setAttribute("role","option");
     button.setAttribute("aria-selected",String(code===active));
     const image=document.createElement("img");
-    image.src=flagUrl(region);image.alt="";image.loading="lazy";
+    image.src=flagUrl(region);image.alt="";image.loading="lazy";image.decoding="async";
     image.width=25;image.height=18;image.className="language-option-flag";
     const fallback=document.createElement("span");
     fallback.className="language-option-emoji";fallback.textContent=flag;
