@@ -1,4 +1,4 @@
-name: GeoDetective checks
+name: Cartigma checks
 
 on:
   push:
