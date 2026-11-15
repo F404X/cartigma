@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#111310">
+  <meta name="theme-color" content="#0c111b">
   <meta name="description" content="GeoDetective: find the hidden location with geographic clues.">
   <meta property="og:title" content="GeoDetective — Find the hidden city">
   <meta property="og:description" content="A daily geography deduction game.">
@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.18.0/dist/maplibre-gl.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="themes.css">
   
   <script defer src="places.js"></script>
   <script defer src="i18n.js"></script>
@@ -23,6 +24,7 @@
   <script defer src="facts.js"></script>
   <script defer src="references.js"></script>
   <script defer src="compass-i18n.js"></script>
+  <script defer src="theme.js"></script>
   <script defer src="map-fallback.js"></script>
   <script defer src="language-picker.js"></script>
   <script type="module" src="map-bootstrap.js"></script>
@@ -59,6 +61,11 @@
           <option value="id">Bahasa Indonesia</option>
         </select>
       </div>
+      <button type="button" class="theme-toggle" id="themeToggle" aria-label="Switch to light mode" aria-pressed="false" title="Switch to light mode">
+        <svg class="theme-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <svg class="theme-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.1 15.6A8.4 8.4 0 0 1 8.4 3.9 8.5 8.5 0 1 0 20.1 15.6Z"/></svg>
+        <span id="themeLabel">Light mode</span>
+      </button>
       <button type="button" class="header-button" id="helpBtn" data-i18n="help" aria-label="How to play">How to play</button>
       <a class="github-link" href="https://github.com/F404X/geodetective" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
         <svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 .8a11.2 11.2 0 0 0-3.54 21.82c.56.1.77-.24.77-.54v-1.9c-3.12.68-3.78-1.33-3.78-1.33-.5-1.28-1.23-1.28-1.23-1.02-.7.08-.69.08-.69 1.13.08 1.72 1.16 1.72 1.16 1.01 1.72 2.63 1.22 3.27.94.1-.73.4-1.22.71-1.5-2.5-.28-5.12-1.25-5.12-5.56 0-1.23.44-2.23 1.16-3.02-.12-.28-.5-1.43.11-2.98 0 0 .95-.3 3.08 1.15a10.73 10.73 0 0 1 5.6 0c2.13-1.44 3.07-1.15 3.07-1.15.62 1.55.23 2.7.12 2.98.72.79 1.15 1.79 1.15 3.02 0 4.32-2.63 5.28-5.14 5.55.4.34.75.99.75 2v2.98c0 .3.2.65.78.54A11.2 11.2 0 0 0 12 .8Z"/></svg>
