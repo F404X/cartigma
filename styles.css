@@ -520,3 +520,52 @@ dialog.case-report .report-heading h2{font-size:24px}
   .language-trigger{width:112px;gap:4px}
   .language-trigger .language-current{font-size:9px}
 }
+
+
+
+/* Distinct detective navigation: fixed compass rose and explicit map style tabs. */
+.map-card{position:relative}
+.compass-rose{
+  position:absolute;right:13px;bottom:49px;z-index:6;
+  width:91px;height:91px;border:1px solid #4d5840;border-radius:3px;
+  background:#192019e8;color:#dadbc5;pointer-events:none;
+  box-shadow:0 3px 12px #0006;
+  font:600 11px/1 var(--mono);direction:ltr;
+}
+.compass-rose .compass-art{
+  position:absolute;top:19px;left:19px;width:52px;height:52px;
+}
+.compass-rose>span{position:absolute;display:block;min-width:15px;text-align:center}
+.compass-n{top:6px;left:50%;transform:translateX(-50%);color:var(--accent)}
+.compass-s{bottom:5px;left:50%;transform:translateX(-50%)}
+.compass-e{top:50%;right:4px;transform:translateY(-50%)}
+.compass-w{top:50%;left:4px;transform:translateY(-50%)}
+.map-bottom{gap:8px}
+#coordinates{min-width:0;max-width:45%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.map-style-picker{
+  display:flex;align-items:center;gap:2px;margin-left:auto;
+  padding:2px;border:1px solid var(--border-strong);border-radius:3px;
+  background:#111610;direction:ltr;flex-shrink:0;
+}
+.map-style-button{
+  border:0;border-radius:2px;background:transparent;color:#b0b8a6;
+  font:600 10px/1.2 var(--font);padding:4px 10px;white-space:nowrap;
+}
+.map-style-button.active{color:#241d08;background:var(--accent)}
+.map-style-button:not(.active):hover{color:var(--accent);background:#343927}
+.map-style-button:disabled{opacity:.6;cursor:wait}
+@media(max-width:960px){
+  .compass-rose{width:76px;height:76px;right:8px;bottom:41px}
+  .compass-rose .compass-art{width:44px;height:44px;left:15px;top:16px}
+  .compass-rose>span{font-size:10px}
+}
+@media(max-width:520px){
+  .compass-rose{width:65px;height:65px;right:5px;bottom:29px;font-size:9px}
+  .compass-rose .compass-art{width:38px;height:38px;left:13px;top:13px}
+  .compass-rose>span{font-size:9px}
+  .compass-n{top:3px}.compass-s{bottom:3px}
+  .map-bottom{padding:0 5px}
+  #coordinates{max-width:42%;font-size:8px}
+  .map-style-picker{padding:1px;gap:0}
+  .map-style-button{font-size:9px;padding:3px 5px}
+}
