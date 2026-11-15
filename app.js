@@ -131,12 +131,12 @@
     const buttons=$("mapStylePicker");
     if(buttons)buttons.setAttribute("aria-label",pack.mapStyle);
   }
+  const RIVER_NAMES=Object.freeze({7:"Thames",8:"Seine",10:"Tiber",35:"Han"});
   function locationFeature(index) {
     // Naming the river is more useful than the generic clue "river valleys".
-    const rivers={7:"Thames",8:"Seine",10:"Tiber",35:"Han"};
-    if(rivers[index]){
+    if(RIVER_NAMES[index]){
       const template=COMPASS_I18N[lang]?.river||COMPASS_I18N.en?.river||"Along the {name} River";
-      return template.replace("{name}",rivers[index]);
+      return template.replace("{name}",RIVER_NAMES[index]);
     }
     const key = FEATURES[index] || "plain";
     return CLUE_I18N[lang]?.features?.[key] || CLUE_I18N.en?.features?.[key] || key;
