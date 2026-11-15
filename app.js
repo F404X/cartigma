@@ -1,4 +1,4 @@
-/* GeoDetective — game engine · no framework, no account, no API key. */
+/* Cartigma — game engine · no framework, no account, no API key. */
 (() => {
   "use strict";
   const PLACES = window.GEODETECTIVE_PLACES || [];
@@ -43,6 +43,10 @@
   const $ = id => document.getElementById(id);
   const hash = input => {let h=2166136261;for(const char of input){h ^=char.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0;};
   const norm = s => String(s).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
+  // Index immutable search terms once instead of normalizing 74 cities per keystroke.
+  const LOCAL_SEARCH_INDEX = PLACES.map((place,index)=>({
+    place,index,terms:norm(place[0]+" "+(EN_CITY[place[0]]||"")+" "+place[1])
+  }));
   const rad = n => n*Math.PI/180;
   const dist = (a,b) => {
     const la=rad(b[0]-a[0]),lo=rad(b[1]-a[1]);
@@ -74,6 +78,8 @@
   let fallbackSwitching=false, mapStyleTimeout=null, mapSwitching=false, mapPointerController=null;
   let activeMapStyle=window.maplibregl?.isFallback?"osm":"vector";
   let controller = null, debounce = null, toastTimer = null;
+  const regionFormatters = new Map();
+  const clueCache = new Map();
 
   function t(key, variables={}) {
     const template = REPORT_I18N[lang]?.[key] ?? TRANSLATIONS[lang]?.[key] ?? REPORT_I18N.en?.[key] ?? TRANSLATIONS.en?.[key] ?? key;
@@ -86,7 +92,15 @@
   function locale() {return LANGS[lang] || "en";}
   function number(value){return Math.round(value).toLocaleString(locale())}
   function displayRegion(code){
-    try{return new Intl.DisplayNames([locale()],{type:"region"}).of(code)}catch{return code}
+    try{
+      const language=locale();
+      let formatter=regionFormatters.get(language);
+      if(!formatter){
+        formatter=new Intl.DisplayNames([language],{type:"region"});
+        regionFormatters.set(language,formatter);
+      }
+      return formatter.of(code);
+    }catch{return code}
   }
   function cityName(p) {return lang==="pt"?p[0]:(EN_CITY[p[0]]||p[0]);}
   function countryName(index){return displayRegion(COUNTRY_CODES[index])}
@@ -158,8 +172,7 @@
     const modifier=level==="hard"?1.2:1;
     return Math.round(Math.min(6000,Math.min(5200,normalRadius)*modifier)/100)*100;
   }
-  function anchorDistances(index,level) {
-    const radius=regionalHintRadius(index,level);
+  function anchorDistances(index,level,radius=regionalHintRadius(index,level)) {
     const origin=cityCoords(index),region=continentKey(index);
     const items=[];
     for(let i=0;i<PLACES.length;i++){
@@ -189,9 +202,11 @@
     return item.name+", "+displayRegion(item.country);
   }
   function cluesFor(index,level){
+    const cacheKey=index+":"+level+":"+lang;
+    if(clueCache.has(cacheKey))return clueCache.get(cacheKey);
     const p=cityAt(index);
     const radius=regionalHintRadius(index,level);
-    const anchors=anchorDistances(index,level);
+    const anchors=anchorDistances(index,level,radius);
     if(anchors.length<2)throw Error("Not enough regional references for "+p[0]);
     // Avoid a near-neighbor that instantly reveals the destination.
     // Prefer places in the same geographical region, about 65% of the local radius away.
@@ -223,7 +238,7 @@
     const relationship={
       key:"closer",a:referenceName(nearReference),b:referenceName(farReference)
     };
-    return [
+    const clues=[
       opening,
       {key:"continent",value:continentName(index)},
       third,
@@ -231,6 +246,8 @@
       relationship,
       {key:"landmark",name:LANDMARKS[index]}
     ];
+    clueCache.set(cacheKey,clues);
+    return clues;
   }
   function clueText(clue){return tc(clue.key,clue)}
   function maximum(){return DIFFICULTIES[difficulty].attempts}
@@ -319,8 +336,9 @@
       }[clue.key]||"clueRegion";
       category.textContent=t(categoryKey);
       const value=document.createElement("span");value.className="clue-text";
-      value.textContent=i<game.revealed?clueText(clue):t("locked");
-      value.title=i<game.revealed?clueText(clue):t("locked");
+      const clueValue=i<game.revealed?clueText(clue):t("locked");
+      value.textContent=clueValue;
+      value.title=clueValue;
       body.append(category,value);row.append(idx,body);list.append(row);
     });
     $("revealBtn").disabled=game.finished||game.revealed>=6;
@@ -626,9 +644,13 @@
     // Keep the investigator’s chosen zoom after a wrong guess.
   }
   function searchLocal(term){
-    const q=norm(term);
-    return PLACES.filter(p=>norm(p[0]+" "+(EN_CITY[p[0]]||"")+" "+p[1]).includes(q)).slice(0,5)
-      .map((p)=>({name:cityName(p),description:countryName(PLACES.indexOf(p)),lat:p[3],lon:p[4]}));
+    const q=norm(term),results=[];
+    for(const {place,index,terms} of LOCAL_SEARCH_INDEX){
+      if(!terms.includes(q))continue;
+      results.push({name:cityName(place),description:countryName(index),lat:place[3],lon:place[4]});
+      if(results.length===5)break;
+    }
+    return results;
   }
   function suggestions(items){
     const list=$("suggestions");list.replaceChildren();
