@@ -22,6 +22,7 @@
   <script defer src="report-i18n.js"></script>
   <script defer src="facts.js"></script>
   <script defer src="references.js"></script>
+  <script defer src="compass-i18n.js"></script>
   <script defer src="map-fallback.js"></script>
   <script defer src="language-picker.js"></script>
   <script type="module" src="map-bootstrap.js"></script>
@@ -89,9 +90,26 @@
           <button id="resetViewBtn" type="button" class="ghost-button" data-i18n="reset">Reset view</button>
         </div>
         <div id="map" role="application" aria-label="Interactive map for placing your guess"></div>
+        <div class="compass-rose" id="compassRose" role="img" aria-label="Compass rose">
+          <span class="compass-n" id="compassN">N</span>
+          <span class="compass-e" id="compassE">E</span>
+          <span class="compass-s" id="compassS">S</span>
+          <span class="compass-w" id="compassW">W</span>
+          <svg class="compass-art" width="54" height="54" viewBox="0 0 64 64" aria-hidden="true">
+            <circle cx="32" cy="32" r="23" fill="none" stroke="currentColor" stroke-opacity=".28" stroke-width="1"/>
+            <path d="M32 10 L37 32 L32 29 L27 32 Z" fill="#ffd449"/>
+            <path d="M32 54 L37 32 L32 35 L27 32 Z" fill="#b7bdab"/>
+            <path d="M10 32 L32 27 L29 32 L32 37 Z" fill="#8c9484"/>
+            <path d="M54 32 L32 27 L35 32 L32 37 Z" fill="#8c9484"/>
+            <circle cx="32" cy="32" r="3" fill="#141811" stroke="#ffd449" stroke-width="1.5"/>
+          </svg>
+        </div>
         <div class="map-bottom">
           <span id="coordinates">NO LOCATION SELECTED</span>
-          <span class="map-attribution-note">WGS84</span>
+          <div class="map-style-picker" role="group" aria-label="Map style">
+            <button type="button" id="mapVectorBtn" class="map-style-button active" aria-pressed="true">Vector</button>
+            <button type="button" id="mapOsmBtn" class="map-style-button" aria-pressed="false">OpenStreetMap</button>
+          </div>
         </div>
       </div>
 
