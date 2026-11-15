@@ -672,7 +672,8 @@
   }
   async function searchRemote(term){
     if(term.length<3||game.finished)return;
-    const local=searchLocal(term);suggestions(local);
+    // Local matches were already rendered by the input handler.
+    const local=searchLocal(term);
     if(controller)controller.abort();
     const signaler=new AbortController();controller=signaler;
     try{
