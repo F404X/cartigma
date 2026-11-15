@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {runInNewContext} from "node:vm";
 
-const names=["places.js","references.js","i18n.js","clues-i18n.js","report-i18n.js","facts.js","app.js","index.html","styles.css","map-bootstrap.js"];
+const names=["places.js","references.js","i18n.js","clues-i18n.js","report-i18n.js","facts.js","compass-i18n.js","app.js","index.html","styles.css","map-bootstrap.js"];
 const files=Object.fromEntries(names.map(n=>[n,readFileSync(new URL("../"+n,import.meta.url),"utf8")]));
 
 class Element {
@@ -60,6 +60,8 @@ function boot({storage=new Map(),map=false,randomValue=0}={}){
     easeTo(options){mapState.eases.push(options);return this},
     fitBounds(bounds,options){mapState.fits.push({bounds,options});return this},
     getZoom(){return 3},
+    getCenter(){return {lng:8,lat:15}},
+    remove(){mapState.removed=(mapState.removed||0)+1},
     getLayer(id){return mapState.layers.get(id)||null},
     removeLayer(id){mapState.layers.delete(id)},
     addLayer(layer){mapState.layers.set(layer.id,layer)},
@@ -82,7 +84,10 @@ function boot({storage=new Map(),map=false,randomValue=0}={}){
       setDOMContent(){return this}
     }
   };
-  if(map)window.maplibregl=libre;
+  if(map){
+    window.maplibregl=libre;
+    window.GeoMapLoader={load:async style=>style==="osm"?{...libre,isFallback:true}:libre};
+  }
   const math=Object.create(Math);math.random=()=>randomValue;
   const context={
     window,document,localStorage,navigator:{},Math:math,Number,String,Array,Set,Map,JSON,Date,Intl,
@@ -190,7 +195,7 @@ test("Normal mode shows direction and switches language without losing the dossi
   const day=new Date().toISOString().slice(0,10);
   const index=hash("GEODETECTIVE-v3|"+day+"|normal")%g.window.GEODETECTIVE_PLACES.length;
   if(g.window.GEODETECTIVE_PLACES[index][0]!=="Londres")
-    assert.match($("feedback").textContent,/ · [NESW]+/);
+    assert.match($("feedback").textContent,/ · (?:North|South|East|West)[a-z]* [↑↗→↘↓↙←↖]/);
   for(const code of Object.keys(g.window.GeoI18n.PACKS)){
     g.language(code);
     assert.equal(g.document.documentElement.lang,g.window.GeoI18n.langNames[code]);
@@ -321,12 +326,13 @@ test("map labels appear gradually with zoom instead of all at once",()=>{
   const road=ranges.find(x=>x.id==="road_shield");
   assert.ok(country&&city&&road,"Country, city and road layers should have zoom rules");
   assert.ok(country.min<=2,"Countries remain visible at world scale");
-  assert.ok(city.min>=4,"City names should appear only after zooming in");
-  assert.ok(road.min>=11,"Road labels should appear at local zoom");
+  assert.ok(city.min>=2.5&&city.min<=3.3,"City names should appear at moderate zoom");
+  assert.ok(road.min>=9,"Road labels should remain at local zoom");
   assert.ok(city.min<road.min,"Different labels need progressively higher zoom");
   assert.equal(country.max,24);
   assert.equal(city.max,24);
   assert.match(files["app.js"],/configureMapLabelDensity/);
+  assert.ok(files["index.html"].includes("mapVectorBtn")&&files["index.html"].includes("mapOsmBtn"));
 });
 
 
@@ -391,4 +397,63 @@ test("Hard mode uses a wider local radius and coarser distance approximation",()
     /Nearest catalog city:/,
     "Fifth clue should no longer reveal the nearest catalog city"
   );
+});
+
+
+test("hemisphere evidence never follows the continent and no generic river-valley clue remains",()=>{
+  const places=boot().window.GEODETECTIVE_PLACES;
+  let hemisphereUsed=0;
+  for(let i=0;i<places.length;i++){
+    const g=boot({randomValue:i/places.length});
+    g.get("freeBtn").handlers.click();
+    for(let j=0;j<6;j++)g.get("revealBtn").handlers.click();
+    const entries=clueTexts(g);
+    const hemisphere=entries.findIndex(x=>/hemisphere/i.test(x));
+    const continent=entries.findIndex(x=>/continent/i.test(x));
+    assert.ok(continent!==-1,places[i][0]+" has no continent evidence");
+    if(hemisphere!==-1){hemisphereUsed++;assert.ok(hemisphere<continent,places[i][0]+" hemisphere follows continent");}
+    assert.doesNotMatch(entries.join(" "),/river valleys|mountain valleys/i,places[i][0]);
+  }
+  assert.ok(hemisphereUsed>5,"Some cases should still have hemisphere evidence before continent");
+  for(const [i,river] of [[7,"Thames"],[8,"Seine"],[10,"Tiber"],[35,"Han"]]){
+    const g=boot({randomValue:i/places.length});g.get("freeBtn").handlers.click();
+    for(let j=0;j<6;j++)g.get("revealBtn").handlers.click();
+    assert.ok(clueTexts(g).join(" ").includes(river),"Named river "+river+" missing");
+  }
+});
+test("Normal mode renders full localized direction with pointing arrow; Hard never shows it",()=>{
+  const normal=boot({randomValue:0});normal.get("freeBtn").handlers.click();
+  normal.select("Oslo");normal.get("guessBtn").handlers.click();
+  const english=normal.get("feedback").textContent;
+  assert.match(english,/(North|South|East|West)/);
+  assert.match(english,/[↑↗→↘↓↙←↖]/);
+  normal.language("pt");
+  const portuguese=normal.get("feedback").textContent;
+  assert.match(portuguese,/(Norte|Nordeste|Leste|Sudeste|Sul|Sudoeste|Oeste|Noroeste)/);
+  assert.match(portuguese,/[↑↗→↘↓↙←↖]/);
+  assert.equal(normal.get("compassE").textContent,"L");
+  assert.equal(normal.get("compassW").textContent,"O");
+  const hard=boot({randomValue:0});hard.difficulty("hard");hard.get("freeBtn").handlers.click();
+  hard.select("Oslo");hard.get("guessBtn").handlers.click();
+  assert.doesNotMatch(hard.get("feedback").textContent,/[↑↗→↘↓↙←↖]/);
+  assert.equal(hard.get("guessHistory").children[0].children[1].textContent.includes(" · "),false);
+});
+test("map buttons change engine without discarding the current investigation",async()=>{
+  const g=boot({map:true}),$=g.get;
+  g.get("freeBtn").handlers.click();
+  g.select("Oslo");g.get("guessBtn").handlers.click();
+  const originalCase=$("caseCode").textContent;
+  const originalGuess=$("guessHistory").children.length;
+  assert.equal($("mapVectorBtn").attributes["aria-pressed"],"true");
+  await $("mapOsmBtn").handlers.click();
+  assert.equal($("mapOsmBtn").attributes["aria-pressed"],"true");
+  assert.equal($("mapVectorBtn").attributes["aria-pressed"],"false");
+  assert.equal($("caseCode").textContent,originalCase);
+  assert.equal($("guessHistory").children.length,originalGuess);
+  assert.equal(JSON.parse(g.storage.get("geodetective-map-style")),"osm");
+  await $("mapVectorBtn").handlers.click();
+  assert.equal($("mapVectorBtn").attributes["aria-pressed"],"true");
+  assert.equal($("caseCode").textContent,originalCase);
+  assert.equal($("guessHistory").children.length,originalGuess);
+  assert.equal(JSON.parse(g.storage.get("geodetective-map-style")),"vector");
 });
