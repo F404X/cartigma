@@ -426,6 +426,7 @@
     $("dailyBtn").classList.toggle("active",daily);$("freeBtn").classList.toggle("active",!daily);
     $("dailyBtn").setAttribute("aria-pressed",String(daily));$("freeBtn").setAttribute("aria-pressed",String(!daily));
     $("difficultySelect").value=difficulty;
+    $("mapToolbar").classList.toggle("is-hard",difficulty==="hard");
     const code=caseCode();
     $("caseCode").textContent=code;
     $("caseNumber").textContent=t("caseWord")+" "+code;
