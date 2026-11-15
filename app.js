@@ -47,6 +47,7 @@
   const LOCAL_SEARCH_INDEX = PLACES.map((place,index)=>({
     place,index,terms:norm(place[0]+" "+(EN_CITY[place[0]]||"")+" "+place[1])
   }));
+  const GEOCODER_LANGUAGES=new Set(["en","pt","es","fr","de","it","ru","zh","ja","nl","pl","tr"]);
   const rad = n => n*Math.PI/180;
   const dist = (a,b) => {
     const la=rad(b[0]-a[0]),lo=rad(b[1]-a[1]);
@@ -678,7 +679,7 @@
     if(controller)controller.abort();
     const signaler=new AbortController();controller=signaler;
     try{
-      const supported=["en","pt","es","fr","de","it","ru","zh","ja","nl","pl","tr"].includes(lang)?lang:"en";
+      const supported=GEOCODER_LANGUAGES.has(lang)?lang:"en";
       const url="https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(term)+"&count=8&language="+supported+"&format=json";
       const response=await fetch(url,{signal:signaler.signal});
       if(!response.ok)throw Error("search failed");
