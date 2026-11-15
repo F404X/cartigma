@@ -330,7 +330,8 @@
 
 /* Short-height phones and landscape: let the entire page scroll.
    This prevents a square map from reducing the lower panel to a sliver. */
-@media(max-width:760px) and (max-height:730px){
+@media(max-width:760px) and (max-height:730px),
+       (max-width:760px) and (min-aspect-ratio:11/20){
   html,body{
     height:auto;
     min-height:100%;
