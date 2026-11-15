@@ -59,11 +59,11 @@
     const x=Math.cos(rad(a[0]))*Math.sin(rad(b[0]))-Math.sin(rad(a[0]))*Math.cos(rad(b[0]))*Math.cos(rad(b[1]-a[1]));
     return (Math.atan2(y,x)*180/Math.PI+360)%360;
   };
+  const DIRECTION_ARROWS=Object.freeze(["↑","↗","→","↘","↓","↙","←","↖"]);
   const direction = bearing => {
     const idx=Math.round(bearing/45)%8;
     const labels=COMPASS_I18N[lang]?.names||COMPASS_I18N.en?.names||["N","NE","E","SE","S","SW","W","NW"];
-    const arrows=["↑","↗","→","↘","↓","↙","←","↖"];
-    return labels[idx]+" "+arrows[idx];
+    return labels[idx]+" "+DIRECTION_ARROWS[idx];
   };
   const today = () => new Date().toISOString().slice(0,10);
   const store = {
