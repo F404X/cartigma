@@ -352,14 +352,16 @@
     if(!game.guesses.length){
       const li=document.createElement("li");li.className="empty-history";li.textContent=t("empty");list.append(li);return;
     }
-    [...game.guesses].reverse().forEach((g,reversed)=>{
+    // Render newest first without copying and reversing the guesses array.
+    for(let i=game.guesses.length-1;i>=0;i--){
+      const g=game.guesses[i];
       const row=document.createElement("li");row.className="history-item";
       const label=document.createElement("span");
-      const idx=document.createElement("span");idx.className="history-number";idx.textContent=String(game.guesses.length-reversed).padStart(2,"0");
+      const idx=document.createElement("span");idx.className="history-number";idx.textContent=String(i+1).padStart(2,"0");
       label.append(idx,document.createTextNode(g.label||g.lat.toFixed(2)+"°, "+g.lng.toFixed(2)+"°"));
       const distance=document.createElement("strong");distance.textContent=number(g.distance)+" km"+(difficulty==="hard"?"":" · "+direction(g.bearing));
       row.append(label,distance);list.append(row);
-    });
+    }
   }
   function bestGuess(){
     if(!game.guesses.length)return null;
