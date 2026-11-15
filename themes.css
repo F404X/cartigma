@@ -179,3 +179,68 @@ dialog.case-report,dialog.case-report[open]{background:var(--surface);color:var(
 @media(prefers-reduced-motion:reduce){
   .theme-toggle,.language-trigger{transition:none}
 }
+
+
+/* The world-map title is the difficulty signal, independent of the site theme. */
+.map-toolbar{
+  background:#f4ca51;
+  color:#1e2836;
+  border-bottom-color:#d5a93b;
+}
+.map-toolbar.is-hard{
+  background:#c94152;
+  color:#fff;
+  border-bottom-color:#a63240;
+}
+.map-toolbar .map-status,.map-toolbar .map-hint{color:inherit}
+.map-toolbar .map-hint{opacity:.82}
+.map-toolbar .status-dot{background:#283347}
+.map-toolbar.is-hard .status-dot{background:#fff}
+.map-toolbar .ghost-button{
+  background:#1e28360e;
+  border-color:#1e28365b;
+  color:#1e2836;
+}
+.map-toolbar.is-hard .ghost-button{
+  background:#ffffff15;
+  border-color:#ffffff87;
+  color:#fff;
+}
+.map-toolbar .ghost-button:hover{
+  background:#1e28361f;
+  border-color:#1e2836a8;
+  color:#1e2836;
+}
+.map-toolbar.is-hard .ghost-button:hover{
+  background:#ffffff2b;
+  border-color:#fff;
+  color:#fff;
+}
+
+/* GitHub brand mark is visible and comfortably tappable on all screens. */
+.github-link{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 34px;
+  width:34px;
+  height:34px;
+  border:1px solid var(--border-strong);
+  border-radius:3px;
+  background:var(--surface2);
+  color:var(--muted);
+}
+.github-link:hover{color:var(--accent);border-color:var(--accent);background:var(--hover-bg)}
+.github-link svg{width:19px;height:19px;display:block;flex-shrink:0}
+@media(max-width:520px){
+  .github-link{display:inline-flex;flex-basis:28px;width:28px;height:28px}
+  .github-link svg{width:17px;height:17px}
+  .header-button{width:27px;height:28px;padding:0;font-size:0;display:grid;place-items:center}
+  .header-button::after{content:"?";font:600 15px var(--font)}
+}
+@media(max-width:390px){
+  .site-header{padding-inline:5px;gap:5px}
+  .brand{font-size:14px;gap:2px}
+  .brand-icon{font-size:20px}
+  .header-end{gap:4px}
+}
