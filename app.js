@@ -286,6 +286,7 @@
     document.documentElement.lang=locale();
     document.documentElement.dir=["ar","he"].includes(lang)?"rtl":"ltr";
     $("langSelect").value=lang;
+    window.GeoTheme?.sync();
     updateCompassRose();
     const FLAGS={en:"🇺🇸",pt:"🇧🇷",es:"🇪🇸",zh:"🇨🇳",ja:"🇯🇵",ru:"🇷🇺",fr:"🇫🇷",de:"🇩🇪",it:"🇮🇹",nl:"🇳🇱",pl:"🇵🇱",sv:"🇸🇪",tr:"🇹🇷",ar:"🇸🇦",he:"🇮🇱",ko:"🇰🇷",th:"🇹🇭",vi:"🇻🇳",id:"🇮🇩"};
     $("languageFlag").textContent=FLAGS[lang]||"🌐";
@@ -715,6 +716,21 @@
       await setMapStyle("osm",false);
     }finally{fallbackSwitching=false}
   }
+  function activeMapTheme(){
+    return document.documentElement.getAttribute?.("data-theme")==="light"?"light":"dark";
+  }
+  function vectorMapStyle(){
+    // Public OpenFreeMap styles, with no API keys or custom tile providers.
+    return "https://tiles.openfreemap.org/styles/"+
+      (activeMapTheme()==="light"?"positron":"dark");
+  }
+  function updateMapTheme(){
+    if(!map||window.maplibregl?.isFallback)return; // Raster tiles follow CSS.
+    if(typeof map.setStyle!=="function")return;
+    mapStyleReady=false;
+    try{map.setStyle(vectorMapStyle())}
+    catch(error){console.warn("Could not apply map theme:",error);}
+  }
   function initMap(initialView={center:[8,15],zoom:1.7}){
     const libre=window.maplibregl;
     // Some supported MapLibre versions omit supported(); its absence is not a failure.
@@ -730,7 +746,7 @@
     try {
       map=new libre.Map({
         container:"map",
-        style:"https://tiles.openfreemap.org/styles/dark",
+        style:vectorMapStyle(),
         center:initialView.center,
         zoom:initialView.zoom,minZoom:1.2,maxZoom:16,
         attributionControl:true,
@@ -801,6 +817,7 @@
     $("freeBtn").addEventListener("click",startFree);
     $("difficultySelect").addEventListener("change",e=>setDifficulty(e.target.value));
     $("langSelect").addEventListener("change",e=>setLanguage(e.target.value));
+    window.addEventListener?.("geodetective:themechange",updateMapTheme);
     $("revealBtn").addEventListener("click",reveal);
     $("guessBtn").addEventListener("click",guess);
     $("resetViewBtn").addEventListener("click",resetMapView);
