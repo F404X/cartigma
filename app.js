@@ -298,6 +298,7 @@
     difficulty=level;store.set("geodetective-difficulty",level);
     if(game.mode==="daily")startDaily();else startFree();
   }
+  const LANGUAGE_FLAGS=Object.freeze({en:"🇺🇸",pt:"🇧🇷",es:"🇪🇸",zh:"🇨🇳",ja:"🇯🇵",ru:"🇷🇺",fr:"🇫🇷",de:"🇩🇪",it:"🇮🇹",nl:"🇳🇱",pl:"🇵🇱",sv:"🇸🇪",tr:"🇹🇷",ar:"🇸🇦",he:"🇮🇱",ko:"🇰🇷",th:"🇹🇭",vi:"🇻🇳",id:"🇮🇩"});
   function setLanguage(value){
     if(!TRANSLATIONS[value])return;
     lang=value;store.set("geodetective-language",lang);
@@ -306,8 +307,7 @@
     $("langSelect").value=lang;
     window.GeoTheme?.sync();
     updateCompassRose();
-    const FLAGS={en:"🇺🇸",pt:"🇧🇷",es:"🇪🇸",zh:"🇨🇳",ja:"🇯🇵",ru:"🇷🇺",fr:"🇫🇷",de:"🇩🇪",it:"🇮🇹",nl:"🇳🇱",pl:"🇵🇱",sv:"🇸🇪",tr:"🇹🇷",ar:"🇸🇦",he:"🇮🇱",ko:"🇰🇷",th:"🇹🇭",vi:"🇻🇳",id:"🇮🇩"};
-    $("languageFlag").textContent=FLAGS[lang]||"🌐";
+    $("languageFlag").textContent=LANGUAGE_FLAGS[lang]||"🌐";
     window.GeoLanguagePicker?.sync(lang);
     updateMapLanguage();
     document.querySelectorAll("[data-i18n]").forEach(element=>{element.textContent=t(element.dataset.i18n)});
