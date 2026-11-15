@@ -399,7 +399,17 @@
     if(!game?.finished)return;
     renderDossier();
     const dialog=$("reportDialog");
-    if(!dialog.open)dialog.show(); // Non-modal right-side dossier: the map stays visible.
+    // Phone dossier lives inside the lower investigation scroller, without
+    // obscuring the square map. Desktop keeps the existing side dossier.
+    const mobile=window.matchMedia?.("(max-width: 760px)")?.matches===true;
+    const destination=mobile?document.querySelector(".case-card"):document.body;
+    if(destination&&dialog.parentElement!==destination)destination.append(dialog);
+    if(!dialog.open)dialog.show();
+    if(mobile){
+      const move=()=>dialog.scrollIntoView?.({behavior:"smooth",block:"start"});
+      if(typeof requestAnimationFrame==="function")requestAnimationFrame(move);
+      else move();
+    }
   }
   function renderResult(){
     $("resultCard").classList.toggle("hidden",!game.finished);
@@ -815,6 +825,12 @@
     $("difficultySelect").value=difficulty;
     $("langSelect").value=lang;
     initMap();
+    // Reconcile canvas size with the phone's square map after rotation,
+    // split-screen changes or mobile browser toolbar resizing.
+    if(typeof ResizeObserver!=="undefined"){
+      const observer=new ResizeObserver(()=>map?.resize?.());
+      observer.observe($("map"));
+    }
     $("dailyBtn").addEventListener("click",startDaily);
     $("freeBtn").addEventListener("click",startFree);
     $("difficultySelect").addEventListener("change",e=>setDifficulty(e.target.value));
