@@ -458,3 +458,17 @@ test("map buttons change engine without discarding the current investigation",as
   assert.equal($("guessHistory").children.length,originalGuess);
   assert.equal(JSON.parse(g.storage.get("geodetective-map-style")),"vector");
 });
+
+
+test("map title bar reflects Normal and Hard difficulty",()=>{
+  const g=boot(),bar=g.get("mapToolbar");
+  assert.equal(bar.classList.contains("is-hard"),false);
+  g.difficulty("hard");
+  assert.equal(bar.classList.contains("is-hard"),true);
+  g.difficulty("normal");
+  assert.equal(bar.classList.contains("is-hard"),false);
+  assert.match(files["index.html"],/id="mapToolbar"/);
+  assert.match(files["index.html"],/aria-label="GeoDetective on GitHub"/);
+  assert.match(files["index.html"],/viewBox="0 0 24 24"/);
+  assert.match(files["app.js"],/mapToolbar"\)\.classList\.toggle\("is-hard"/);
+});
