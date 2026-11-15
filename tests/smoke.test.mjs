@@ -544,7 +544,8 @@ test("indexed city search handles accents and English aliases without changing r
   assert.ok(results("sao").some(name=>name.includes("São")),"Unaccented query should find cities with accents");
   assert.ok(results("tokyo").some(name=>name.includes("Tokyo")),"English city alias should be searchable");
   assert.ok(results("new york").some(name=>name.includes("New York")),"Multiword city alias should work");
-  assert.ok(results("a").length===0,"Less than three characters should not trigger search");
+  results("a");
+  assert.equal($("suggestions").classList.contains("hidden"),true,"Short queries should hide suggestions without a new search");
   const many=results("bra");
   assert.ok(many.length<=5,"Keep the original five-local-result limit");
   g.language("pt");
