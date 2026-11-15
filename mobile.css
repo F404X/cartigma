@@ -170,6 +170,9 @@
   .case-columns>.clue-panel{
     border-bottom:1px solid var(--border-strong);
   }
+  .case-columns>.guess-panel{
+    padding-bottom:max(17px,env(safe-area-inset-bottom));
+  }
   .section-heading{
     min-height:34px;
     gap:9px;
