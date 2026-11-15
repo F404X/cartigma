@@ -44,8 +44,9 @@
           <span class="language-current" id="languageLabel">English</span>
           <svg class="language-caret" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
         </button>
+        <div class="language-backdrop hidden" id="languageBackdrop" aria-hidden="true"></div>
         <div class="language-menu hidden" id="languageMenu">
-          <div class="language-menu-heading"><span>LANGUAGE / IDIOMA</span><span class="language-count">19</span></div>
+          <div class="language-menu-heading"><span id="languageMenuHeading">LANGUAGE / IDIOMA</span><span class="language-count">19</span><button type="button" class="language-close" id="languageCloseBtn" aria-label="Close language picker" title="Close / Fechar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 5 19 19M19 5 5 19"/></svg></button></div>
           <div class="language-search-wrap">
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
             <input type="search" id="languageSearch" placeholder="Search language..." aria-label="Search language" autocomplete="off" spellcheck="false">
