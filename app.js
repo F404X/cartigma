@@ -216,7 +216,7 @@
     // Hemisphere, when used at all, comes BEFORE the continent clue.
     // It must never appear in a later evidence slot after the continent.
     const choice=hash("opening:"+p[0])%3;
-    const opening=choice===2?hemisphere:(choice===0?terrain:zone);
+    const opening=[7,8,10,35].includes(index)?terrain:(choice===2?hemisphere:(choice===0?terrain:zone));
     const third=reliableCapital&&hash("profile:"+p[0])%3===0?capital:
       (opening===terrain?zone:terrain);
     // Comparison replaces the precise "nearest city" clue, which was too revealing.
