@@ -39,6 +39,8 @@ test("small phone layout has readable text and touch-friendly actions",()=>{
 test("very short and wider mobile screens can scroll entire page rather than clipping the square",()=>{
   assert.match(mobile,/@media\(max-width:760px\) and \(max-height:730px\),/);
   assert.match(mobile,/\(min-aspect-ratio:11\/20\)/);
+  assert.match(mobile,/\(pointer:coarse\)/);
+  assert.match(mobile,/orientation:landscape/);
   assert.match(mobile,/overflow-y:auto;/);
   assert.match(mobile,/\.app\{[\s\S]*?min-height:100dvh;[\s\S]*?max-height:none;[\s\S]*?overflow:visible/);
 });
