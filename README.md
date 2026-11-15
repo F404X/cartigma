@@ -1,8 +1,8 @@
-# GeoDetective
+# Cartigma
 
 A browser-based geographic detective game. Read the evidence, place pins on a world map, and identify a hidden city in a limited number of attempts.
 
-**Play:** https://f404x.github.io/geodetective/
+**Play:** https://f404x.github.io/cartigma/
 
 ## Game rules
 
@@ -79,7 +79,7 @@ Open http://localhost:8000. The tests also run automatically on pushes and pull 
 | `app.js` | State, date-specific case IDs, clues, map, gameplay, reports |
 | `tests/smoke.test.mjs` | Automated gameplay and data integrity checks |
 
-The [GitHub Pages deployment workflow](.github/workflows/pages.yml) publishes the files to `https://f404x.github.io/geodetective/` after passing the automated tests.
+The [GitHub Pages deployment workflow](.github/workflows/pages.yml) publishes the files to `https://f404x.github.io/cartigma/` after passing the automated tests.
 
 ## Data accuracy
 
