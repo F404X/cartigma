@@ -536,8 +536,8 @@
       if(min===null)continue;
       const originalMin=Number.isFinite(layer.minzoom)?layer.minzoom:0;
       const originalMax=Number.isFinite(layer.maxzoom)?layer.maxzoom:24;
-      const targetMin=Math.max(originalMin,min);
-      // Never invert an existing zoom range from the source style.
+      // Allow major city names earlier than the original style if tile data exists.
+      const targetMin=Math.max(1,Math.min(min,originalMin||min));
       if(targetMin>=originalMax)continue;
       try{map.setLayerZoomRange(layer.id,targetMin,originalMax)}
       catch(error){console.warn("Could not adjust label zoom",layer.id,error);}
