@@ -90,6 +90,8 @@ function boot({storage=new Map(),map=false,randomValue=0,mobile=false}={}){
     window.GeoMapLoader={load:async style=>style==="osm"?{...libre,isFallback:true}:libre};
   }
   const math=Object.create(Math);math.random=()=>randomValue;
+  const perf={distanceCalls:0};
+  math.atan2=(...args)=>{perf.distanceCalls++;return Math.atan2(...args)};
   const context={
     window,document,localStorage,navigator:{},Math:math,Number,String,Array,Set,Map,JSON,Date,Intl,
     AbortController,console,setTimeout(){return 0},clearTimeout(){},
@@ -107,7 +109,7 @@ function boot({storage=new Map(),map=false,randomValue=0,mobile=false}={}){
   }
   const difficulty=value=>get("difficultySelect").handlers.change({target:{value}});
   const language=value=>get("langSelect").handlers.change({target:{value}});
-  return {get,window,document,storage,select,difficulty,language,mapState,mobileCase};
+  return {get,window,document,storage,select,difficulty,language,mapState,mobileCase,perf};
 }
 function clueTexts(g){
   return g.get("clueList").children.map(row=>row.children[1].children[1].textContent);
@@ -509,4 +511,44 @@ test("mobile completed-case dossier moves into lower scroller without covering m
   assert.equal(report.open,false);
   g.get("reportOpenBtn").handlers.click();
   assert.equal(report.open,true);
+});
+
+
+test("repeated clue renders reuse geographic calculations and switch cache by language",()=>{
+  const g=boot(),$=g.get;
+  const before=g.perf.distanceCalls;
+  assert.ok(before>20,"Initial investigation needs geographic distances");
+  $("revealBtn").handlers.click();
+  assert.equal(g.perf.distanceCalls,before,"Revealing a clue should not recalculate all regional distances");
+  $("dailyBtn").handlers.click();
+  assert.equal(g.perf.distanceCalls,before,"Reopening the same case should reuse immutable clues");
+  const english=clueTexts(g);
+  g.language("pt");
+  const translated=g.perf.distanceCalls;
+  assert.ok(translated>before,"A different language needs its own translated clue cache");
+  assert.notDeepEqual(clueTexts(g),english,"Localized text must still update");
+  g.language("en");
+  assert.equal(g.perf.distanceCalls,translated,"Returning to a cached language should not repeat calculations");
+  assert.match(files["app.js"],/const cacheKey=index\+":"\+level\+":"\+lang/);
+  assert.match(files["app.js"],/anchorDistances\(index,level,radius\)/);
+  assert.match(files["app.js"],/regionFormatters\.get\(language\)/);
+});
+
+test("indexed city search handles accents and English aliases without changing result limits",()=>{
+  const g=boot(),$=g.get,search=$("citySearch");
+  function results(query){
+    search.value=query;
+    search.handlers.input({target:search});
+    return $("suggestions").children.filter(x=>x.className==="suggestion").map(x=>x.textContent);
+  }
+  assert.ok(results("sao").some(name=>name.includes("São")),"Unaccented query should find cities with accents");
+  assert.ok(results("tokyo").some(name=>name.includes("Tokyo")),"English city alias should be searchable");
+  assert.ok(results("new york").some(name=>name.includes("New York")),"Multiword city alias should work");
+  assert.ok(results("a").length===0,"Less than three characters should not trigger search");
+  const many=results("bra");
+  assert.ok(many.length<=5,"Keep the original five-local-result limit");
+  g.language("pt");
+  assert.ok(results("tokyo").some(name=>name.includes("Tóquio")),"Results must be translated at display time");
+  assert.match(files["app.js"],/const LOCAL_SEARCH_INDEX = PLACES\.map/);
+  assert.doesNotMatch(files["app.js"],/PLACES\.indexOf\(p\)/);
 });
