@@ -1,4 +1,4 @@
-name: Deploy GeoDetective to GitHub Pages
+name: Deploy Cartigma to GitHub Pages
 
 on:
   push:
@@ -25,7 +25,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Testar GeoDetective
+      - name: Testar Cartigma
         run: node --test tests/*.test.mjs
 
       - name: Preparar arquivos estáticos
