@@ -24,23 +24,23 @@ class Element {
   addEventListener(name,fn){this.handlers[name]=fn}
   setAttribute(k,v){this.attributes[k]=v}
   replaceChildren(...nodes){this.children=nodes}
-  append(...nodes){this.children.push(...nodes)}
+  append(...nodes){this.children.push(...nodes);for(const node of nodes)node.parentElement=this}
   querySelector(selector){if(selector==="button.suggestion")return this.children.find(x=>x.className==="suggestion")||null;return null}
-  scrollIntoView(){}
+  scrollIntoView(){this.scrolled=true}
   showModal(){this._open=true}
   show(){this._open=true}
   close(){this._open=false}
   closest(){return null}
 }
 const hash=input=>{let h=2166136261;for(const c of input){h ^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0};
-function boot({storage=new Map(),map=false,randomValue=0}={}){
-  const nodes=new Map(),window={},mapState={fits:[],eases:[],styles:[],zoomRanges:[],markers:[],layers:new Map(),sources:new Map(),events:{},canvas:new Element("canvas")};
+function boot({storage=new Map(),map=false,randomValue=0,mobile=false}={}){
+  const nodes=new Map(),window={},mobileCase=new Element("mobile-case"),mapState={fits:[],eases:[],styles:[],zoomRanges:[],markers:[],layers:new Map(),sources:new Map(),events:{},canvas:new Element("canvas")};
   const document={
     readyState:"complete",documentElement:{lang:"en",dir:"ltr"},hidden:false,
     getElementById(id){if(!nodes.has(id))nodes.set(id,new Element(id));return nodes.get(id)},
     createElement(name){return new Element(name)},
     createTextNode(text){const n=new Element();n.textContent=text;return n},
-    querySelectorAll(){return []},querySelector(){return new Element()},addEventListener(){}
+    querySelectorAll(){return []},querySelector(selector){return selector===".case-card"?mobileCase:new Element()},body:new Element("body"),addEventListener(){}
   };
   const localStorage={
     getItem:k=>storage.get(k)||null,
@@ -84,6 +84,7 @@ function boot({storage=new Map(),map=false,randomValue=0}={}){
       setDOMContent(){return this}
     }
   };
+  if(mobile)window.matchMedia=()=>({matches:true});
   if(map){
     window.maplibregl=libre;
     window.GeoMapLoader={load:async style=>style==="osm"?{...libre,isFallback:true}:libre};
@@ -106,7 +107,7 @@ function boot({storage=new Map(),map=false,randomValue=0}={}){
   }
   const difficulty=value=>get("difficultySelect").handlers.change({target:{value}});
   const language=value=>get("langSelect").handlers.change({target:{value}});
-  return {get,window,document,storage,select,difficulty,language,mapState};
+  return {get,window,document,storage,select,difficulty,language,mapState,mobileCase};
 }
 function clueTexts(g){
   return g.get("clueList").children.map(row=>row.children[1].children[1].textContent);
@@ -491,4 +492,21 @@ test("Cartigma map title includes localized difficulty and has a globe at its le
   assert.match(files["index.html"],/href="https:\/\/github\.com\/F404X\/cartigma"/);
   assert.match(files["app.js"],/const txt="Cartigma "/);
   assert.doesNotMatch(files["index.html"],/GeoDetective/i);
+});
+
+test("mobile completed-case dossier moves into lower scroller without covering map",()=>{
+  const g=boot({map:true,mobile:true});
+  g.get("freeBtn").handlers.click();
+  g.select("Reykjavík");
+  g.get("guessBtn").handlers.click();
+  const report=g.get("reportDialog");
+  assert.equal(report.open,true);
+  assert.ok(g.mobileCase.children.includes(report));
+  assert.equal(report.parentElement,g.mobileCase);
+  assert.equal(report.scrolled,true,"case file should scroll into view below the map");
+  report.handlers.click?.({});
+  g.get("reportCloseBtn").handlers.click();
+  assert.equal(report.open,false);
+  g.get("reportOpenBtn").handlers.click();
+  assert.equal(report.open,true);
 });
