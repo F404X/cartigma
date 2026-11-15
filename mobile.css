@@ -372,3 +372,131 @@
   .map-card{align-items:stretch}
   #map{width:min(100%,540px);align-self:center}
 }
+
+
+/* Smartphone language selector: a centered, large, accessible dialog. */
+.language-backdrop,.language-close{display:none}
+@media (max-width:760px), (max-height:540px) and (pointer:coarse){
+  html.language-modal-open,
+  html.language-modal-open body{
+    overflow:hidden!important;
+  }
+  .language-picker .language-backdrop:not(.hidden){
+    position:fixed;
+    display:block;
+    inset:0;
+    z-index:1240;
+    background:rgba(4,9,20,.78);
+    backdrop-filter:blur(3px);
+    -webkit-backdrop-filter:blur(3px);
+    touch-action:none;
+  }
+  .language-picker .language-menu:not(.hidden){
+    position:fixed;
+    inset:50% auto auto 50%;
+    top:50%;
+    right:auto;
+    bottom:auto;
+    left:50%;
+    z-index:1250;
+    display:flex;
+    flex-direction:column;
+    transform:translate(-50%,-50%);
+    width:min(92vw,450px);
+    height:min(78dvh,660px);
+    max-width:calc(100vw - 20px);
+    max-height:calc(100dvh - 24px);
+    overflow:hidden;
+    border:1px solid var(--border-strong);
+    border-radius:12px;
+    background:var(--surface);
+    color:var(--text);
+    box-shadow:0 28px 75px #0009;
+  }
+  .language-menu .language-menu-heading{
+    min-height:58px;
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:12px 16px;
+    border-bottom:1px solid var(--border);
+    color:var(--text);
+    font:700 13px var(--mono);
+    letter-spacing:.6px;
+  }
+  .language-menu .language-count{margin-left:auto;font-size:12px}
+  .language-menu .language-close{
+    display:grid;
+    place-items:center;
+    width:40px;
+    height:40px;
+    flex:0 0 40px;
+    padding:0;
+    border:1px solid var(--border);
+    border-radius:7px;
+    background:var(--surface2);
+    color:var(--text);
+  }
+  .language-menu .language-close:hover,
+  .language-menu .language-close:focus-visible{
+    border-color:var(--accent);
+    color:var(--accent);
+  }
+  .language-menu .language-search-wrap{
+    min-height:48px;
+    height:48px;
+    flex:0 0 48px;
+    margin:14px 14px 8px;
+    padding:0 13px;
+    background:var(--input-bg);
+    border-color:var(--border-strong);
+    border-radius:7px;
+  }
+  .language-menu .language-search-wrap input{
+    min-height:44px;
+    height:44px;
+    font-size:16px;
+  }
+  .language-menu .language-options{
+    min-height:0;
+    flex:1 1 auto;
+    overflow-y:auto;
+    overflow-x:hidden;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-y;
+    padding:3px 12px 14px;
+    scrollbar-width:thin;
+    scrollbar-color:var(--border-strong) transparent;
+  }
+  .language-menu .language-option{
+    min-height:52px;
+    gap:12px;
+    padding:10px 12px;
+    border-radius:6px;
+    border-bottom:1px solid var(--border);
+    font-size:14px;
+  }
+  .language-menu .language-option-name{font-size:14px}
+  .language-menu .language-option-code{font-size:11px}
+  .language-menu .language-option-flag{
+    width:29px;
+    height:21px;
+  }
+  .language-menu .language-option-emoji{
+    min-width:29px;
+    flex-basis:29px;
+    height:21px;
+    font-size:20px;
+  }
+}
+@media (max-width:760px) and (max-height:540px),
+       (max-height:540px) and (pointer:coarse){
+  .language-picker .language-menu:not(.hidden){
+    height:min(86dvh,500px);
+    max-height:calc(100dvh - 16px);
+  }
+  .language-menu .language-menu-heading{min-height:46px;padding:6px 12px}
+  .language-menu .language-search-wrap{margin:6px 12px;height:44px;min-height:44px;flex-basis:44px}
+}
