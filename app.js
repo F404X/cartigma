@@ -369,7 +369,12 @@
   }
   function bestGuess(){
     if(!game.guesses.length)return null;
-    return game.guesses.reduce((best,g)=>g.distance<best.distance?g:best,game.guesses[0]);
+    let best=game.guesses[0];
+    for(let i=1;i<game.guesses.length;i++){
+      const candidate=game.guesses[i];
+      if(candidate.distance<best.distance)best=candidate;
+    }
+    return best;
   }
   function factFor(index){
     const fact=FACTS[index];
