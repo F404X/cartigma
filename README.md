@@ -32,7 +32,7 @@ The map automatically frames the **closest guess and the actual city**, with zoo
 
 ## Design and languages
 
-The game uses a restrained detective interface with **dark and light appearance modes**. Dark uses near-black and desaturated navy surfaces; light uses white and cool-gray surfaces. **Yellow is reserved for accents** such as interactive selections, map pins, clue markers and buttons, not large panel backgrounds. A header toggle switches modes and saves the preference in local storage. Evidence cards have larger typography, ruled separators, numbered sections and evidence classifications. **Evidence is stacked above the guess panel** on all screen sizes, with internal scrolling where necessary. The whole application fits in the viewport without a browser-page scrollbar; longer clue, log and report sections can scroll **internally** when needed, particularly on small screens.
+The game uses a restrained detective interface with **dark and light appearance modes**. Dark uses near-black and desaturated navy surfaces; light uses white and cool-gray surfaces. **Yellow is reserved for accents** such as interactive selections, map pins, clue markers and buttons, not large panel backgrounds. A header toggle switches modes and saves the preference in local storage. Evidence cards have larger typography, ruled separators, numbered sections and evidence classifications. **Evidence is stacked above the guess panel** on all screen sizes, with internal scrolling where necessary. On desktop, the game fits within the viewport, with internal scrolling where needed. **On smartphones (up to 760 px wide), the map is exactly square (1:1)** and the evidence, city search, guesses and results are arranged vertically below it in one scrollable investigation panel. When the available screen height is too short for a square map and a useful lower panel, the full page scrolls instead, so nothing is clipped. Touch controls are sized for fingers; the case report is shown inside the lower scroller rather than covering the map.
 
 The theme button follows the currently selected UI language. On the vector map, the dark appearance uses OpenFreeMap **Dark** and the light appearance uses OpenFreeMap **Positron**, both keyless; the original OpenStreetMap tiles remain available, with their dark CSS filter disabled in light mode.
 
@@ -64,6 +64,7 @@ Open http://localhost:8000. The tests also run automatically on pushes and pull 
 | --- | --- |
 | `index.html` | Single-screen UI and case report |
 | `styles.css` | Responsive investigation layout, lined evidence, map pins and report |
+| `mobile.css` | Square map and readable scrolling investigation panel for smartphones |
 | `themes.css` | Semantic dark/white palettes and contrast-safe appearance overrides |
 | `theme.js` | Localized appearance toggle, persistence, and map theme notification |
 | `places.js` | 74 cities with approximate locations |
