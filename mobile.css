@@ -117,6 +117,7 @@
     -webkit-overflow-scrolling:touch;
     touch-action:pan-y;
     scroll-behavior:smooth;
+    scroll-padding-top:75px;
     scrollbar-width:thin;
     scrollbar-color:var(--border-strong) transparent;
     background:var(--surface);
