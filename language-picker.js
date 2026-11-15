@@ -126,7 +126,10 @@
   }
   function render(query){
     const q=strip(query);
-    const found=SEARCH_INDEX.filter(({terms})=>terms.includes(q)).map(({row})=>row);
+    const found=[];
+    for(const {row,terms} of SEARCH_INDEX){
+      if(terms.includes(q))found.push(row);
+    }
     const box=$("languageOptions");
     box.replaceChildren(...found.map(buildOption));
     if(!found.length){
