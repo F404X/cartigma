@@ -427,6 +427,7 @@
     $("dailyBtn").setAttribute("aria-pressed",String(daily));$("freeBtn").setAttribute("aria-pressed",String(!daily));
     $("difficultySelect").value=difficulty;
     $("mapToolbar").classList.toggle("is-hard",difficulty==="hard");
+    $("mapTitle").textContent=t("map")+" - "+t(difficulty);
     const code=caseCode();
     $("caseCode").textContent=code;
     $("caseNumber").textContent=t("caseWord")+" "+code;
@@ -655,9 +656,9 @@
   }
   async function share(){
     const symbols=game.guesses.map(g=>g.distance<=WIN_RADIUS?"🟨":g.distance<500?"🟧":"⬛").join("");
-    const txt="GeoDetective "+caseCode()
+    const txt="Cartigma "+caseCode()
       +"\n"+(game.won?"✓ "+game.guesses.length+"/"+maximum():"×")+" · "+number(game.score)+" pts\n"+symbols
-      +"\nhttps://f404x.github.io/geodetective/";
+      +"\nhttps://f404x.github.io/cartigma/";
     try{
       if(navigator.share){await navigator.share({text:txt});return}
       if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(txt);toast(t("copied"));return}
