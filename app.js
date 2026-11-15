@@ -329,23 +329,24 @@
   });
   function renderClues(){
     const clues=cluesFor(game.index,difficulty);
-    $("hintCount").textContent=game.revealed+" / "+clues.length;
+    const revealed=game.revealed;
+    $("hintCount").textContent=revealed+" / "+clues.length;
     const list=$("clueList");list.replaceChildren();
     const lockedText=t("locked");
     clues.forEach((clue,i)=>{
-      const row=document.createElement("li");row.className="clue"+(i>=game.revealed?" locked":"");
+      const row=document.createElement("li");row.className="clue"+(i>=revealed?" locked":"");
       const idx=document.createElement("span");idx.className="clue-index";idx.textContent=String(i+1).padStart(2,"0");
       const body=document.createElement("span");body.className="clue-body";
       const category=document.createElement("span");category.className="clue-category";
       const categoryKey=CLUE_CATEGORY_KEYS[clue.key]||"clueRegion";
       category.textContent=t(categoryKey);
       const value=document.createElement("span");value.className="clue-text";
-      const clueValue=i<game.revealed?clueText(clue):lockedText;
+      const clueValue=i<revealed?clueText(clue):lockedText;
       value.textContent=clueValue;
       value.title=clueValue;
       body.append(category,value);row.append(idx,body);list.append(row);
     });
-    $("revealBtn").disabled=game.finished||game.revealed>=6;
+    $("revealBtn").disabled=game.finished||revealed>=6;
     $("revealBtn").classList.toggle("hidden",game.finished);
   }
   function renderHistory(){
