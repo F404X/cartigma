@@ -330,6 +330,7 @@
     const clues=cluesFor(game.index,difficulty);
     $("hintCount").textContent=game.revealed+" / "+clues.length;
     const list=$("clueList");list.replaceChildren();
+    const lockedText=t("locked");
     clues.forEach((clue,i)=>{
       const row=document.createElement("li");row.className="clue"+(i>=game.revealed?" locked":"");
       const idx=document.createElement("span");idx.className="clue-index";idx.textContent=String(i+1).padStart(2,"0");
@@ -338,7 +339,7 @@
       const categoryKey=CLUE_CATEGORY_KEYS[clue.key]||"clueRegion";
       category.textContent=t(categoryKey);
       const value=document.createElement("span");value.className="clue-text";
-      const clueValue=i<game.revealed?clueText(clue):t("locked");
+      const clueValue=i<game.revealed?clueText(clue):lockedText;
       value.textContent=clueValue;
       value.title=clueValue;
       body.append(category,value);row.append(idx,body);list.append(row);
