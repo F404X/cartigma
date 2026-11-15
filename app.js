@@ -7,12 +7,13 @@
   const LANGS = window.GeoI18n?.langNames || {};
   const REPORT_I18N = window.GeoReportI18n || {};
   const FACTS = window.GEODETECTIVE_FACTS || [];
+  const COMPASS_I18N = window.GeoCompassI18n || {};
   const NEARBY_REFERENCES = window.GEODETECTIVE_NEARBY_REFERENCES || {};
   const DIFFICULTIES = {normal:{attempts:6,initial:2},hard:{attempts:4,initial:1}};
   const SERIAL_PREFIX = "geodetective-case-counter-";
   const WIN_RADIUS = 100, HINT_COST = 300, DAILY_KEY = "geodetective-daily-v3-";
   const COUNTRY_CODES = "IS NO NO NO FI SE DK GB FR PT IT GR TR MA EG SN NG KE ET ZA MG AE JO IL IN IN IN NP BD TH SG ID ID JP JP KR CN CN CN TW MN KZ AU AU AU AU NZ NZ FJ PF CA US US US US MX MX CU GT CO EC PE PE BO BR BR BR BR BR BR AR CL AR CL".split(" ");
-  const FEATURES = "volcanic fjord polar fjord coast islands coast river river estuary river valley strait desert desert peninsula delta plateau plateau peninsula plateau desert plateau mountains coast plain delta valley delta delta islands delta islands coast valley river plain delta bay valley plateau mountains harbor coast coast islands volcanic harbor islands volcanic coast estuary bay mountains islands plateau valley coast volcanic plateau mountains desert mountains valley plateau plateau forest bay plateau bay estuary valley islands strait".split(" ");
+  const FEATURES = "volcanic fjord polar fjord coast islands coast river river estuary river mountains strait desert desert peninsula delta plateau plateau peninsula plateau desert plateau mountains coast plain delta mountains delta delta islands delta islands coast mountains river plain delta bay mountains plateau mountains harbor coast coast islands volcanic harbor islands volcanic coast estuary bay mountains islands plateau plateau coast volcanic plateau mountains desert mountains plateau plateau plateau forest bay plateau bay estuary mountains islands strait".split(" ");
   const LANDMARKS = [
     "Hallgrímskirkja","Arctic Cathedral","Svalbard Global Seed Vault","Vigeland Sculpture Park","Suomenlinna","Gamla Stan","Nyhavn","Tower Bridge",
     "Eiffel Tower","Belém Tower","Colosseum","Acropolis","Hagia Sophia","Jemaa el-Fnaa","Pyramids of Giza","Gorée Island",
@@ -53,7 +54,12 @@
     const x=Math.cos(rad(a[0]))*Math.sin(rad(b[0]))-Math.sin(rad(a[0]))*Math.cos(rad(b[0]))*Math.cos(rad(b[1]-a[1]));
     return (Math.atan2(y,x)*180/Math.PI+360)%360;
   };
-  const direction = bearing => ["N","NE","E","SE","S","SW","W","NW"][Math.round(bearing/45)%8];
+  const direction = bearing => {
+    const idx=Math.round(bearing/45)%8;
+    const labels=COMPASS_I18N[lang]?.names||COMPASS_I18N.en?.names||["N","NE","E","SE","S","SW","W","NW"];
+    const arrows=["↑","↗","→","↘","↓","↙","←","↖"];
+    return labels[idx]+" "+arrows[idx];
+  };
   const today = () => new Date().toISOString().slice(0,10);
   const store = {
     get(k){try{return JSON.parse(localStorage.getItem(k))}catch{return null}},
@@ -95,7 +101,27 @@
     const key=continentKey(index);
     return CLUE_I18N[lang]?.continents?.[key] || CLUE_I18N.en?.continents?.[key] || key;
   }
+  function updateCompassRose(){
+    const pack=COMPASS_I18N[lang]||COMPASS_I18N.en;
+    if(!pack)return;
+    for(const [i,id] of ["compassN","compassE","compassS","compassW"].entries()){
+      const node=$(id);
+      if(node){node.textContent=pack.rose[i];node.title=pack.names[i*2];}
+    }
+    const node=$("compassRose");
+    if(node)node.setAttribute("aria-label",pack.names.filter((_,i)=>i%2===0).join(" · "));
+    const btn=$("mapVectorBtn");
+    if(btn)btn.textContent=pack.vector;
+    const buttons=$("mapStylePicker");
+    if(buttons)buttons.setAttribute("aria-label",pack.mapStyle);
+  }
   function locationFeature(index) {
+    // Naming the river is more useful than the generic clue "river valleys".
+    const rivers={7:"Thames",8:"Seine",10:"Tiber",35:"Han"};
+    if(rivers[index]){
+      const template=COMPASS_I18N[lang]?.river||COMPASS_I18N.en?.river||"Along the {name} River";
+      return template.replace("{name}",rivers[index]);
+    }
     const key = FEATURES[index] || "plain";
     return CLUE_I18N[lang]?.features?.[key] || CLUE_I18N.en?.features?.[key] || key;
   }
@@ -186,9 +212,12 @@
     const capital={key:"capital",value:tc(CAPITALS.has(p[0])?"yes":"no")};
     const hemisphere={key:"hemisphere",value:tc(p[3]>=0?"north":"south")};
     const reliableCapital=!["Jerusalém","La Paz","Jacarta"].includes(p[0]);
-    const opening=hash("opening:"+p[0])%2===0?terrain:zone;
-    const third=hash("profile:"+p[0])%3===0&&reliableCapital?capital
-      :hash("profile:"+p[0])%3===1?hemisphere:(opening===terrain?zone:terrain);
+    // Hemisphere, when used at all, comes BEFORE the continent clue.
+    // It must never appear in a later evidence slot after the continent.
+    const choice=hash("opening:"+p[0])%3;
+    const opening=choice===2?hemisphere:(choice===0?terrain:zone);
+    const third=reliableCapital&&hash("profile:"+p[0])%3===0?capital:
+      (opening===terrain?zone:terrain);
     // Comparison replaces the precise "nearest city" clue, which was too revealing.
     const relationship={
       key:"closer",a:referenceName(nearReference),b:referenceName(farReference)
@@ -256,6 +285,7 @@
     document.documentElement.lang=locale();
     document.documentElement.dir=["ar","he"].includes(lang)?"rtl":"ltr";
     $("langSelect").value=lang;
+    updateCompassRose();
     const FLAGS={en:"🇺🇸",pt:"🇧🇷",es:"🇪🇸",zh:"🇨🇳",ja:"🇯🇵",ru:"🇷🇺",fr:"🇫🇷",de:"🇩🇪",it:"🇮🇹",nl:"🇳🇱",pl:"🇵🇱",sv:"🇸🇪",tr:"🇹🇷",ar:"🇸🇦",he:"🇮🇱",ko:"🇰🇷",th:"🇹🇭",vi:"🇻🇳",id:"🇮🇩"};
     $("languageFlag").textContent=FLAGS[lang]||"🌐";
     window.GeoLanguagePicker?.sync(lang);
