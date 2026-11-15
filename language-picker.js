@@ -29,6 +29,7 @@
   let ready=false;
   const strip=str=>str.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
   const SEARCH_INDEX=DATA.map(row=>({row,terms:strip(row.join(" "))}));
+  const LANG_BY_CODE=new Map(DATA.map(row=>[row[0],row]));
   function flagUrl(region){return "https://flagcdn.com/w40/"+region+".png";}
   const isMobile=()=>window.matchMedia?.("(max-width: 760px), (max-height: 540px) and (pointer: coarse)")?.matches===true;
   function isOpen(){return !$("languageMenu").classList.contains("hidden");}
@@ -64,7 +65,7 @@
     if(restoreFocus)$("languageTrigger").focus();
   }
   function sync(code){
-    const entry=DATA.find(row=>row[0]===code)||DATA[0];
+    const entry=LANG_BY_CODE.get(code)||DATA[0];
     active=entry[0];
     const label=$("languageLabel"),image=$("languageFlagImage"),emoji=$("languageFlag");
     if(label)label.textContent=entry[1];
@@ -77,7 +78,7 @@
     if(ready&&isOpen())render($("languageSearch").value);
   }
   function choose(code){
-    if(!DATA.some(row=>row[0]===code))return;
+    if(!LANG_BY_CODE.has(code))return;
     // Use the same change path that the app uses for persistence/map localization.
     const select=$("langSelect");
     select.value=code;
