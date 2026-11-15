@@ -29,17 +29,37 @@
   let ready=false;
   const strip=str=>str.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
   function flagUrl(region){return "https://flagcdn.com/w40/"+region+".png";}
+  const isMobile=()=>window.matchMedia?.("(max-width: 760px), (max-height: 540px) and (pointer: coarse)")?.matches===true;
   function isOpen(){return !$("languageMenu").classList.contains("hidden");}
   function open(){
-    $("languageMenu").classList.remove("hidden");
-    $("languageTrigger").setAttribute("aria-expanded","true");
+    const mobile=isMobile();
+    const menu=$("languageMenu"),trigger=$("languageTrigger");
+    menu.classList.remove("hidden");
+    trigger.setAttribute("aria-expanded","true");
+    trigger.setAttribute("aria-haspopup",mobile?"dialog":"listbox");
+    if(mobile){
+      menu.setAttribute("role","dialog");
+      menu.setAttribute("aria-modal","true");
+      menu.setAttribute("aria-labelledby","languageMenuHeading");
+      $("languageBackdrop").classList.remove("hidden");
+      document.documentElement?.classList?.add("language-modal-open");
+    }else{
+      menu.removeAttribute?.("role");
+      menu.removeAttribute?.("aria-modal");
+      menu.removeAttribute?.("aria-labelledby");
+    }
     $("languageSearch").value="";
     render("");
-    $("languageSearch").focus();
+    // Avoid opening the mobile keyboard over the centered picker automatically.
+    if(mobile)$("languageCloseBtn").focus();
+    else $("languageSearch").focus();
   }
   function close(restoreFocus=false){
     $("languageMenu").classList.add("hidden");
+    $("languageBackdrop").classList.add("hidden");
+    document.documentElement?.classList?.remove("language-modal-open");
     $("languageTrigger").setAttribute("aria-expanded","false");
+    $("languageTrigger").setAttribute("aria-haspopup","listbox");
     if(restoreFocus)$("languageTrigger").focus();
   }
   function sync(code){
@@ -123,6 +143,8 @@
       $("languageFlag").style.display="inline-flex";
     });
     trigger.addEventListener("click",()=>isOpen()?close():open());
+    $("languageCloseBtn").addEventListener("click",()=>close(true));
+    $("languageBackdrop").addEventListener("click",()=>close(true));
     trigger.addEventListener("keydown",event=>{
       if(event.key==="ArrowDown"||event.key==="Enter"||event.key===" "){
         event.preventDefault();if(!isOpen())open();
@@ -140,7 +162,17 @@
       if(isOpen()&&!picker.contains(event.target))close();
     });
     document.addEventListener("keydown",event=>{
-      if(event.key==="Escape"&&isOpen())close(true);
+      if(!isOpen())return;
+      if(event.key==="Escape"){event.preventDefault?.();close(true);return;}
+      if(event.key!=="Tab"||!isMobile())return;
+      const options=[...$("languageOptions").querySelectorAll(".language-option")];
+      const focusable=[$("languageCloseBtn"),$("languageSearch"),...options];
+      const first=focusable[0],last=focusable.at(-1);
+      if(event.shiftKey&&document.activeElement===first){
+        event.preventDefault();last.focus();
+      }else if(!event.shiftKey&&document.activeElement===last){
+        event.preventDefault();first.focus();
+      }
     });
     sync($("langSelect").value||"en");
     render("");
