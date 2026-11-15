@@ -32,7 +32,9 @@ The map automatically frames the **closest guess and the actual city**, with zoo
 
 ## Design and languages
 
-The game uses a flat, yellow-and-charcoal detective interface. Evidence cards have larger typography, ruled separators, numbered sections and evidence classifications. **Evidence is stacked above the guess panel** on all screen sizes, with internal scrolling where necessary. The whole application fits in the viewport without a browser-page scrollbar; longer clue, log and report sections can scroll **internally** when needed, particularly on small screens.
+The game uses a restrained detective interface with **dark and light appearance modes**. Dark uses near-black and desaturated navy surfaces; light uses white and cool-gray surfaces. **Yellow is reserved for accents** such as interactive selections, map pins, clue markers and buttons, not large panel backgrounds. A header toggle switches modes and saves the preference in local storage. Evidence cards have larger typography, ruled separators, numbered sections and evidence classifications. **Evidence is stacked above the guess panel** on all screen sizes, with internal scrolling where necessary. The whole application fits in the viewport without a browser-page scrollbar; longer clue, log and report sections can scroll **internally** when needed, particularly on small screens.
+
+The theme button follows the currently selected UI language. On the vector map, the dark appearance uses OpenFreeMap **Dark** and the light appearance uses OpenFreeMap **Positron**, both keyless; the original OpenStreetMap tiles remain available, with their dark CSS filter disabled in light mode.
 
 The UI supports **19 languages**: English (default), Portuguese, Spanish, Simplified Chinese, Japanese, Russian, French, German, Italian, Dutch, Polish, Swedish, Turkish, Arabic, Hebrew, Korean, Thai, Vietnamese and Indonesian. Arabic and Hebrew use RTL layout. The language selector is a searchable custom menu with a persistent globe icon, a representative flag image in **every option**, full native-language names, keyboard navigation and a visible selected state (with emoji fallback when a flag image cannot load). Preferences are stored locally. The primary map uses MapLibre vector labels that follow the selected language when translated name fields exist, falling back to the local name otherwise. **Label density is zoom-dependent:** countries appear at world scale, major cities at moderate zoom, and neighborhoods, local streets and points of interest at progressively higher zoom. This is applied directly to vector style layers; raster fallback tiles have fixed labels. A **map-style selector below the map** lets players switch between the vector map (localized names where available) and the classic OpenStreetMap raster map (fixed labels). The choice persists in local storage and retains the current case and map viewport. A **compass rose at the bottom-right of the map** adapts its cardinal lettering to the selected language. If WebGL, a CDN or the vector style fails, the Leaflet/OpenStreetMap raster map also loads automatically. Interface strings, clue templates, geographic terminology, and report controls are also translated.
 
@@ -42,7 +44,7 @@ The UI supports **19 languages**: English (default), Portuguese, Spanish, Simpli
 - **MapLibre GL JS 6.18.0** with [OpenFreeMap](https://openfreemap.org/) dark vector tiles, no API key, plus **Leaflet 1.9.4** as an automatic fallback when WebGL or the vector style is unavailable. Viewport gestures are distinguished from deliberate clicks (8 px pointer threshold plus drag suppression).
 - Open-Meteo Geocoding API for optional search suggestions.
 - Browser `Intl.DisplayNames` for country names; six continents have explicit localized names.
-- `localStorage` for daily results, sequence numbers, preferred language and preferred basemap.
+- `localStorage` for daily results, sequence numbers, preferred language, preferred basemap and appearance theme.
 
 Because this is entirely static, the answers and clues exist on the client; it is a casual game rather than a secure competition. No proprietary API secrets are required.
 
@@ -61,9 +63,11 @@ Open http://localhost:8000. The tests also run automatically on pushes and pull 
 | File | Content |
 | --- | --- |
 | `index.html` | Single-screen UI and case report |
-| `styles.css` | Flat dark/yellow layout, lined evidence, map pins and report |
+| `styles.css` | Responsive investigation layout, lined evidence, map pins and report |
+| `themes.css` | Semantic dark/white palettes and contrast-safe appearance overrides |
+| `theme.js` | Localized appearance toggle, persistence, and map theme notification |
 | `places.js` | 74 cities with approximate locations |
-| `references.js` | Local named reference coordinates within a 1,000 km radius |
+| `references.js` | Curated named regional reference coordinates used for distance clues |
 | `map-bootstrap.js` | Loads the vector engine from redundant CDNs and selects fallback when needed |
 | `map-fallback.js` | Loads Leaflet and adapts OpenStreetMap map interactions without WebGL |
 | `compass-i18n.js` | Cardinal directions, arrow labels, rose abbreviations and map selector labels in 19 languages |
