@@ -55,6 +55,7 @@
       getStyle(){return {layers:[]};}
       setLayoutProperty(){}
       getZoom(){return this.root.getZoom();}
+      resize(){this.root.invalidateSize({pan:false});return this;}
       getCenter(){const c=this.root.getCenter();return {lng:c.lng,lat:c.lat};}
       easeTo(opts){
         this.root.setView([opts.center[1],opts.center[0]],opts.zoom||this.root.getZoom(),{animate:true});
