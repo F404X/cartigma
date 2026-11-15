@@ -28,6 +28,7 @@
   let active="en";
   let ready=false;
   const strip=str=>str.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
+  const SEARCH_INDEX=DATA.map(row=>({row,terms:strip(row.join(" "))}));
   function flagUrl(region){return "https://flagcdn.com/w40/"+region+".png";}
   const isMobile=()=>window.matchMedia?.("(max-width: 760px), (max-height: 540px) and (pointer: coarse)")?.matches===true;
   function isOpen(){return !$("languageMenu").classList.contains("hidden");}
@@ -124,7 +125,7 @@
   }
   function render(query){
     const q=strip(query);
-    const found=DATA.filter(row=>strip(row.join(" ")).includes(q));
+    const found=SEARCH_INDEX.filter(({terms})=>terms.includes(q)).map(({row})=>row);
     const box=$("languageOptions");
     box.replaceChildren(...found.map(buildOption));
     if(!found.length){
