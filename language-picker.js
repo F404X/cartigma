@@ -90,9 +90,9 @@
     close(true);
   }
   function moveOption(current,delta){
-    const options=[...$("languageOptions").querySelectorAll(".language-option")];
+    const options=$("languageOptions").querySelectorAll(".language-option");
     if(!options.length)return;
-    const i=options.indexOf(current);
+    const i=Array.prototype.indexOf.call(options,current);
     options[(i+delta+options.length)%options.length].focus();
   }
   function buildOption(entry){
