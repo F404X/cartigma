@@ -157,11 +157,11 @@
     }
     return {index:best,km:minimum};
   }
+  const REGIONAL_BASE_RADIUS=Object.freeze({europe:2000,africa:2600,asia:2700,oceania:2500,northAmerica:2500,southAmerica:2300});
   function regionalHintRadius(index, level){
     // Use the geographic spread of the target's region, not a universal 1,000 km cap.
     // Sparse/large regions need longer references; dense regions get a smaller radius.
-    const base={europe:2000,africa:2600,asia:2700,oceania:2500,
-      northAmerica:2500,southAmerica:2300};
+    const base=REGIONAL_BASE_RADIUS;
     const region=continentKey(index);
     const center=cityCoords(index);
     const neighbors=PLACES.map((_,i)=>({
