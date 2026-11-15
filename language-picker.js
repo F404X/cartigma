@@ -71,9 +71,12 @@
     if(label)label.textContent=entry[1];
     if(emoji)emoji.textContent=entry[3];
     if(image){
-      image.style.display="";
-      if(emoji)emoji.style.display="";
-      image.src=flagUrl(entry[2]);
+      const url=flagUrl(entry[2]);
+      if(image.src!==url){
+        image.style.display="";
+        if(emoji)emoji.style.display="";
+        image.src=url;
+      }
     }
     if(ready&&isOpen())render($("languageSearch").value);
   }
