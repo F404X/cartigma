@@ -1,0 +1,181 @@
+/* GeoDetective appearance system.
+   Warm yellow is reserved for interactive accents, never for large background areas.
+   All base surfaces are blue-black (dark) or near-white (light). */
+:root,:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0b1018;
+  --surface:#111827;
+  --surface2:#1a2434;
+  --surface3:#253247;
+  --border:#2a374b;
+  --border-strong:#455772;
+  --text:#ebeff7;
+  --muted:#a5b2c5;
+  --accent:#f6ca47;
+  --accent-hover:#ffdd70;
+  --accent-soft:#f6ca4717;
+  --accent-fill:#f6ca47;
+  --on-accent:#242014;
+  --danger:#ee918e;
+  --input-bg:#0c1420;
+  --hover-bg:#253249;
+  --disabled-bg:#303947;
+  --disabled-text:#99a6b8;
+  --map-placeholder:#101924;
+  --control-overlay:#111827ed;
+  --pin-outline:#0b1018;
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --bg:#f3f6fb;
+  --surface:#ffffff;
+  --surface2:#f5f8fc;
+  --surface3:#eaf0f8;
+  --border:#d5dfec;
+  --border-strong:#b7c5d7;
+  --text:#172338;
+  --muted:#5e7087;
+  --accent:#855900;
+  --accent-hover:#a66f00;
+  --accent-soft:#fff2cf;
+  --accent-fill:#f5c84d;
+  --on-accent:#252015;
+  --danger:#b83a3a;
+  --input-bg:#f9fbff;
+  --hover-bg:#eaf1fa;
+  --disabled-bg:#e3e8f0;
+  --disabled-text:#8491a5;
+  --map-placeholder:#dfe7f0;
+  --control-overlay:#fffffff2;
+  --pin-outline:#344054;
+}
+
+/* Neutral surfaces in both modes — no green cast or yellow fills for ordinary panels. */
+html,body{background:var(--bg);color:var(--text)}
+.site-header,.toolbar,.map-toolbar,.map-bottom,.case-header,.clue-panel,.guess-panel,.status-bar{
+  background:var(--surface);border-color:var(--border)
+}
+.game-grid{background:var(--bg)}
+.guess-panel{background:var(--surface)}
+.clue:nth-child(even):not(.locked){background:var(--surface2)}
+.clue.locked,.clue.locked:first-child{background:var(--surface2);border-bottom-color:var(--border)}
+.clue.locked .clue-category,.clue.locked .clue-text,.clue.locked .clue-index{color:var(--muted)}
+.clue-category{color:var(--accent)}
+.clue.locked{opacity:.72}
+.section-index{border-color:var(--border-strong)}
+.attempt-dots i{background:var(--border-strong)}
+.search-wrap input,.language-search-wrap,.map-style-picker{background:var(--input-bg);color:var(--text);border-color:var(--border-strong)}
+.search-wrap input::placeholder,.language-search-wrap input::placeholder{color:var(--muted)}
+.suggestions,.language-menu{background:var(--surface);border-color:var(--border-strong)}
+.suggestion:hover,.suggestion:focus-visible,.language-option:hover,.language-option:focus-visible{
+  background:var(--hover-bg);border-color:var(--border)
+}
+.language-option.selected{background:var(--surface3);color:var(--text);border-left-color:var(--accent)}
+.language-option.selected .language-option-code{color:var(--accent)}
+.language-option-code,.language-count,.language-trigger .language-caret{color:var(--muted)}
+.language-trigger{background:var(--surface2);color:var(--text);border-color:var(--border-strong)}
+.language-trigger:hover,.language-trigger[aria-expanded="true"]{background:var(--hover-bg);border-color:var(--accent)}
+.language-menu-heading{color:var(--accent)}
+.language-options{scrollbar-color:var(--border-strong) transparent}
+.language-search-wrap:focus-within{border-color:var(--accent)}
+.language-search-wrap input{color:var(--text)}
+.primary-btn:disabled{background:var(--disabled-bg);border-color:var(--disabled-bg);color:var(--disabled-text)}
+.primary-btn,.mode-tab.active,.map-style-button.active{
+  background:var(--accent-fill);border-color:var(--accent-fill);color:var(--on-accent)
+}
+.primary-btn:hover:not(:disabled){background:var(--accent-hover)}
+.map-style-button{color:var(--muted)}
+.map-style-button:not(.active):hover{background:var(--hover-bg);color:var(--accent)}
+.reveal-btn small{color:var(--muted)}
+.suggestion,.result-card,.toast,dialog{background:var(--surface);color:var(--text);border-color:var(--border-strong)}
+.result-card{background:var(--surface)}
+.report-topbar,.report-footer{background:var(--surface2);border-color:var(--border)}
+dialog.case-report,dialog.case-report[open]{background:var(--surface);color:var(--text);border-color:var(--border-strong)}
+.report-grid>div,.report-fact{background:var(--surface2)}
+.report-log-row.best{background:var(--accent-soft)}
+.report-section h3{color:var(--text);border-bottom-color:var(--border)}
+.report-log-row strong{color:var(--accent)}
+.report-stamp{color:var(--accent);border-color:var(--accent)}
+.report-heading,.report-topbar,.report-footer,.report-log-row,.report-evidence-row{border-color:var(--border)}
+.report-close{background:transparent;border-color:var(--border);color:var(--text)}
+.report-close:hover{color:var(--accent);border-color:var(--accent)}
+.feedback{background:var(--surface2)}
+#map,.maplibregl-map,.leaflet-container{background:var(--map-placeholder)}
+.maplibregl-ctrl-group{border-color:var(--border-strong)!important}
+.maplibregl-ctrl-group button{background:var(--surface)!important;border-color:var(--border)!important}
+.maplibregl-ctrl-group button:hover{background:var(--surface3)!important}
+.maplibregl-ctrl-attrib,.leaflet-control-attribution{
+  background:var(--control-overlay)!important;color:var(--muted)!important
+}
+.maplibregl-ctrl-attrib a,.leaflet-control-attribution a{color:var(--accent)!important}
+.maplibregl-popup-content-wrapper,.maplibregl-popup-tip{
+  background:var(--surface)!important;color:var(--text)!important
+}
+.leaflet-control-zoom a{background:var(--surface)!important;color:var(--text)!important;border-color:var(--border)!important}
+.leaflet-control-zoom a:hover{background:var(--surface3)!important}
+.compass-rose{background:transparent;color:var(--muted)}
+.map-style-picker{border-color:var(--border-strong)}
+.case-status{border-color:var(--border)}
+.clue-list,.case-columns .clue-list{scrollbar-color:var(--border-strong) transparent}
+.case-columns .clue-list::-webkit-scrollbar-thumb{background:var(--border-strong)}
+
+/* Light theme: dark ink over white/slate. Accent stays gold only on indicators. */
+:root[data-theme="light"] .clue.locked{opacity:.8}
+:root[data-theme="light"] .clue.locked .clue-text{color:#78869a}
+:root[data-theme="light"] .clue.locked .clue-category{color:#6c7c94}
+:root[data-theme="light"] .case-status{background:var(--accent-soft)}
+:root[data-theme="light"] .suggestion:hover,
+:root[data-theme="light"] .suggestion:focus-visible{background:var(--hover-bg)}
+:root[data-theme="light"] .result-card{box-shadow:0 3px 16px #17283d15}
+:root[data-theme="light"] .toast{box-shadow:0 5px 25px #15203319}
+:root[data-theme="light"] .report-stamp{color:var(--accent);border-color:var(--accent)}
+:root[data-theme="light"] .report-fact{border-left-color:var(--accent-fill)}
+:root[data-theme="light"] .report-grid>div{border-left-color:var(--border-strong)}
+:root[data-theme="light"] .report-log-row.best{border-left-color:var(--accent)}
+:root[data-theme="light"] .report-code{color:var(--text)}
+:root[data-theme="light"] .report-close{color:var(--muted)}
+:root[data-theme="light"] dialog.case-report,
+:root[data-theme="light"] dialog.case-report[open]{box-shadow:-8px 0 28px #17283d20}
+:root[data-theme="light"] dialog{box-shadow:0 16px 45px #19294429}
+:root[data-theme="light"] .language-menu{box-shadow:0 12px 35px #14233c23}
+:root[data-theme="light"] .suggestions{box-shadow:0 6px 18px #14233c21}
+:root[data-theme="light"] .language-option.selected{color:var(--text)}
+:root[data-theme="light"] .maplibregl-ctrl button .maplibregl-ctrl-icon{filter:invert(.12)}
+:root[data-theme="light"] .leaflet-tile-pane{filter:none}
+:root[data-theme="light"] .leaflet-control-zoom a{color:var(--text)!important}
+:root[data-theme="light"] .leaflet-container .leaflet-popup-content-wrapper,
+:root[data-theme="light"] .leaflet-container .leaflet-popup-tip{
+  color:var(--text)!important;background:var(--surface)!important
+}
+:root[data-theme="light"] .maplibregl-marker.pin .pin-head,
+:root[data-theme="light"] .geodetective-leaflet-pin .pin-head{border-color:var(--pin-outline)}
+:root[data-theme="light"] .compass-rose{color:#49596e}
+:root[data-theme="light"] .compass-art path[fill="#b7bdab"],
+:root[data-theme="light"] .compass-art path[fill="#8c9484"]{fill:#57687c}
+:root[data-theme="light"] .compass-art circle[fill="#141811"]{fill:#ffffff}
+
+/* Theme toggle: plain utility control, not another yellow panel. */
+.theme-toggle{
+  height:33px;display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:0 10px;border:1px solid var(--border-strong);border-radius:3px;
+  color:var(--muted);background:var(--surface2);font:600 11px var(--font);
+  white-space:nowrap;flex-shrink:0;
+}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent);background:var(--hover-bg)}
+.theme-toggle .theme-moon{display:none}
+:root[data-theme="light"] .theme-toggle .theme-sun{display:none}
+:root[data-theme="light"] .theme-toggle .theme-moon{display:block}
+:root[data-theme="light"] .theme-toggle{background:var(--surface);color:var(--text)}
+:root[data-theme="light"] .theme-toggle:hover{color:var(--accent)}
+@media(max-width:760px){
+  .theme-toggle{width:31px;height:31px;padding:0}
+  .theme-toggle #themeLabel{display:none}
+  .header-end{gap:8px}
+}
+@media(max-width:520px){
+  .theme-toggle{width:28px;height:28px}
+  .header-end{gap:5px}
+}
+@media(prefers-reduced-motion:reduce){
+  .theme-toggle,.language-trigger{transition:none}
+}
