@@ -468,7 +468,27 @@ test("map title bar reflects Normal and Hard difficulty",()=>{
   g.difficulty("normal");
   assert.equal(bar.classList.contains("is-hard"),false);
   assert.match(files["index.html"],/id="mapToolbar"/);
-  assert.match(files["index.html"],/aria-label="GeoDetective on GitHub"/);
+  assert.match(files["index.html"],/aria-label="Cartigma on GitHub"/);
   assert.match(files["index.html"],/viewBox="0 0 24 24"/);
   assert.match(files["app.js"],/mapToolbar"\)\.classList\.toggle\("is-hard"/);
+});
+
+
+test("Cartigma map title includes localized difficulty and has a globe at its left",()=>{
+  const g=boot(),bar=g.get("mapToolbar");
+  assert.equal(g.get("mapTitle").textContent,"World map - Normal");
+  assert.equal(bar.classList.contains("is-hard"),false);
+  g.difficulty("hard");
+  assert.equal(g.get("mapTitle").textContent,"World map - Hard");
+  assert.equal(bar.classList.contains("is-hard"),true);
+  g.language("pt");
+  assert.equal(g.get("mapTitle").textContent,"Mapa mundial - Difícil");
+  g.difficulty("normal");
+  assert.equal(g.get("mapTitle").textContent,"Mapa mundial - Normal");
+  assert.equal(bar.classList.contains("is-hard"),false);
+  assert.match(files["index.html"],/class="map-title-globe"/);
+  assert.match(files["index.html"],/aria-label="Cartigma home"/);
+  assert.match(files["index.html"],/href="https:\/\/github\.com\/F404X\/cartigma"/);
+  assert.match(files["app.js"],/const txt="Cartigma "/);
+  assert.doesNotMatch(files["index.html"],/GeoDetective/i);
 });
