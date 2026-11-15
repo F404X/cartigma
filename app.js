@@ -665,7 +665,8 @@
     if(!items.length){
       const empty=document.createElement("div");empty.className="suggestion-empty";empty.textContent=t("noResults");list.append(empty);
     }
-    for(const item of items.slice(0,7)){
+    for(let i=0;i<items.length&&i<7;i++){
+      const item=items[i];
       const button=document.createElement("button");button.type="button";button.className="suggestion";button.setAttribute("role","option");
       button.textContent=item.name;
       const desc=document.createElement("small");desc.textContent=item.description;button.append(desc);
