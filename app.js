@@ -350,12 +350,13 @@
   }
   function renderHistory(){
     const list=$("guessHistory");list.replaceChildren();
-    $("historyCount").textContent=String(game.guesses.length).padStart(2,"0");
-    if(!game.guesses.length){
+    const count=game.guesses.length;
+    $("historyCount").textContent=String(count).padStart(2,"0");
+    if(!count){
       const li=document.createElement("li");li.className="empty-history";li.textContent=t("empty");list.append(li);return;
     }
     // Render newest first without copying and reversing the guesses array.
-    for(let i=game.guesses.length-1;i>=0;i--){
+    for(let i=count-1;i>=0;i--){
       const g=game.guesses[i];
       const row=document.createElement("li");row.className="history-item";
       const label=document.createElement("span");
