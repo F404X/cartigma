@@ -320,6 +320,12 @@
     const element=$("toast");element.textContent=text;element.classList.remove("hidden");
     clearTimeout(toastTimer);toastTimer=setTimeout(()=>element.classList.add("hidden"),2800);
   }
+  // Reuse the clue-category lookup instead of rebuilding it for every row.
+  const CLUE_CATEGORY_KEYS=Object.freeze({
+    terrain:"clueTerrain",continent:"clueRegion",zone:"clueClimate",
+    hemisphere:"clueRegion",capital:"clueCivic",distance:"clueDistance",
+    closer:"clueDistance",nearest:"clueDistance",landmark:"clueLandmark"
+  });
   function renderClues(){
     const clues=cluesFor(game.index,difficulty);
     $("hintCount").textContent=game.revealed+" / "+clues.length;
@@ -329,11 +335,7 @@
       const idx=document.createElement("span");idx.className="clue-index";idx.textContent=String(i+1).padStart(2,"0");
       const body=document.createElement("span");body.className="clue-body";
       const category=document.createElement("span");category.className="clue-category";
-      const categoryKey={
-        terrain:"clueTerrain",continent:"clueRegion",zone:"clueClimate",
-        hemisphere:"clueRegion",capital:"clueCivic",distance:"clueDistance",
-        closer:"clueDistance",nearest:"clueDistance",landmark:"clueLandmark"
-      }[clue.key]||"clueRegion";
+      const categoryKey=CLUE_CATEGORY_KEYS[clue.key]||"clueRegion";
       category.textContent=t(categoryKey);
       const value=document.createElement("span");value.className="clue-text";
       const clueValue=i<game.revealed?clueText(clue):t("locked");
