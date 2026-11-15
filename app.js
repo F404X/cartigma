@@ -71,7 +71,8 @@
   let difficulty = DIFFICULTIES[savedDifficulty] ? savedDifficulty : "normal";
   let game = null, selected = null, map = null, marker = null, overlayMarkers = [], freeIndex = -1;
   let activeLine=false, mapStyleReady=false, lastDragAt=0, pointerDown=null, pointerMoved=false;
-  let fallbackSwitching=false, mapStyleTimeout=null;
+  let fallbackSwitching=false, mapStyleTimeout=null, mapSwitching=false, mapPointerController=null;
+  let activeMapStyle=window.maplibregl?.isFallback?"osm":"vector";
   let controller = null, debounce = null, toastTimer = null;
 
   function t(key, variables={}) {
@@ -515,16 +516,17 @@
     const id=(layer.id+" "+(layer["source-layer"]||"")).toLowerCase();
     // Each category progressively appears as the investigator zooms in.
     // Country labels remain at world scale; street names and POIs require local zoom.
-    if(/(road|street|highway|motorway|rail|transit|route|shield|housenumber|house-number)/.test(id))return 12;
-    if(/(poi|amenity|shop|building|landmark|business|tourism|airport|station)/.test(id))return 11;
-    if(/(neighbou?rhood|suburb|hamlet|village|district|quarter|locality)/.test(id))return 8.2;
-    if(/(town|settlement)/.test(id))return 7;
-    if(/(province|state|region|admin)/.test(id))return 5;
-    if(/(city|capital|place)/.test(id))return 4.6;
-    if(/(river|lake|water|sea|ocean|mountain|hill|peak|park|island|natural)/.test(id))return 6.6;
+    if(/(road|street|highway|motorway|rail|transit|route|shield|housenumber|house-number)/.test(id))return 9.5;
+    if(/(poi|amenity|shop|building|landmark|business|tourism|airport|station)/.test(id))return 9;
+    if(/(neighbou?rhood|suburb|hamlet|village|district|quarter|locality)/.test(id))return 6.4;
+    if(/(town|settlement)/.test(id))return 4.1;
+    if(/(province|state|region|admin)/.test(id))return 3.15;
     if(/(country|continent)/.test(id))return 1.5;
-    if(/(label|name|text)/.test(id))return 7.2;
-    return 8;
+    if(/(capital)/.test(id))return 2.3;
+    if(/(city|place)/.test(id))return 2.9;
+    if(/(river|lake|water|sea|ocean|mountain|hill|peak|park|island|natural)/.test(id))return 5.1;
+    if(/(label|name|text)/.test(id))return 5.2;
+    return 5.8;
   }
   function configureMapLabelDensity(){
     if(!map||!mapStyleReady||typeof map.setLayerZoomRange!=="function")return;
@@ -661,28 +663,59 @@
       const ok=document.execCommand("copy");ta.remove();if(!ok)throw Error("copy failed");toast(t("copied"));
     }catch(e){if(e.name!=="AbortError")toast(t("shareError"))}
   }
-  async function switchToFallback(reason){
-    if(fallbackSwitching || window.maplibregl?.isFallback)return;
-    fallbackSwitching=true;
-    clearTimeout(mapStyleTimeout);
-    console.warn("Switching to Leaflet basemap:",reason);
-    try{
-      const leaf=await window.GeoMapFallback.ensure();
-      if(map){
-        try{map.remove();}catch(error){console.warn(error);}
-      }
-      $("map").replaceChildren();
-      map=null;mapStyleReady=false;overlayMarkers=[];marker=null;activeLine=false;
-      window.maplibregl=leaf;
-      initMap();
-    }catch(error){
-      console.error("Leaflet fallback could not initialize:",error);
-      $("map").textContent=t("noMap");
-    }finally{
-      fallbackSwitching=false;
+  function syncMapStylePicker(){
+    const buttons=[["vector","mapVectorBtn"],["osm","mapOsmBtn"]];
+    for(const [style,id] of buttons){
+      const button=$(id);
+      if(!button)continue;
+      button.classList.toggle("active",activeMapStyle===style);
+      button.setAttribute("aria-pressed",String(activeMapStyle===style));
+      button.disabled=mapSwitching;
     }
   }
-  function initMap(){
+  function currentMapView(){
+    const center=map?.getCenter?.();
+    return {
+      center:center&&Number.isFinite(center.lng)&&Number.isFinite(center.lat)
+        ?[center.lng,center.lat]:[8,15],
+      zoom:map?.getZoom?.()||1.7
+    };
+  }
+  async function setMapStyle(style,savePreference=true){
+    if((style!=="osm"&&style!=="vector")||mapSwitching)return;
+    if(style===activeMapStyle&&map)return;
+    mapSwitching=true;syncMapStylePicker();
+    const view=currentMapView();
+    try{
+      const engine=await window.GeoMapLoader.load(style);
+      clearTimeout(mapStyleTimeout);
+      mapPointerController?.abort();
+      if(map){try{map.remove()}catch(error){console.warn(error)}}
+      $("map").replaceChildren();
+      map=null;mapStyleReady=false;overlayMarkers=[];marker=null;activeLine=false;
+      pointerDown=null;pointerMoved=false;lastDragAt=Date.now();
+      window.maplibregl=engine;
+      activeMapStyle=style;
+      initMap(view);
+      if(savePreference)store.set("geodetective-map-style",style);
+    }catch(error){
+      console.error("Map style unavailable:",style,error);
+      toast(t("noMap"));
+    }finally{
+      mapSwitching=false;syncMapStylePicker();
+    }
+  }
+  async function switchToFallback(reason){
+    if(fallbackSwitching||activeMapStyle==="osm")return;
+    fallbackSwitching=true;
+    clearTimeout(mapStyleTimeout);
+    console.warn("Switching to OpenStreetMap:",reason);
+    try{
+      // Do not overwrite the user's preferred style when falling back automatically.
+      await setMapStyle("osm",false);
+    }finally{fallbackSwitching=false}
+  }
+  function initMap(initialView={center:[8,15],zoom:1.7}){
     const libre=window.maplibregl;
     // Some supported MapLibre versions omit supported(); its absence is not a failure.
     if(!libre||typeof libre.Map!=="function"||
@@ -698,8 +731,8 @@
       map=new libre.Map({
         container:"map",
         style:"https://tiles.openfreemap.org/styles/dark",
-        center:[8,15],
-        zoom:1.7,minZoom:1.2,maxZoom:16,
+        center:initialView.center,
+        zoom:initialView.zoom,minZoom:1.2,maxZoom:16,
         attributionControl:true,
         dragRotate:false,touchPitch:false,pitchWithRotate:false,
         doubleClickZoom:false
@@ -730,24 +763,27 @@
     }
     map.on("dragstart",()=>{pointerMoved=true;lastDragAt=Date.now()});
     map.on("dragend",()=>{pointerMoved=true;lastDragAt=Date.now()});
+    mapPointerController?.abort();
+    mapPointerController=new AbortController();
     const canvas=map.getCanvas();
+    const pointerOptions={signal:mapPointerController.signal};
     canvas.addEventListener("pointerdown",event=>{
       if(event.button!==0&&event.pointerType==="mouse")return;
       pointerDown={x:event.clientX,y:event.clientY};
       pointerMoved=false;
-    });
+    },pointerOptions);
     canvas.addEventListener("pointermove",event=>{
       if(pointerDown&&Math.hypot(event.clientX-pointerDown.x,event.clientY-pointerDown.y)>8)
         pointerMoved=true;
-    });
+    },pointerOptions);
     canvas.addEventListener("pointerup",event=>{
       if(pointerDown&&Math.hypot(event.clientX-pointerDown.x,event.clientY-pointerDown.y)>8)
         pointerMoved=true;
       pointerDown=null;
-    });
+    },pointerOptions);
     canvas.addEventListener("pointercancel",()=>{
       pointerMoved=true;pointerDown=null;lastDragAt=Date.now();
-    });
+    },pointerOptions);
     map.on("click",event=>{
       // A drag release must never be interpreted as a fresh pin.
       if(game.finished||pointerMoved||Date.now()-lastDragAt<220)return;
@@ -768,6 +804,9 @@
     $("revealBtn").addEventListener("click",reveal);
     $("guessBtn").addEventListener("click",guess);
     $("resetViewBtn").addEventListener("click",resetMapView);
+    $("mapVectorBtn").addEventListener("click",()=>setMapStyle("vector"));
+    $("mapOsmBtn").addEventListener("click",()=>setMapStyle("osm"));
+    syncMapStylePicker();
     $("reportOpenBtn").addEventListener("click",showReport);
     $("shareBtn").addEventListener("click",share);
     $("reportCloseBtn").addEventListener("click",closeReport);
