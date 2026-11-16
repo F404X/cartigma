@@ -2,7 +2,7 @@
 
 A browser-based geographic detective game. Read the evidence, place pins on a world map, and identify a hidden city in a limited number of attempts.
 
-**Play:** https://f404x.github.io/cartigma/
+**Play:** https://cartigma.f404x.net/
 
 ## Game rules
 
