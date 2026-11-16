@@ -269,7 +269,7 @@
   function referenceName(item){
     return item.name+", "+displayRegion(item.country);
   }
-  function extraCountryClue(index,level){
+  function extraCountryClues(index,level){
     const code=COUNTRY_CODES[index],data=COUNTRY_INSIGHTS[code];
     if(!data)throw Error("Missing country insights for "+code);
     const candidates=[];
@@ -317,25 +317,18 @@
     }
     if(typeof data.landlocked==="boolean")
       add("countryLandlocked",{value:tc(data.landlocked?"yes":"no")});
-    // The seventh clue changes between cases, but is fixed for a given city,
-    // difficulty and language. Never select a field without verified data.
-    if(!candidates.length)throw Error("No seventh evidence for "+code);
-    return candidates[hash("country-evidence:"+code+":"+index+":"+level)%candidates.length];
+    // Choose two distinct verified country facts. They vary by case and
+    // difficulty, but their types remain stable when the language changes.
+    if(candidates.length<2)throw Error("Not enough country evidence for "+code);
+    const first=hash("country-evidence:"+code+":"+index+":"+level)%candidates.length;
+    const other=1+hash("country-evidence-alt:"+code+":"+index+":"+level)%(candidates.length-1);
+    return [candidates[first],candidates[(first+other)%candidates.length]];
   }
   function cluesFor(index,level){
     const cacheKey=index+":"+level+":"+lang;
     if(clueCache.has(cacheKey))return clueCache.get(cacheKey);
     const p=cityAt(index);
-    const radius=regionalHintRadius(index,level);
-    const anchors=anchorDistances(index,level,radius);
-    if(anchors.length<2)throw Error("Not enough regional references for "+p[0]);
-    const regionalComparison=anchors.filter(a=>a.regional&&a.km>=radius*.25);
-    const comparison=regionalComparison.length>=2?regionalComparison:anchors;
-    const nearIndex=Math.floor((comparison.length-1)*.22);
-    const farIndex=Math.max(nearIndex+1,Math.ceil((comparison.length-1)*.83));
-    const nearReference=comparison[nearIndex];
-    const farReference=comparison[farIndex];
-    const terrain={key:"terrain",value:locationFeature(index)};
+     const terrain={key:"terrain",value:locationFeature(index)};
     const zone={key:"zone",value:latitudeZone(p[3])};
     const capital={key:"capital",value:tc(CAPITALS.has(p[0])?"yes":"no")};
     const hemisphere={key:"hemisphere",value:tc(p[3]>=0?"north":"south")};
@@ -350,19 +343,19 @@
       ?(extra.capital?capital:(safeRegion?{key:"adminRegion",value:p[2]}:capital))
       :(reliableCapital&&hash("profile:"+p[0])%3===0?capital:
         (opening===terrain?zone:terrain));
-    // Comparison replaces the precise "nearest city" clue, which was too revealing.
-    const relationship={
-      key:"closer",a:referenceName(nearReference),b:referenceName(farReference)
-    };
-    const clues=[
-      opening,
-      {key:"continent",value:continentName(index)},
-      third,
-      coordinateClue(index,level),
-      relationship,
-      landmarkClue(index,level),
-      extraCountryClue(index,level)
+    // Retire the distance-reference evidence entirely. Keep five geographic
+    // and civic clues plus TWO different country facts in every case.
+    const mixed=[
+      third,coordinateClue(index,level),landmarkClue(index,level),
+      ...extraCountryClues(index,level)
     ];
+    // Reproducible Fisher-Yates shuffle: country facts can appear in any
+    // position 3–7 instead of being reserved for the final evidence.
+    for(let i=mixed.length-1;i>0;i--){
+      const j=hash("mixed-evidence:"+index+":"+level+":"+i)%(i+1);
+      [mixed[i],mixed[j]]=[mixed[j],mixed[i]];
+    }
+    const clues=[opening,{key:"continent",value:continentName(index)},...mixed];
     clueCache.set(cacheKey,clues);
     return clues;
   }
@@ -461,7 +454,7 @@
     countryLandlocked:"clueRegion",
     hemisphere:"clueRegion",capital:"clueCivic",longitude:"clueRegion",
     latitude:"clueRegion",utmZone:"clueRegion",utmBand:"clueRegion",
-    closer:"clueDistance",nearest:"clueDistance",landmark:"clueLandmark"
+    landmark:"clueLandmark"
   });
   function revealGeographyOnMap(clue){
     const cost=MAP_OVERLAY_COSTS[clue.key];
@@ -572,6 +565,44 @@
     if(fact&&lang==="en")return fact[0];
     return t("reportFactFallback",{landmark:LANDMARKS[index]});
   }
+
+  function renderCountryProfile(info,code,place){
+    const locale=window.GeoCountryProfileI18n?.[lang]||
+      window.GeoCountryProfileI18n?.en||{};
+    $("reportCountryStatsTitle").textContent=locale.title||"Country profile";
+    $("reportCountryStatsSource").textContent=locale.source||
+      "Country metadata and historical World Bank indicators";
+    const list=$("reportCountryStats");list.replaceChildren();
+    const fmt=value=>new Intl.NumberFormat(
+      TRANSLATIONS[lang]?.numberLocale||({pt:"pt-BR",en:"en-US"}[lang]||lang)
+    ).format(value);
+    const add=(key,value)=>{
+      if(value===null||value===undefined||value==="")return;
+      const cell=document.createElement("div");
+      const label=document.createElement("dt");
+      const content=document.createElement("dd");
+      label.textContent=locale[key]||key;
+      content.textContent=String(value);
+      cell.append(label,content);list.append(cell);
+    };
+    const countryWord=value=>typeof value==="boolean"
+      ?tc(value?"yes":"no"):null;
+    add("iso",code);
+    add("region",place[2]);
+    add("capital",countryWord(CAPITALS.has(place[0])));
+    add("currency",info?.currency);
+    if(info?.languageFamily)add("language",lang==="pt"
+      ?COUNTRY_FAMILIES_PT[info.languageFamily]||info.languageFamily:info.languageFamily);
+    if(info?.flagColor)add("flagColor",
+      COUNTRY_CLUE_I18N[lang]?.colors?.[info.flagColor]||
+      COUNTRY_CLUE_I18N.en?.colors?.[info.flagColor]||info.flagColor);
+    if(info?.population)add("population",fmt(info.population)+
+      (info.populationYear?" ("+info.populationYear+")":""));
+    if(info?.gdpPerCapita)add("gdp","US$ "+fmt(info.gdpPerCapita)+
+      (info.gdpYear?" ("+info.gdpYear+")":""));
+    if(info?.area)add("area",fmt(info.area)+" km²");
+    add("landlocked",countryWord(info?.landlocked));
+  }
   function renderDossier(){
     if(!game.finished)return;
     const best=bestGuess();
@@ -585,13 +616,13 @@
     flagFallback.textContent=details?.flag||"";
     flagFallback.classList.add("hidden");
     flagImage.classList.remove("hidden");
-    flagImage.src=/^[A-Z]{2}$/.test(iso)
-      ?"https://flagcdn.com/w160/"+iso.toLowerCase()+".png":"";
     flagImage.alt=countryName(game.index);
     flagImage.onerror=()=>{
       flagImage.classList.add("hidden");
       flagFallback.classList.remove("hidden");
     };
+    flagImage.src=/^[A-Z]{2}$/.test(iso)
+      ?"https://flagcdn.com/w160/"+iso.toLowerCase()+".png":"";
     $("reportHistoryTitle").textContent=COUNTRY_CLUE_I18N[lang]?.countryHistory||
       COUNTRY_CLUE_I18N.en?.countryHistory||"Country history";
     $("reportHistory").textContent=details?.history?.[lang==="pt"?"pt":"en"]||
@@ -607,6 +638,7 @@
     $("reportScore").textContent=number(game.score)+" / 5,000";
     $("reportCoordinates").textContent=place[3].toFixed(4)+"°, "+place[4].toFixed(4)+"°";
     $("reportContinent").textContent=continentName(game.index);
+    renderCountryProfile(details,iso,place);
     $("reportFact").textContent=factFor(game.index);
     const log=$("reportTimeline");log.replaceChildren();
     for(const [i,g] of game.guesses.entries()){
@@ -1003,13 +1035,13 @@
 
   // Basemap display settings only. Purchased case clues are NEVER filtered.
   const MAP_FILTER_INPUTS=Object.freeze({
-    continents:"mapFilterContinents",borders:"mapFilterBorders",regions:"mapFilterRegions",
+    borders:"mapFilterBorders",regions:"mapFilterRegions",
     countryNames:"mapFilterCountryNames",cityNames:"mapFilterCityNames",
     roads:"mapFilterRoads",areas:"mapFilterAreas",water:"mapFilterWater",poi:"mapFilterPoi"
   });
   const MAP_FILTER_KEYS=Object.keys(MAP_FILTER_INPUTS);
   const MAP_FILTER_DEFAULTS=Object.freeze({
-    continents:false,borders:true,regions:true,countryNames:true,
+    borders:true,regions:true,countryNames:true,
     cityNames:true,roads:true,areas:true,water:true,poi:true
   });
   const MAP_FILTER_STORAGE="cartigma-map-filters-v1";
@@ -1047,26 +1079,6 @@
     return null;
   }
 
-  function renderContinentOverview(){
-    const id="map-filter-continents";
-    if(!map||!mapStyleReady)return;
-    if(!mapFilterPrefs.continents){
-      if(map.getLayer(id))map.removeLayer(id);
-      if(map.getSource(id))map.removeSource(id);
-      return;
-    }
-    if(map.getLayer(id))return;
-    const coordinates=Object.values(CONTINENT_BORDERS)
-      .flatMap(part=>part.geometry?.coordinates||[]);
-    if(!coordinates.length)return;
-    if(!map.getSource(id))map.addSource(id,{type:"geojson",data:{
-      type:"Feature",properties:{},geometry:{type:"MultiPolygon",coordinates}
-    }});
-    map.addLayer({id,type:"line",source:id,
-      layout:{"line-cap":"round","line-join":"round"},
-      paint:{"line-color":"#8fa0b1","line-width":1,"line-opacity":0.29}});
-  }
-
   function applyMapFilters(){
     if(!map||!mapStyleReady||activeMapStyle!=="vector"
        ||typeof map.setLayoutProperty!=="function")return;
@@ -1079,7 +1091,6 @@
       try{map.setLayoutProperty(layer.id,"visibility",visibility)}
       catch(error){console.warn("Could not filter map layer",layer.id,error)}
     }
-    renderContinentOverview();
   }
 
   function syncMapFiltersUI(){
@@ -1235,7 +1246,8 @@
         center:initialView.center,
         zoom:initialView.zoom,minZoom:1.2,maxZoom:16,
         attributionControl:true,
-        fadeDuration:0, // Eliminate the otherwise delayed fade-out of Equator arrows.
+        fadeDuration:0, // Eliminate delayed fade-out of Equator arrows.
+        bearing:0,pitch:0,maxPitch:0,
         dragRotate:false,touchPitch:false,pitchWithRotate:false,
         doubleClickZoom:false
       });
@@ -1245,6 +1257,9 @@
       else $("map").textContent=t("noMap");
       return;
     }
+    // Pin the map north-up on mouse, keyboard and multitouch controls.
+    map.touchZoomRotate?.disableRotation?.();
+    map.keyboard?.disableRotation?.();
     map.addControl(new libre.NavigationControl({showCompass:false}),"bottom-left");
     map.on("style.load",()=>{
       clearTimeout(mapStyleTimeout);
@@ -1323,7 +1338,7 @@
     initMapFiltersUI();
     syncMapStylePicker();
     $("reportOpenBtn").addEventListener("click",showReport);
-    $("shareBtn").addEventListener("click",share);
+    $("newCaseBtn").addEventListener("click",startFree);
     $("reportCloseBtn").addEventListener("click",closeReport);
     $("reportMapBtn").addEventListener("click",closeReport);
     $("reportNextBtn").addEventListener("click",()=>{closeReport();startFree()});

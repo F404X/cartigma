@@ -19,26 +19,27 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.18.0/dist/maplibre-gl.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=20261116-country-dossier">
+  <link rel="stylesheet" href="styles.css?v=20261116-profile-diversity">
   <link rel="stylesheet" href="themes.css">
   <link rel="stylesheet" href="mobile.css">
   
   <script defer src="places.js"></script>
-  <script defer src="continent-borders.js?v=20261116-country-dossier"></script>
+  <script defer src="continent-borders.js?v=20261116-profile-diversity"></script>
   <script defer src="i18n.js"></script>
-  <script defer src="clues-i18n.js?v=20261116-country-dossier"></script>
-  <script defer src="map-filters-i18n.js?v=20261116-country-dossier"></script>
+  <script defer src="clues-i18n.js?v=20261116-profile-diversity"></script>
+  <script defer src="map-filters-i18n.js?v=20261116-profile-diversity"></script>
   <script defer src="report-i18n.js"></script>
   <script defer src="facts.js"></script>
-  <script defer src="cities-extended.js?v=20261116-country-dossier"></script>
-  <script defer src="country-insights.js?v=20261116-country-dossier"></script>
-  <script defer src="country-clues-i18n.js?v=20261116-country-dossier"></script>
+  <script defer src="cities-extended.js?v=20261116-profile-diversity"></script>
+  <script defer src="country-insights.js?v=20261116-profile-diversity"></script>
+  <script defer src="country-clues-i18n.js?v=20261116-profile-diversity"></script>
+  <script defer src="country-profile-i18n.js?v=20261116-profile-diversity"></script>
   <script defer src="references.js"></script>
   <script defer src="compass-i18n.js"></script>
   <script defer src="theme.js"></script>
-  <script defer src="map-fallback.js?v=20261116-country-dossier"></script>
+  <script defer src="map-fallback.js?v=20261116-profile-diversity"></script>
   <script defer src="language-picker.js"></script>
-  <script type="module" src="map-bootstrap.js?v=20261116-country-dossier"></script>
+  <script type="module" src="map-bootstrap.js?v=20261116-profile-diversity"></script>
 </head>
 <body>
 <div class="app">
@@ -143,7 +144,6 @@
                   <div class="map-filter-section"><span id="mapFiltersGeography">Geography</span>
                     <button type="button" id="mapFiltersReset" class="map-filter-reset">Reset</button>
                   </div>
-                  <label class="map-filter-row" for="mapFilterContinents"><span data-map-filter-label="continents">Continents</span><input type="checkbox" id="mapFilterContinents"></label>
                   <label class="map-filter-row" for="mapFilterBorders"><span data-map-filter-label="borders">Country borders</span><input type="checkbox" id="mapFilterBorders" checked></label>
                   <label class="map-filter-row" for="mapFilterRegions"><span data-map-filter-label="regions">Regions / states</span><input type="checkbox" id="mapFilterRegions" checked></label>
                   <div class="map-filter-section"><span id="mapFiltersDetails">Details</span></div>
@@ -180,7 +180,7 @@
           <section class="clue-panel" aria-labelledby="evidenceHeading">
             <div class="section-heading">
               <h2 id="evidenceHeading"><span class="section-index">01</span> <span data-i18n="evidence">Evidence</span></h2>
-              <span id="hintCount">2 / 6</span>
+              <span id="hintCount">2 / 7</span>
             </div>
             <ol class="clue-list" id="clueList" aria-live="polite"></ol>
             <button type="button" id="revealBtn" class="reveal-btn"><span data-i18n="reveal">Reveal a hint</span><small>−300</small></button>
@@ -210,7 +210,7 @@
               <p id="resultDetail"></p>
               <div class="score-box"><span data-i18n="score">Score</span><strong id="finalScore">0</strong><small>/ 5,000</small></div>
               <div class="result-actions">
-                <button id="shareBtn" type="button" class="secondary-btn" data-i18n="share">Share</button>
+                <button id="newCaseBtn" type="button" class="secondary-btn" data-i18n="newCase">New case</button>
                 <button id="reportOpenBtn" type="button" class="primary-btn" data-i18n="openReport">View case file</button>
               </div>
             </div>
@@ -274,6 +274,11 @@
       <h3 id="reportHistoryTitle">A little history</h3>
       <p id="reportHistory"></p>
       <small id="reportHistorySource"></small>
+    </section>
+    <section class="report-section report-country-profile">
+      <h3 id="reportCountryStatsTitle">Country profile</h3>
+      <dl id="reportCountryStats" class="report-country-stats"></dl>
+      <small id="reportCountryStatsSource" class="report-country-stats-source"></small>
     </section>
     <section class="report-section">
       <h3 data-i18n="reportTimeline">Guess log</h3>

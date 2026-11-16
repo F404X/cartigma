@@ -647,10 +647,10 @@ dialog.case-report .report-heading h2{font-size:24px}
 @media(prefers-reduced-motion:reduce){.map-filter-row input,.map-filter-row input::before{transition:none}}
 
 /* Country flags and readable historical context on final case dossiers. */
-.report-flag{flex:0 0 52px;width:52px;min-height:34px;display:grid;place-items:center;
- border:1px solid var(--border-strong);border-radius:2px;overflow:hidden;background:var(--surface3)}
-.report-flag img{display:block;width:100%;height:34px;object-fit:contain}
-.report-flag span{font:30px/1 var(--font);height:34px;display:grid;place-items:center}
+.report-flag{flex:0 0 82px;width:82px;min-height:56px;display:grid;place-items:center;
+ border:0;border-radius:0;overflow:visible;background:transparent}
+.report-flag img{display:block;width:100%;height:56px;object-fit:contain;border:0;box-shadow:none;background:transparent}
+.report-flag span{font:43px/1 var(--font);height:56px;display:grid;place-items:center}
 .report-flag .hidden{display:none!important}
 .report-country-history{padding:11px 14px;border-left:2px solid var(--accent);
  background:var(--surface2);overflow-wrap:anywhere}
@@ -658,9 +658,19 @@ dialog.case-report .report-heading h2{font-size:24px}
 .report-country-history p{margin:0;color:var(--text);font:500 13px/1.55 var(--font)}
 .report-country-history small{display:block;margin-top:8px;color:var(--muted);font:10px/1.35 var(--font)}
 @media(max-width:760px){
- .report-flag{flex-basis:40px;width:40px;min-height:28px}
- .report-flag img{height:28px}
- .report-flag span{height:28px;font-size:24px}
+ .report-flag{flex-basis:62px;width:62px;min-height:44px}
+ .report-flag img{height:44px}
+ .report-flag span{height:44px;font-size:34px}
  .report-country-history{padding:9px 11px}
  .report-country-history p{font-size:12px}
 }
+
+/* Fact-filled dossier country profile, visually separate from paid evidence. */
+.report-country-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0}
+.report-country-stats>div{min-width:0;background:var(--surface2);border-left:2px solid var(--border-strong);padding:9px 10px}
+.report-country-stats dt{font:500 10px/1.4 var(--font);color:var(--muted);margin-bottom:5px}
+.report-country-stats dd{margin:0;font:600 12px/1.45 var(--mono);color:var(--text);overflow-wrap:anywhere}
+.report-country-stats-source{display:block;margin-top:9px;font:10px/1.45 var(--font);color:var(--muted)}
+@media(max-width:760px){.report-country-stats{gap:6px}.report-country-stats>div{padding:8px 9px}
+ .report-country-stats dd{font-size:11px}}
+@media(max-width:370px){.report-country-stats{grid-template-columns:minmax(0,1fr)}}
