@@ -589,3 +589,59 @@ dialog.case-report .report-heading h2{font-size:24px}
   font:600 14px/18px "IBM Plex Mono",monospace;text-align:center;
   text-shadow:0 0 3px #111c16b8;
   pointer-events:none!important;user-select:none}
+
+/* Mini vector-map layer panel: anchored above the bottom map selector. */
+.map-bottom{position:relative;z-index:12;overflow:visible}
+.map-style-picker{position:relative;overflow:visible}
+.map-filter-anchor{display:flex;align-items:center;flex:0 0 auto}
+.map-filter-gear{display:grid;place-items:center;flex:0 0 26px;width:26px;height:24px;
+ padding:0;border:0;border-radius:2px;background:transparent;color:var(--muted)}
+.map-filter-gear:hover,.map-filter-gear[aria-expanded="true"]{color:var(--accent);background:var(--hover-bg)}
+.map-filter-gear[aria-expanded="true"]{box-shadow:inset 0 0 0 1px var(--border-strong)}
+.map-filter-gear:disabled{opacity:.38;cursor:not-allowed}
+.map-filter-gear svg{display:block;pointer-events:none}
+.map-filter-popover{position:absolute;right:0;bottom:calc(100% + 10px);z-index:30;
+ width:min(298px,calc(100vw - 16px));max-height:min(440px,calc(100dvh - 128px));
+ display:flex;flex-direction:column;overflow:hidden;
+ color:var(--text);background:var(--surface);border:1px solid var(--border-strong);
+ border-radius:5px;box-shadow:0 12px 32px #0008;font-family:var(--font)}
+.map-filter-head{display:flex;align-items:flex-start;gap:12px;justify-content:space-between;
+ padding:13px 13px 10px;border-bottom:1px solid var(--border)}
+.map-filter-head strong{font:650 13px/1.3 var(--font);color:var(--text)}
+.map-filter-head p{margin:3px 0 0;font:11px/1.4 var(--font);color:var(--muted)}
+.map-filter-close{display:grid;place-items:center;width:25px;height:25px;flex:0 0 25px;
+ padding:0;border:1px solid var(--border);border-radius:3px;background:transparent;
+ color:var(--muted);font:20px/1 var(--font)}
+.map-filter-close:hover{color:var(--accent);border-color:var(--accent)}
+.map-filter-scroll{min-height:0;overflow-y:auto;overscroll-behavior:contain;
+ padding:5px 9px 7px;scrollbar-width:thin;scrollbar-color:var(--border-strong) transparent}
+.map-filter-section{display:flex;align-items:center;justify-content:space-between;
+ gap:8px;min-height:30px;margin:4px 2px 2px;color:var(--muted);
+ font:650 9px/1.2 var(--mono);letter-spacing:.8px;text-transform:uppercase}
+.map-filter-reset{padding:4px 7px;border:1px solid var(--border);border-radius:2px;
+ background:transparent;color:var(--muted);font:600 10px var(--font);
+ letter-spacing:normal;text-transform:none}
+.map-filter-reset:hover{color:var(--accent);border-color:var(--accent)}
+.map-filter-row{display:flex;align-items:center;justify-content:space-between;gap:9px;
+ min-height:35px;padding:6px 8px;border-radius:2px;
+ font:500 12px/1.35 var(--font);color:var(--text);cursor:pointer}
+.map-filter-row:hover{background:var(--hover-bg)}
+.map-filter-row:focus-within{outline:1px solid var(--accent);outline-offset:-1px}
+.map-filter-row input{flex:0 0 auto;position:relative;appearance:none;width:29px;height:17px;
+ margin:0;border:1px solid var(--border-strong);border-radius:99px;background:var(--surface3);
+ cursor:pointer;transition:background .13s,border-color .13s}
+.map-filter-row input::before{content:"";position:absolute;width:11px;height:11px;
+ left:2px;top:2px;border-radius:50%;background:var(--muted);transition:transform .13s}
+.map-filter-row input:checked{background:var(--accent-soft);border-color:var(--accent)}
+.map-filter-row input:checked::before{transform:translateX(12px);background:var(--accent)}
+.map-filter-row input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.map-filter-note{margin:0;padding:10px 13px;border-top:1px solid var(--border);
+ color:var(--muted);font:10px/1.4 var(--font)}
+[dir="rtl"] .map-filter-popover,[dir="rtl"] .map-filter-head,[dir="rtl"] .map-filter-row{direction:rtl}
+@media(max-width:760px){
+ .map-filter-popover{width:min(298px,calc(100vw - 13px));
+  max-height:min(360px,calc(100vw - 55px),calc(100dvh - 105px))}
+ .map-filter-gear{width:27px;height:28px;flex-basis:27px}
+}
+@media(max-width:390px){.map-filter-gear{width:25px;flex-basis:25px}}
+@media(prefers-reduced-motion:reduce){.map-filter-row input,.map-filter-row input::before{transition:none}}

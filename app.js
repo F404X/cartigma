@@ -4,6 +4,7 @@
   const PLACES = window.GEODETECTIVE_PLACES || [];
   const TRANSLATIONS = window.GeoI18n?.PACKS || {};
   const CLUE_I18N = window.GeoCluesI18n || {};
+  const FILTER_TRANSLATIONS = window.GeoMapFilterLabels || {};
   const LANGS = window.GeoI18n?.langNames || {};
   const REPORT_I18N = window.GeoReportI18n || {};
   const FACTS = window.GEODETECTIVE_FACTS || [];
@@ -327,6 +328,7 @@
     $("languageFlag").textContent=LANGUAGE_FLAGS[lang]||"🌐";
     window.GeoLanguagePicker?.sync(lang);
     updateMapLanguage();
+    syncMapFiltersUI();
     document.querySelectorAll("[data-i18n]").forEach(element=>{element.textContent=t(element.dataset.i18n)});
     $("citySearch").placeholder=t("searchPlaceholder");
     $("helpBtn").setAttribute("aria-label",t("help"));
@@ -856,6 +858,151 @@
       const ok=document.execCommand("copy");ta.remove();if(!ok)throw Error("copy failed");toast(t("copied"));
     }catch(e){if(e.name!=="AbortError")toast(t("shareError"))}
   }
+
+  // Basemap display settings only. Purchased case clues are NEVER filtered.
+  const MAP_FILTER_INPUTS=Object.freeze({
+    continents:"mapFilterContinents",borders:"mapFilterBorders",regions:"mapFilterRegions",
+    countryNames:"mapFilterCountryNames",cityNames:"mapFilterCityNames",
+    roads:"mapFilterRoads",areas:"mapFilterAreas",water:"mapFilterWater",poi:"mapFilterPoi"
+  });
+  const MAP_FILTER_KEYS=Object.keys(MAP_FILTER_INPUTS);
+  const MAP_FILTER_DEFAULTS=Object.freeze({
+    continents:false,borders:true,regions:true,countryNames:true,
+    cityNames:true,roads:true,areas:true,water:true,poi:true
+  });
+  const MAP_FILTER_STORAGE="cartigma-map-filters-v1";
+  const previousMapFilters=store.get(MAP_FILTER_STORAGE);
+  let mapFilterPrefs=Object.fromEntries(MAP_FILTER_KEYS.map(key=>[
+    key,typeof previousMapFilters?.[key]==="boolean"?previousMapFilters[key]:MAP_FILTER_DEFAULTS[key]
+  ]));
+  const originalLayerVisibility=new Map();
+  let mapFiltersOpen=false;
+  const filterText=key=>FILTER_TRANSLATIONS[lang]?.[key]||FILTER_TRANSLATIONS.en?.[key]||key;
+
+  function mapFilterCategory(layer){
+    if(!layer?.id||/^(case-|map-filter-)/.test(layer.id))return null;
+    const id=(layer.id+" "+(layer["source-layer"]||"")).toLowerCase();
+    if(layer.type==="symbol"){
+      if(/(poi|amenity|shop|tourism|attraction|museum|airport|station|housenumber)/.test(id))return "poi";
+      if(/(road|route|transportation|highway|motorway|rail|transit|shield)/.test(id))return "roads";
+      if(/(country|continent|nation)/.test(id))return "countryNames";
+      if(/(state|province|region|district|admin|suburb|neighbou?rhood)/.test(id))return "regions";
+      if(/(city|town|village|settlement|place|hamlet|locality)/.test(id))return "cityNames";
+      if(/(river|stream|lake|water|ocean|sea|canal)/.test(id))return "water";
+      return null;
+    }
+    if(layer.type==="line"){
+      if(/(boundary|border|admin)/.test(id))
+        return /(country|national|admin[_ -]?0|level[_ -]?0|boundary_0)/.test(id)?"borders":"regions";
+      if(/(road|transportation|highway|motorway|rail|route|path|track|street|bridge|tunnel)/.test(id))return "roads";
+      if(/(river|stream|waterway|canal)/.test(id))return "water";
+      return null;
+    }
+    if(layer.type==="fill"||layer.type==="fill-extrusion"){
+      if(/(park|landcover|landuse|wood|forest|nature|grass|green|protected|landscape)/.test(id))return "areas";
+      if(/(water|lake|reservoir|river)/.test(id))return "water";
+    }
+    return null;
+  }
+
+  function renderContinentOverview(){
+    const id="map-filter-continents";
+    if(!map||!mapStyleReady)return;
+    if(!mapFilterPrefs.continents){
+      if(map.getLayer(id))map.removeLayer(id);
+      if(map.getSource(id))map.removeSource(id);
+      return;
+    }
+    if(map.getLayer(id))return;
+    const coordinates=Object.values(CONTINENT_BORDERS)
+      .flatMap(part=>part.geometry?.coordinates||[]);
+    if(!coordinates.length)return;
+    if(!map.getSource(id))map.addSource(id,{type:"geojson",data:{
+      type:"Feature",properties:{},geometry:{type:"MultiPolygon",coordinates}
+    }});
+    map.addLayer({id,type:"line",source:id,
+      layout:{"line-cap":"round","line-join":"round"},
+      paint:{"line-color":"#8fa0b1","line-width":1,"line-opacity":0.29}});
+  }
+
+  function applyMapFilters(){
+    if(!map||!mapStyleReady||activeMapStyle!=="vector"
+       ||typeof map.setLayoutProperty!=="function")return;
+    for(const layer of map.getStyle?.()?.layers||[]){
+      const category=mapFilterCategory(layer);
+      if(!category)continue;
+      if(!originalLayerVisibility.has(layer.id))
+        originalLayerVisibility.set(layer.id,layer.layout?.visibility||"visible");
+      const visibility=mapFilterPrefs[category]?originalLayerVisibility.get(layer.id):"none";
+      try{map.setLayoutProperty(layer.id,"visibility",visibility)}
+      catch(error){console.warn("Could not filter map layer",layer.id,error)}
+    }
+    renderContinentOverview();
+  }
+
+  function syncMapFiltersUI(){
+    for(const key of MAP_FILTER_KEYS)$(MAP_FILTER_INPUTS[key]).checked=mapFilterPrefs[key];
+    $("mapFiltersTitle").textContent=filterText("title");
+    $("mapFiltersSubtitle").textContent=filterText("subtitle");
+    $("mapFiltersGeography").textContent=filterText("geography");
+    $("mapFiltersDetails").textContent=filterText("details");
+    $("mapFiltersNote").textContent=filterText("note");
+    $("mapFiltersReset").textContent=filterText("reset");
+    $("mapFiltersClose").setAttribute("aria-label",filterText("close"));
+    $("mapFiltersClose").title=filterText("close");
+    const gear=$("mapFiltersButton");
+    const available=activeMapStyle==="vector"&&!mapSwitching;
+    gear.disabled=!available;
+    gear.setAttribute("aria-label",filterText("gear"));
+    gear.title=available?filterText("gear"):filterText("vectorOnly");
+    for(const el of document.querySelectorAll("[data-map-filter-label]")){
+      el.textContent=filterText(el.dataset.mapFilterLabel);
+    }
+  }
+
+  function closeMapFilters(focus=false){
+    if(!mapFiltersOpen)return;
+    mapFiltersOpen=false;
+    $("mapFiltersPopover").classList.add("hidden");
+    $("mapFiltersButton").setAttribute("aria-expanded","false");
+    if(focus)$("mapFiltersButton").focus?.();
+  }
+  function toggleMapFilters(){
+    if(activeMapStyle!=="vector"||mapSwitching)return;
+    if(mapFiltersOpen){closeMapFilters();return}
+    mapFiltersOpen=true;
+    $("mapFiltersPopover").classList.remove("hidden");
+    $("mapFiltersButton").setAttribute("aria-expanded","true");
+  }
+  function updateMapFilter(key,checked){
+    if(!MAP_FILTER_KEYS.includes(key)||typeof checked!=="boolean")return;
+    mapFilterPrefs[key]=checked;
+    store.set(MAP_FILTER_STORAGE,mapFilterPrefs);
+    syncMapFiltersUI();
+    applyMapFilters();
+  }
+  function resetMapFilters(){
+    mapFilterPrefs={...MAP_FILTER_DEFAULTS};
+    store.set(MAP_FILTER_STORAGE,mapFilterPrefs);
+    syncMapFiltersUI();
+    applyMapFilters();
+  }
+  function initMapFiltersUI(){
+    $("mapFiltersButton").addEventListener("click",toggleMapFilters);
+    $("mapFiltersClose").addEventListener("click",()=>closeMapFilters(true));
+    $("mapFiltersReset").addEventListener("click",resetMapFilters);
+    for(const key of MAP_FILTER_KEYS)
+      $(MAP_FILTER_INPUTS[key]).addEventListener("change",event=>
+        updateMapFilter(key,Boolean(event.target.checked)));
+    document.addEventListener("pointerdown",event=>{
+      if(mapFiltersOpen&&!$("mapStylePicker").contains(event.target))closeMapFilters();
+    });
+    document.addEventListener("keydown",event=>{
+      if(mapFiltersOpen&&event.key==="Escape")closeMapFilters(true);
+    });
+    syncMapFiltersUI();
+  }
+
   function syncMapStylePicker(){
     const buttons=[["vector","mapVectorBtn"],["osm","mapOsmBtn"]];
     for(const [style,id] of buttons){
@@ -865,6 +1012,8 @@
       button.setAttribute("aria-pressed",String(activeMapStyle===style));
       button.disabled=mapSwitching;
     }
+    if(activeMapStyle!=="vector"||mapSwitching)closeMapFilters();
+    syncMapFiltersUI();
   }
   function currentMapView(){
     const center=map?.getCenter?.();
@@ -920,6 +1069,7 @@
     if(!map||window.maplibregl?.isFallback)return; // Raster tiles follow CSS.
     if(typeof map.setStyle!=="function")return;
     mapStyleReady=false;
+    originalLayerVisibility.clear();
     try{map.setStyle(vectorMapStyle())}
     catch(error){console.warn("Could not apply map theme:",error);}
   }
@@ -935,6 +1085,7 @@
       }
       return;
     }
+    originalLayerVisibility.clear();
     try {
       map=new libre.Map({
         container:"map",
@@ -958,6 +1109,7 @@
       mapStyleReady=true;
       configureMapLabelDensity();
       updateMapLanguage();
+      applyMapFilters();
       if(game){renderMap();renderClues();}
     });
     if(!libre.isFallback){
@@ -1022,6 +1174,7 @@
     $("resetViewBtn").addEventListener("click",resetMapView);
     $("mapVectorBtn").addEventListener("click",()=>setMapStyle("vector"));
     $("mapOsmBtn").addEventListener("click",()=>setMapStyle("osm"));
+    initMapFiltersUI();
     syncMapStylePicker();
     $("reportOpenBtn").addEventListener("click",showReport);
     $("shareBtn").addEventListener("click",share);

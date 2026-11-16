@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {runInNewContext} from "node:vm";
 
-const names=["places.js","continent-borders.js","references.js","i18n.js","clues-i18n.js","report-i18n.js","facts.js","compass-i18n.js","app.js","index.html","styles.css","map-bootstrap.js"];
+const names=["places.js","continent-borders.js","references.js","i18n.js","map-filters-i18n.js","clues-i18n.js","report-i18n.js","facts.js","compass-i18n.js","app.js","index.html","styles.css","map-bootstrap.js"];
 const files=Object.fromEntries(names.map(n=>[n,readFileSync(new URL("../"+n,import.meta.url),"utf8")]));
 
 class Element {
@@ -53,7 +53,13 @@ function boot({storage=new Map(),map=false,randomValue=0,mobile=false,clock=Date
     getStyle(){return {layers:[
       {id:"label_country_1",type:"symbol",layout:{"text-field":["get","name"]}},
       {id:"label_city",type:"symbol",layout:{"text-field":["get","name"]}},
-      {id:"road_shield",type:"symbol",layout:{"text-field":["get","ref"]}}
+      {id:"road_shield",type:"symbol",layout:{"text-field":["get","ref"]}},
+      {id:"boundary_country",type:"line",layout:{}},
+      {id:"boundary_state",type:"line",layout:{}},
+      {id:"park_green",type:"fill",layout:{}},
+      {id:"waterway",type:"line",layout:{}},
+      {id:"poi_museum",type:"symbol",layout:{"text-field":["get","name"]}},
+      {id:"case-hemisphere-arrows",type:"symbol",layout:{"text-field":"↑"}}
     ]}},
     setLayoutProperty(id,key,expr){mapState.styles.push({id,key,expr})},
     setLayerZoomRange(id,min,max){mapState.zoomRanges.push({id,min,max})},
@@ -61,7 +67,7 @@ function boot({storage=new Map(),map=false,randomValue=0,mobile=false,clock=Date
     fitBounds(bounds,options){mapState.fits.push({bounds,options});return this},
     getZoom(){return 3},
     getCenter(){return {lng:8,lat:15}},
-    remove(){mapState.removed=(mapState.removed||0)+1},
+    remove(){mapState.removed=(mapState.removed||0)+1;mapState.layers.clear();mapState.sources.clear()},
     getLayer(id){return mapState.layers.get(id)||null},
     removeLayer(id){mapState.layers.delete(id)},
     addLayer(layer){mapState.layers.set(layer.id,layer)},
@@ -357,6 +363,78 @@ test("map labels appear gradually with zoom instead of all at once",()=>{
 });
 
 
+
+test("gear opens a localized map layer popover above the map selector",()=>{
+  const g=boot({map:true}),$=g.get;
+  assert.ok(files["index.html"].includes('id="mapFiltersButton"'));
+  assert.ok(files["index.html"].includes('id="mapFiltersPopover"'));
+  assert.ok(files["styles.css"].includes("bottom:calc(100% + 10px)"));
+  assert.equal(Object.keys(g.window.GeoMapFilterLabels).length,19);
+  assert.equal($("mapFiltersButton").disabled,false);
+  $("mapFiltersButton").handlers.click();
+  assert.equal($("mapFiltersButton").attributes["aria-expanded"],"true");
+  assert.equal($("mapFiltersPopover").classList.contains("hidden"),false);
+  g.language("pt");
+  assert.equal($("mapFiltersTitle").textContent,"Camadas do mapa");
+  assert.equal($("mapFiltersReset").textContent,"Restaurar");
+  $("mapFiltersClose").handlers.click();
+  assert.equal($("mapFiltersPopover").classList.contains("hidden"),true);
+});
+
+test("map filters affect basemap features without hiding purchased clue layers",()=>{
+  const g=boot({map:true}),$=g.get;
+  const change=(id,checked)=>{
+    const input=$(id);input.checked=checked;input.handlers.change({target:input});
+  };
+  for(const [id,layer] of [
+    ["mapFilterBorders","boundary_country"],["mapFilterRegions","boundary_state"],
+    ["mapFilterCountryNames","label_country_1"],["mapFilterCityNames","label_city"],
+    ["mapFilterRoads","road_shield"],["mapFilterAreas","park_green"],
+    ["mapFilterWater","waterway"],["mapFilterPoi","poi_museum"]
+  ]){
+    change(id,false);
+    assert.ok(g.mapState.styles.some(x=>x.id===layer&&x.key==="visibility"&&x.expr==="none"),layer);
+  }
+  assert.ok(!g.mapState.styles.some(x=>x.id.startsWith("case-")&&x.key==="visibility"));
+  change("mapFilterRoads",true);
+  assert.equal(g.mapState.styles.filter(x=>x.id==="road_shield"&&x.key==="visibility").at(-1).expr,"visible");
+  change("mapFilterContinents",true);
+  const overview=g.mapState.layers.get("map-filter-continents");
+  assert.equal(overview.type,"line");
+  assert.equal(overview.paint["line-color"],"#8fa0b1");
+  assert.equal(overview.paint["line-opacity"],.29);
+  assert.ok(!("fill-color" in overview.paint));
+  assert.equal(g.mapState.sources.get("map-filter-continents").data.geometry.type,"MultiPolygon");
+  change("mapFilterContinents",false);
+  assert.equal(g.mapState.layers.has("map-filter-continents"),false);
+  assert.equal(g.mapState.sources.has("map-filter-continents"),false);
+});
+
+test("filter preferences persist across map styles and reset without affecting clue prices",async()=>{
+  const storage=new Map(),g=boot({map:true,storage}),$=g.get;
+  $("mapFiltersButton").handlers.click();
+  for(const [id,checked] of [["mapFilterContinents",true],["mapFilterPoi",false]]){
+    const el=$(id);el.checked=checked;el.handlers.change({target:el});
+  }
+  assert.equal(JSON.parse(storage.get("cartigma-map-filters-v1")).poi,false);
+  await $("mapOsmBtn").handlers.click();
+  assert.equal($("mapFiltersButton").disabled,true);
+  assert.equal($("mapFiltersPopover").classList.contains("hidden"),true);
+  assert.equal(g.mapState.layers.has("map-filter-continents"),false);
+  await $("mapVectorBtn").handlers.click();
+  assert.equal($("mapFiltersButton").disabled,false);
+  assert.ok(g.mapState.layers.has("map-filter-continents"));
+  const next=boot({map:true,storage});
+  assert.equal(next.get("mapFilterContinents").checked,true);
+  assert.equal(next.get("mapFilterPoi").checked,false);
+  assert.ok(next.mapState.layers.has("map-filter-continents"));
+  assert.ok(next.mapState.styles.some(x=>x.id==="poi_museum"&&x.expr==="none"));
+  next.get("mapFiltersReset").handlers.click();
+  assert.equal(next.get("mapFilterContinents").checked,false);
+  assert.equal(next.get("mapFilterPoi").checked,true);
+  assert.equal(next.mapState.layers.has("map-filter-continents"),false);
+  assert.equal(next.get("clueList").children[1].children[1].children[2].textContent,"Map −600");
+});
 test("the fourth clue is longitude, never an extra distance hint",()=>{
   const places=boot().window.GEODETECTIVE_PLACES;
   for(const [city,expected] of [
@@ -437,8 +515,8 @@ test("a correct fifth guess in Cape Town has no distance or bearing in history o
 });
 
 test("fresh deployments fingerprint both game engine and translated clues",()=>{
-  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-continent-outline"'));
-  assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-continent-outline"'));
+  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-map-filters"'));
+  assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-map-filters"'));
   assert.ok(files["map-bootstrap.js"].includes('new URL(import.meta.url).searchParams.get("v")'));
   assert.ok(files["app.js"].includes("function guessMetricText(g)"));
   const deploy=readFileSync(new URL("../.github/workflows/pages.yml",import.meta.url),"utf8");
@@ -677,7 +755,7 @@ test("Equator arrows pop in and out without fade animations",()=>{
   assert.match(files["app.js"],/"text-opacity-transition":\{duration:0,delay:0\}/);
   assert.ok(!g.mapState.layers.has("case-continent-outline"),
     "No unpaid continent guide should appear");
-  assert.ok(files["index.html"].includes('src="continent-borders.js?v=20261116-continent-outline"'));
+  assert.ok(files["index.html"].includes('src="continent-borders.js?v=20261116-map-filters"'));
 });
 
 test("hemisphere evidence never follows the continent and no generic river-valley clue remains",()=>{

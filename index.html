@@ -19,22 +19,23 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.18.0/dist/maplibre-gl.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=20261116-continent-outline">
+  <link rel="stylesheet" href="styles.css?v=20261116-map-filters">
   <link rel="stylesheet" href="themes.css">
   <link rel="stylesheet" href="mobile.css">
   
   <script defer src="places.js"></script>
-  <script defer src="continent-borders.js?v=20261116-continent-outline"></script>
+  <script defer src="continent-borders.js?v=20261116-map-filters"></script>
   <script defer src="i18n.js"></script>
-  <script defer src="clues-i18n.js?v=20261116-continent-outline"></script>
+  <script defer src="clues-i18n.js?v=20261116-map-filters"></script>
+  <script defer src="map-filters-i18n.js?v=20261116-map-filters"></script>
   <script defer src="report-i18n.js"></script>
   <script defer src="facts.js"></script>
   <script defer src="references.js"></script>
   <script defer src="compass-i18n.js"></script>
   <script defer src="theme.js"></script>
-  <script defer src="map-fallback.js?v=20261116-continent-outline"></script>
+  <script defer src="map-fallback.js?v=20261116-map-filters"></script>
   <script defer src="language-picker.js"></script>
-  <script type="module" src="map-bootstrap.js?v=20261116-continent-outline"></script>
+  <script type="module" src="map-bootstrap.js?v=20261116-map-filters"></script>
 </head>
 <body>
 <div class="app">
@@ -123,6 +124,36 @@
           <span id="coordinates">NO LOCATION SELECTED</span>
           <div class="map-style-picker" id="mapStylePicker" role="group" aria-label="Map style">
             <button type="button" id="mapVectorBtn" class="map-style-button active" aria-pressed="true">Vector</button>
+            <div class="map-filter-anchor">
+              <button type="button" id="mapFiltersButton" class="map-filter-gear" aria-haspopup="dialog"
+                aria-expanded="false" aria-controls="mapFiltersPopover" aria-label="Map filters" title="Map filters">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2h4l.6 2.4c.6.2 1.1.4 1.6.8l2.2-.9 2.6 2.6-.9 2.2c.4.5.6 1 .8 1.6l2.4.6v4l-2.4.6c-.2.6-.4 1.1-.8 1.6l.9 2.2-2.6 2.6-2.2-.9c-.5.4-1 .6-1.6.8L14 22h-4l-.6-2.4c-.6-.2-1.1-.4-1.6-.8l-2.2.9L3 17.1l.9-2.2c-.4-.5-.6-1-.8-1.6L.7 12.7v-1.4l2.4-.6c.2-.6.4-1.1.8-1.6L3 6.9l2.6-2.6 2.2.9c.5-.4 1-.6 1.6-.8L10 2Z"/><circle cx="12" cy="12" r="3.1"/></svg>
+              </button>
+              <div id="mapFiltersPopover" class="map-filter-popover hidden" role="dialog"
+                aria-modal="false" aria-labelledby="mapFiltersTitle">
+                <header class="map-filter-head">
+                  <div><strong id="mapFiltersTitle">Map layers</strong>
+                    <p id="mapFiltersSubtitle">Choose what appears on the vector map</p></div>
+                  <button type="button" id="mapFiltersClose" class="map-filter-close" aria-label="Close" title="Close">×</button>
+                </header>
+                <div class="map-filter-scroll">
+                  <div class="map-filter-section"><span id="mapFiltersGeography">Geography</span>
+                    <button type="button" id="mapFiltersReset" class="map-filter-reset">Reset</button>
+                  </div>
+                  <label class="map-filter-row" for="mapFilterContinents"><span data-map-filter-label="continents">Continents</span><input type="checkbox" id="mapFilterContinents"></label>
+                  <label class="map-filter-row" for="mapFilterBorders"><span data-map-filter-label="borders">Country borders</span><input type="checkbox" id="mapFilterBorders" checked></label>
+                  <label class="map-filter-row" for="mapFilterRegions"><span data-map-filter-label="regions">Regions / states</span><input type="checkbox" id="mapFilterRegions" checked></label>
+                  <div class="map-filter-section"><span id="mapFiltersDetails">Details</span></div>
+                  <label class="map-filter-row" for="mapFilterCountryNames"><span data-map-filter-label="countryNames">Country names</span><input type="checkbox" id="mapFilterCountryNames" checked></label>
+                  <label class="map-filter-row" for="mapFilterCityNames"><span data-map-filter-label="cityNames">City names</span><input type="checkbox" id="mapFilterCityNames" checked></label>
+                  <label class="map-filter-row" for="mapFilterRoads"><span data-map-filter-label="roads">Roads / routes</span><input type="checkbox" id="mapFilterRoads" checked></label>
+                  <label class="map-filter-row" for="mapFilterAreas"><span data-map-filter-label="areas">Natural areas</span><input type="checkbox" id="mapFilterAreas" checked></label>
+                  <label class="map-filter-row" for="mapFilterWater"><span data-map-filter-label="water">Rivers / lakes</span><input type="checkbox" id="mapFilterWater" checked></label>
+                  <label class="map-filter-row" for="mapFilterPoi"><span data-map-filter-label="poi">Places of interest</span><input type="checkbox" id="mapFilterPoi" checked></label>
+                </div>
+                <p id="mapFiltersNote" class="map-filter-note">Only changes the display; paid clues remain separate.</p>
+              </div>
+            </div>
             <button type="button" id="mapOsmBtn" class="map-style-button" aria-pressed="false">OpenStreetMap</button>
           </div>
         </div>
