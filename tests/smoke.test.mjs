@@ -288,7 +288,7 @@ test("new cities have ten meaningful clues without a redundant distance comparis
     assert.ok(clues.some(text=>/^Longitude sector:/.test(text)),city);
     assert.ok(clues.some(text=>/^Latitude sector:/.test(text)),city);
     assert.doesNotMatch(clues.join(" "),/Closer to |Distance clue|from [^\n]+ km/i);
-    const national=clues.filter(text=>["Currency code","Language family","One flag color", "Population (","GDP per capita","Country / territory area:","No access to the sea.","Has access to the sea."].some(x=>text.startsWith(x)));
+    const national=clues.filter(text=>["Currency:","Language family","One flag color", "Population (","GDP per capita","Country / territory area:","No access to the sea.","Has access to the sea."].some(x=>text.startsWith(x)));
     assert.equal(national.length,4,city+" must have four distinct country facts");
     if(g.window.GeoExtendedPlaceMetadata[index-74].capital)
       assert.ok(clues.some(x=>x==="National capital: Yes"),city);
@@ -773,7 +773,7 @@ test("Normal and Hard have ten translated clues with unchanged guess limits",()=
   assert.doesNotMatch(files["index.html"],/value="easy"/);
   assert.equal($("attemptCount").textContent,"6 / 6");
   assert.equal($("hintCount").textContent,"2 / 10");
-  assert.equal(clueTexts(g).length,7);
+  assert.equal(clueTexts(g).length,10);
   assert.equal(g.document.documentElement.lang,"en");
   g.difficulty("hard");
   assert.equal($("attemptCount").textContent,"4 / 4");
@@ -1099,7 +1099,7 @@ test("a correct fifth guess in Cape Town has no distance or bearing in history o
 });
 
 test("fresh deployments fingerprint both game engine and translated clues",()=>{
-  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-currency-names"'));
+  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-ten-evidence"'));
   assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-profile-diversity"'));
   assert.ok(files["map-bootstrap.js"].includes('new URL(import.meta.url).searchParams.get("v")'));
   assert.ok(files["app.js"].includes("function guessMetricText(g)"));
