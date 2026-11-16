@@ -908,13 +908,16 @@
   function renderAtlasOptions(query=""){
     const text=norm(query),tokens=text.split(/\s+/).filter(Boolean);
     const matches=ATLAS_ROWS.map(({place,index})=>({
-      place,index,name:cityName(place),country:countryName(index)
+      place,index,name:cityName(place),country:countryName(index),
+      exact:text.length>0&&(norm(place[0])===text||norm(cityName(place))===text||
+        norm(EN_CITY[place[0]]||"")===text)
     })).filter(({place,index,name,country})=>{
       const searchable=norm([place[0],EN_CITY[place[0]]||"",
         PT_EXTRA_NAMES[place[0]]||"",place[1],place[2],
         COUNTRY_CODES[index],name,country].join(" "));
       return tokens.every(term=>searchable.includes(term));
-    }).sort((a,b)=>a.name.localeCompare(b.name,locale())||a.index-b.index);
+    }).sort((a,b)=>Number(b.exact)-Number(a.exact)||
+      a.name.localeCompare(b.name,locale())||a.index-b.index);
     $("atlasCount").textContent=atlasText("count",{count:matches.length});
     const options=$("atlasOptions");
     atlasButtons=[];

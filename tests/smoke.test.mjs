@@ -174,9 +174,13 @@ test("city archive opens from the header with 500 accessible searchable entries 
   assert.equal($("atlasDialog").open,true);
   assert.equal($("atlasOptions").children.length,500);
   assert.equal($("atlasCount").textContent,"500 of 500 cities");
-  const labels=$("atlasOptions").children.map(x=>x.children[1].children[0].textContent);
-  assert.equal(new Set(labels).size,500,"All 500 list entries must be distinct");
+  const entries=$("atlasOptions").children;
+  const labels=entries.map(x=>x.children[1].children[0].textContent);
+  const indices=entries.map(x=>Number(x.dataset.index));
+  assert.equal(new Set(indices).size,500,"All catalogue indices must appear exactly once");
   assert.ok(labels.includes("São Paulo")&&labels.includes("Tokyo")&&labels.includes("Reykjavík"));
+  assert.ok(entries.every(x=>x.children[1].children[1].textContent),
+    "Duplicate city names must be disambiguated by their country");
   assert.equal($("atlasCityName").textContent,"Reykjavík");
   assert.equal($("atlasNormalEvidence").children.length,10);
   assert.equal($("atlasHardEvidence").children.length,10);
@@ -198,8 +202,9 @@ test("archive search handles accents, city aliases, country, region and empty re
   $("atlasBtn").handlers.click();
   const search=$("atlasSearch"),options=$("atlasOptions");
   search.value="sao paulo";search.handlers.input();
-  assert.equal(options.children.length,1);
-  assert.equal(options.children[0].children[1].children[0].textContent,"São Paulo");
+  assert.ok(options.children.length>=1);
+  assert.equal(options.children[0].children[1].children[0].textContent,"São Paulo",
+    "Exact city match should rank before names appearing only in regions");
   options.children[0].handlers.click();
   assert.equal($("atlasCityName").textContent,"São Paulo");
   assert.equal($("atlasCityCountry").textContent,"Brazil");
@@ -237,7 +242,8 @@ test("city archive keeps its selected entry and properly relocalizes all profile
   $("atlasOptions").children[0].handlers.click();
   g.language("pt");
   assert.equal($("atlasTitle").textContent,"Arquivo de cidades");
-  assert.equal($("atlasCount").textContent,"1 de 500 cidades");
+  assert.equal($("atlasCount").textContent,
+    $("atlasOptions").children.length+" de 500 cidades");
   assert.equal($("atlasCityName").textContent,"São Paulo");
   assert.equal($("atlasCityCountry").textContent,"Brasil");
   const stats=$("atlasCityFacts").children;
@@ -252,7 +258,8 @@ test("city archive keeps its selected entry and properly relocalizes all profile
   g.language("en");
   assert.equal($("atlasTitle").textContent,"City archive");
   assert.equal($("atlasCityName").textContent,"São Paulo");
-  assert.equal($("atlasCount").textContent,"1 of 500 cities");
+  assert.equal($("atlasCount").textContent,
+    $("atlasOptions").children.length+" of 500 cities");
   assert.equal($("atlasNormalEvidence").children.length,10);
   assert.equal($("atlasHardEvidence").children.length,10);
   const pack=g.window.CartigmaAtlasI18n;
@@ -522,7 +529,7 @@ test("sea-access cards never render the raw 'Região: Não' state",()=>{
     assert.ok(pack.countryLandlockedLabel,language+" needs a specific category");
     assert.ok(pack.countryLandlockedYes&&pack.countryLandlockedNo,language);
   }
-  assert.ok(files["app.js"].includes("const authoritative=COUNTRY_INSIGHTS[COUNTRY_CODES[game.index]]?.landlocked"));
+  assert.ok(files["app.js"].includes("const authoritative=COUNTRY_INSIGHTS[COUNTRY_CODES[referenceIndex]]?.landlocked"));
   assert.ok(files["index.html"].includes('src="country-clues-i18n.js?v=20261116-currency-names"'));
 });
 test("obsolete hemisphere map purchases in northern-only daily cases are refunded",()=>{
@@ -1388,7 +1395,7 @@ test("a correct fifth guess in Cape Town has no distance or bearing in history o
 });
 
 test("fresh deployments fingerprint both game engine and translated clues",()=>{
-  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-city-evidence"'));
+  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-city-archive"'));
   assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-profile-diversity"'));
   assert.ok(files["map-bootstrap.js"].includes('new URL(import.meta.url).searchParams.get("v")'));
   assert.ok(files["app.js"].includes("function guessMetricText(g)"));
