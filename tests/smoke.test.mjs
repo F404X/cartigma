@@ -693,7 +693,8 @@ test("all 10 evidence cards are purchasable before the first guess without consu
     const costBeforeReveal=[];
     for(let i=initial;i<10;i++){
       const cost=Number($("revealCost").textContent.replace(/[^0-9]/g,""));
-      assert.ok(cost>=150&&cost<=500,"Expected a priced clue "+(i+1));
+      assert.ok(cost>=150&&cost<=(level==="hard"?750:500),
+        "Expected a priced clue "+(i+1));
       costBeforeReveal.push(cost);
       $("revealBtn").handlers.click();
       assert.equal($("hintCount").textContent,(i+1)+" / 10");
@@ -710,7 +711,8 @@ test("all 10 evidence cards are purchasable before the first guess without consu
     assert.equal($("reportEvidenceList").children.length,10);
     assert.equal($("reportHints").textContent,String(10-initial));
     assert.equal($("reportScore").textContent,
-      new Intl.NumberFormat("en-US").format(5000-costBeforeReveal.reduce((a,b)=>a+b,0))+" / 5,000");
+      new Intl.NumberFormat("en-US").format(Math.max(250,
+        5000-costBeforeReveal.reduce((a,b)=>a+b,0)))+" / 5,000");
   }
 });
 
@@ -1447,7 +1449,7 @@ test("continent shape is available only after its second clue, survives daily re
   hard.get("revealBtn").handlers.click();
   const paid=hard.get("clueList").children[1].children[1].children[2];
   assert.ok(paid&&!paid.disabled);
-  assert.match(paid.textContent,/500/);
+  assert.match(paid.textContent,/750/);
 });
 
 test("Equator arrows pop in and out without fade animations",()=>{

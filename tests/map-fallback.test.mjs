@@ -94,7 +94,7 @@ test("raster fallback renders UTM grids and labels with cleanup",async()=>{
   assert.equal(state.groups.length,1);
   assert.equal(state.groups[0].markers.length,2);
   assert.deepEqual(state.groups[0].markers.map(m=>m.options.icon.html),["32","S"]);
-  assert.equal(state.events.zoomend instanceof Function,true);
+  assert.equal(typeof state.events.zoomend,"function");
   map.removeLayer("case-utm-annotations");
   assert.equal(state.events.zoomend,undefined);
   assert.equal(state.groups[0].markers.length,2);
