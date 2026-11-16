@@ -9,9 +9,10 @@
   const FACTS = window.GEODETECTIVE_FACTS || [];
   const COMPASS_I18N = window.GeoCompassI18n || {};
   const NEARBY_REFERENCES = window.GEODETECTIVE_NEARBY_REFERENCES || {};
+  const CONTINENT_BORDERS = window.GeoContinentBorders || {};
   const DIFFICULTIES = {normal:{attempts:6,initial:2},hard:{attempts:4,initial:1}};
   const SERIAL_PREFIX = "geodetective-case-counter-";
-  const WIN_RADIUS = 100, HINT_COST = 300, MAP_OVERLAY_COSTS = Object.freeze({longitude:1200,latitude:1200,hemisphere:600}), DAILY_KEY = "geodetective-daily-v3-";
+  const WIN_RADIUS = 100, HINT_COST = 300, MAP_OVERLAY_COSTS = Object.freeze({longitude:1200,latitude:1200,hemisphere:600,continent:600}), DAILY_KEY = "geodetective-daily-v3-";
   const COUNTRY_CODES = "IS NO NO NO FI SE DK GB FR PT IT GR TR MA EG SN NG KE ET ZA MG AE JO IL IN IN IN NP BD TH SG ID ID JP JP KR CN CN CN TW MN KZ AU AU AU AU NZ NZ FJ PF CA US US US US MX MX CU GT CO EC PE PE BO BR BR BR BR BR BR AR CL AR CL".split(" ");
   const FEATURES = "volcanic fjord polar fjord coast islands coast river river estuary river mountains strait desert desert peninsula delta plateau plateau peninsula plateau desert plateau mountains coast plain delta mountains delta delta islands delta islands coast mountains river plain delta bay mountains plateau mountains harbor coast coast islands volcanic harbor islands volcanic coast estuary bay mountains islands plateau plateau coast volcanic plateau mountains desert mountains plateau plateau plateau forest bay plateau bay estuary mountains islands strait".split(" ");
   const LANDMARKS = [
@@ -347,8 +348,9 @@
   function revealGeographyOnMap(clue){
     const cost=MAP_OVERLAY_COSTS[clue.key];
     if(game.finished||!map||!mapStyleReady||!cost)return;
+    if(clue.key==="continent"&&!CONTINENT_BORDERS[continentKey(game.index)])return;
     if(!cluesFor(game.index,difficulty).slice(0,game.revealed).some(item=>
-      item.key===clue.key&&(clue.key==="hemisphere"
+      item.key===clue.key&&(["hemisphere","continent"].includes(clue.key)
         ?item.value===clue.value:item.from===clue.from&&item.to===clue.to)))return;
     if(!Array.isArray(game.sectorReveals))game.sectorReveals=[];
     if(game.sectorReveals.includes(clue.key))return;
@@ -357,12 +359,19 @@
     save();renderClues();renderMap();
     if(clue.key==="hemisphere"){
       map.easeTo({center:[0,0],zoom:1.7,duration:450});
+    }else if(clue.key==="continent"){
+      const bounds=CONTINENT_BORDERS[continentKey(game.index)].bbox;
+      map.fitBounds([[bounds[0],bounds[1]],[bounds[2],bounds[3]]],{
+        padding:{top:20,bottom:20,left:20,right:20},maxZoom:4,duration:400
+      });
     }else{
       const bounds=clue.key==="longitude"?
         [[clue.from,-75],[clue.to,75]]:[[-179.5,clue.from],[179.5,clue.to]];
       map.fitBounds(bounds,{padding:{top:20,bottom:20,left:20,right:20},maxZoom:3,duration:450});
     }
-    toast(tc(clue.key==="hemisphere"?"hemisphereMapPurchased":"sectorMapPurchased",{cost:number(cost)}));
+    const message=clue.key==="hemisphere"?"hemisphereMapPurchased":
+      clue.key==="continent"?"continentMapPurchased":"sectorMapPurchased";
+    toast(tc(message,{cost:number(cost)}));
   }
   function renderClues(){
     const clues=cluesFor(game.index,difficulty);
@@ -390,7 +399,8 @@
         button.textContent=purchased?tc("sectorMapped"):tc("sectorMapButton",{cost:number(MAP_OVERLAY_COSTS[clue.key])});
         button.title=button.textContent;
         button.setAttribute("aria-label",button.textContent);
-        button.disabled=game.finished||purchased||!map||!mapStyleReady;
+        button.disabled=game.finished||purchased||!map||!mapStyleReady||
+          (clue.key==="continent"&&!CONTINENT_BORDERS[continentKey(game.index)]);
         button.addEventListener("click",()=>revealGeographyOnMap(clue));
         body.classList.add("with-sector-map");
         body.append(button);
@@ -578,8 +588,9 @@
     if(!map||!mapStyleReady)return;
     if(map.getLayer("case-distance-line"))map.removeLayer("case-distance-line");
     if(map.getSource("case-distance-line"))map.removeSource("case-distance-line");
+    // The symbol layer depends on the Equator line source: remove it first.
     for(const id of ["case-sector-longitude","case-sector-latitude",
-      "case-hemisphere-line","case-hemisphere-arrows"]){
+      "case-hemisphere-arrows","case-hemisphere-line","case-continent-outline"]){
       if(map.getLayer(id))map.removeLayer(id);
       if(map.getSource(id))map.removeSource(id);
     }
@@ -603,6 +614,21 @@
         paint:{"fill-color":"#ffd449","fill-opacity":0.10,"fill-outline-color":"#ffd449"}});
     }
   }
+  function drawContinentOutline(){
+    if(!map||!mapStyleReady||!Array.isArray(game.sectorReveals)
+      ||!game.sectorReveals.includes("continent"))return;
+    const shape=CONTINENT_BORDERS[continentKey(game.index)];
+    if(!shape)return;
+    const id="case-continent-outline";
+    map.addSource(id,{type:"geojson",data:{
+      type:"Feature",properties:{},geometry:shape.geometry
+    }});
+    // Only outline: no fill layer. Remains subtle against geographic labels.
+    map.addLayer({id,type:"line",source:id,
+      layout:{"line-cap":"round","line-join":"round"},
+      paint:{"line-color":"#ffd449","line-width":1.7,"line-opacity":0.28,
+        "line-opacity-transition":{duration:0,delay:0}}});
+  }
   function drawHemisphereOverlay(){
     if(!map||!mapStyleReady||!Array.isArray(game.sectorReveals)
       ||!game.sectorReveals.includes("hemisphere")
@@ -624,7 +650,8 @@
         "text-rotation-alignment":"viewport",
         "text-pitch-alignment":"viewport",
         "text-allow-overlap":true,"text-ignore-placement":true},
-      paint:{"text-color":"#ffd449","text-halo-color":"#172015","text-halo-width":0.7}});
+      paint:{"text-color":"#ffd449","text-halo-color":"#172015","text-halo-width":0.7,
+        "text-opacity-transition":{duration:0,delay:0}}});
   }
   function addMarker(lat,lng,label,style,popupText=""){
     const pin=makeMarker(label,style).setLngLat([lng,lat]).addTo(map);
@@ -721,6 +748,7 @@
     clearMapOverlays();
     drawSectorOverlays();
     drawHemisphereOverlay();
+    drawContinentOutline();
     const target=cityCoords(game.index);
     const best=game.finished?bestGuess():null;
     game.guesses.forEach((g,i)=>addMarker(g.lat,g.lng,i+1,g===best?"best":"past"));
@@ -914,6 +942,7 @@
         center:initialView.center,
         zoom:initialView.zoom,minZoom:1.2,maxZoom:16,
         attributionControl:true,
+        fadeDuration:0, // Eliminate the otherwise delayed fade-out of Equator arrows.
         dragRotate:false,touchPitch:false,pitchWithRotate:false,
         doubleClickZoom:false
       });

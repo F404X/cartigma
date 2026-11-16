@@ -85,6 +85,7 @@
             className:"hemisphere-direction-arrow",html:glyph,
             iconSize:[18,18],iconAnchor:[9,north?20:-2]
           });
+          const hide=()=>group.clearLayers();
           const update=()=>{
             group.clearLayers();
             const size=this.root.getSize();
@@ -98,9 +99,13 @@
           };
           this._layers.set(layer.id,group);
           this._layerCleanups.set(layer.id,()=>{
+            this.root.off("zoomstart",hide);
+            this.root.off("movestart",hide);
             this.root.off("zoomend",update);
             this.root.off("moveend",update);
           });
+          this.root.on("zoomstart",hide);
+          this.root.on("movestart",hide);
           this.root.on("zoomend",update);
           this.root.on("moveend",update);
           update();
@@ -111,9 +116,14 @@
           }).addTo(this.root);
           this._layers.set(layer.id,line);
         }else if(geo?.type==="Polygon"||geo?.type==="MultiPolygon"){
+          const outline=layer.id==="case-continent-outline"&&layer.type==="line";
+          const style=outline?
+            {color:"#ffd449",weight:1.7,opacity:.28,fill:false,
+              fillOpacity:0,interactive:false}:
+            {color:"#ffd449",weight:1,opacity:.45,fillColor:"#ffd449",
+              fillOpacity:0.10,interactive:false};
           const polygon=L.geoJSON({type:"Feature",properties:{},geometry:geo},{
-            style:{color:"#ffd449",weight:1,opacity:.45,fillColor:"#ffd449",
-              fillOpacity:0.10,interactive:false}
+            style
           }).addTo(this.root);
           this._layers.set(layer.id,polygon);
         }

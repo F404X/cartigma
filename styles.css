@@ -585,6 +585,7 @@ dialog.case-report .report-heading h2{font-size:24px}
 
 /* Small arrows beside the paid Equator guidance in both map renderers. */
 .hemisphere-direction-arrow{background:transparent!important;border:0!important;color:#ffd449;
+  animation:none!important;transition:none!important;
   font:600 14px/18px "IBM Plex Mono",monospace;text-align:center;
   text-shadow:0 0 3px #111c16b8;
   pointer-events:none!important;user-select:none}

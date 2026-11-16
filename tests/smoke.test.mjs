@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {runInNewContext} from "node:vm";
 
-const names=["places.js","references.js","i18n.js","clues-i18n.js","report-i18n.js","facts.js","compass-i18n.js","app.js","index.html","styles.css","map-bootstrap.js"];
+const names=["places.js","continent-borders.js","references.js","i18n.js","clues-i18n.js","report-i18n.js","facts.js","compass-i18n.js","app.js","index.html","styles.css","map-bootstrap.js"];
 const files=Object.fromEntries(names.map(n=>[n,readFileSync(new URL("../"+n,import.meta.url),"utf8")]));
 
 class Element {
@@ -71,7 +71,7 @@ function boot({storage=new Map(),map=false,randomValue=0,mobile=false,clock=Date
   };
   const libre={
     supported(){return true},
-    Map:class{constructor(){return mapInstance}},
+    Map:class{constructor(options){mapState.options=options;return mapInstance}},
     NavigationControl:class{},
     Marker:class{
       constructor(options){this.element=options.element}
@@ -437,8 +437,8 @@ test("a correct fifth guess in Cape Town has no distance or bearing in history o
 });
 
 test("fresh deployments fingerprint both game engine and translated clues",()=>{
-  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-equator-arrows"'));
-  assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-equator-arrows"'));
+  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-continent-outline"'));
+  assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-continent-outline"'));
   assert.ok(files["map-bootstrap.js"].includes('new URL(import.meta.url).searchParams.get("v")'));
   assert.ok(files["app.js"].includes("function guessMetricText(g)"));
   const deploy=readFileSync(new URL("../.github/workflows/pages.yml",import.meta.url),"utf8");
@@ -513,8 +513,8 @@ test("daily purchased map sectors reload without double deduction and Hard has n
   again.difficulty("hard");
   for(const row of again.get("clueList").children){
     if(row.children[1].children.length===3){
-      assert.match(row.children[1].children[1].textContent,/hemisphere/i,
-        "Hard can offer the hemisphere guide, not longitude/latitude guides");
+      assert.match(row.children[1].children[1].textContent,/hemisphere|continent/i,
+        "Hard can offer hemisphere and continent guides, not longitude/latitude guides");
     }
   }
 });
@@ -604,8 +604,80 @@ test("hemisphere guide requires a revealed hemisphere clue and working map, incl
   hard.difficulty("hard");
   hard.get("freeBtn").handlers.click();
   assert.equal(hard.get("clueList").children[0].children[1].children[2].disabled,false);
-  for(let i=1;i<6;i++)
+  assert.equal(hard.get("clueList").children[1].children[1].children[2],undefined,
+    "The continent clue remains locked after starting Hard mode");
+  for(let i=2;i<6;i++)
     assert.equal(hard.get("clueList").children[i].children[1].children[2],undefined);
+});
+
+test("continent outline is a low-opacity line with NO fill, costs 600 once",()=>{
+  const places=boot().window.GEODETECTIVE_PLACES;
+  const cases=[["Paris","europe"],["Marrakech","africa"],["Tóquio","asia"],
+    ["Sydney","oceania"],["Nova York","northAmerica"],["São Paulo","southAmerica"]];
+  for(const [city,region] of cases){
+    const index=places.findIndex(p=>p[0]===city);
+    assert.ok(index>=0,city+" missing");
+    const g=boot({map:true,randomValue:(index+.25)/places.length}),$=g.get;
+    $("freeBtn").handlers.click();
+    const btn=$("clueList").children[1].children[1].children[2];
+    assert.ok(btn&&!btn.disabled,city);
+    assert.equal(btn.textContent,"Map −600",city);
+    assert.equal(g.mapState.layers.has("case-continent-outline"),false);
+    btn.handlers.click();
+    const shape=g.window.GeoContinentBorders[region];
+    assert.ok(shape?.geometry?.coordinates?.length>0,region);
+    assert.ok(shape.geometry.coordinates.flat(2).length>20,region);
+    const geo=g.mapState.sources.get("case-continent-outline").data.geometry;
+    assert.equal(geo.type,"MultiPolygon");
+    assert.equal(geo.coordinates.length,shape.geometry.coordinates.length);
+    const layer=g.mapState.layers.get("case-continent-outline");
+    assert.equal(layer.type,"line");
+    assert.equal(layer.paint["line-color"],"#ffd449");
+    assert.equal(layer.paint["line-opacity"],0.28);
+    assert.ok(!("fill-opacity" in layer.paint)&&!("fill-color" in layer.paint));
+    assert.equal($("clueList").children[1].children[1].children[2].disabled,true);
+    btn.handlers.click();
+    g.select(city);$("guessBtn").handlers.click();
+    assert.equal($("reportScore").textContent,"4,400 / 5,000");
+    assert.equal($("reportHints").textContent,"0");
+  }
+});
+
+test("continent shape is available only after its second clue, survives daily reload and map styles",async()=>{
+  const storage=new Map(),g=boot({map:true,storage}),$=g.get;
+  const btn=$("clueList").children[1].children[1].children[2];
+  assert.ok(btn&&!btn.disabled);
+  assert.equal(g.mapState.sources.has("case-continent-outline"),false);
+  btn.handlers.click();
+  const day=new Date().toISOString().slice(0,10);
+  const saved=JSON.parse(storage.get("geodetective-daily-v3-"+day+"-normal"));
+  assert.deepEqual(saved.sectorReveals,["continent"]);
+  assert.equal(saved.sectorMapPenalty,600);
+  await $("mapOsmBtn").handlers.click();
+  assert.ok(g.mapState.layers.has("case-continent-outline"));
+  await $("mapVectorBtn").handlers.click();
+  assert.equal(g.mapState.layers.get("case-continent-outline").type,"line");
+  const reopened=boot({map:true,storage});
+  assert.equal(reopened.get("clueList").children[1].children[1].children[2].disabled,true);
+  assert.ok(reopened.mapState.sources.has("case-continent-outline"));
+  assert.equal(JSON.parse(storage.get("geodetective-daily-v3-"+day+"-normal")).sectorMapPenalty,600);
+  const hard=boot({map:true});
+  hard.difficulty("hard");
+  assert.equal(hard.get("clueList").children[1].children[1].children[2],undefined);
+  hard.get("revealBtn").handlers.click();
+  const paid=hard.get("clueList").children[1].children[1].children[2];
+  assert.ok(paid&&!paid.disabled);
+  assert.match(paid.textContent,/600/);
+});
+
+test("Equator arrows pop in and out without fade animations",()=>{
+  const g=boot({map:true}),$=g.get;
+  assert.equal(g.mapState.options.fadeDuration,0);
+  assert.match(files["styles.css"],/\.hemisphere-direction-arrow\{[^}]*transition:none!important/);
+  assert.match(files["app.js"],/"text-opacity-transition":\{duration:0,delay:0\}/);
+  assert.ok(!g.mapState.layers.has("case-continent-outline"),
+    "No unpaid continent guide should appear");
+  assert.ok(files["index.html"].includes('src="continent-borders.js?v=20261116-continent-outline"'));
 });
 
 test("hemisphere evidence never follows the continent and no generic river-valley clue remains",()=>{

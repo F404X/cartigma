@@ -172,5 +172,10 @@
     if(!hemispherePurchaseText[language])throw Error("Missing hemisphere map translation: "+language);
     localeData[language].templates.hemisphereMapPurchased=hemispherePurchaseText[language];
   }
+  const continentPurchasedText={"en":"Continent outlined · −{cost} points","pt":"Continente contornado · −{cost} pontos","es":"Continente delineado · −{cost} puntos","zh":"大陆边界已标示 · −{cost} 分","ja":"大陸の輪郭を表示 · −{cost} 点","ru":"Контур материка показан · −{cost} очков","fr":"Contour du continent affiché · −{cost} points","de":"Kontinentumriss angezeigt · −{cost} Punkte","it":"Contorno del continente mostrato · −{cost} punti","nl":"Continentomtrek getoond · −{cost} punten","pl":"Kontur kontynentu pokazany · −{cost} pkt","sv":"Kontinentens kontur visas · −{cost} poäng","tr":"Kıta sınırı gösterildi · −{cost} puan","ar":"تم تحديد حدود القارة · −{cost} نقطة","he":"גבולות היבשת הוצגו · −{cost} נקודות","ko":"대륙 윤곽 표시 · −{cost}점","th":"แสดงเส้นขอบทวีปแล้ว · −{cost} คะแนน","vi":"Đã hiện ranh giới châu lục · −{cost} điểm","id":"Garis batas benua ditampilkan · −{cost} poin"};
+  for(const language of Object.keys(localeData)){
+    if(!continentPurchasedText[language])throw Error("Missing continent outline translation: "+language);
+    localeData[language].templates.continentMapPurchased=continentPurchasedText[language];
+  }
   window.GeoCluesI18n = localeData;
 })();

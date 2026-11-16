@@ -69,7 +69,7 @@ test("both keyless vector and fallback raster scripts are included in Pages",()=
   assert.match(app,/switchToFallback/);
   assert.match(app,/mapStyleTimeout/);
   assert.match(app,/typeof libre\.supported==="function"/);
-  assert.ok(html.includes('src="map-fallback.js?v=20261116-equator-arrows"'));
+  assert.ok(html.includes('src="map-fallback.js?v=20261116-continent-outline"'));
   assert.match(html,/leaflet@1\.9\.4\/dist\/leaflet\.css/);
   assert.match(workflow,/map-fallback\.js/);
 });
@@ -124,6 +124,9 @@ test("Leaflet fallback restores map, markers, line and click coordinates",async(
   // Simulate a much closer zoom: geographic longitudes change, but screen
   // spacing, glyph dimensions and pixel offset from the Equator remain fixed.
   state.pixelsPerDegree=18;
+  state.events.zoomstart();
+  assert.equal(group.markers.length,0,
+    "Arrows should disappear instantly at the start of a zoom");
   state.events.zoomend();
   const arrowsAfter=group.markers.map(p=>p.coordinate[1]);
   assert.equal(arrowsAfter.length,arrowsBefore.length);
@@ -139,10 +142,22 @@ test("Leaflet fallback restores map, markers, line and click coordinates",async(
   map.removeLayer("case-hemisphere-arrows");
   assert.equal(state.events.zoomend,undefined);
   assert.equal(state.events.moveend,undefined);
+  assert.equal(state.events.zoomstart,undefined);
+  assert.equal(state.events.movestart,undefined);
   map.addLayer({id:"case-hemisphere-arrows",source:"case-hemisphere-line",
     type:"symbol",layout:{"text-field":"↓","symbol-spacing":88}});
   assert.ok(state.groups.at(-1).markers.every(p=>p.options.icon.html==="↓"&&
     p.options.icon.iconAnchor[1]===-2));
+  const outline={type:"MultiPolygon",coordinates:[
+    [[[-2,1],[-1,1],[-1,2],[-2,2],[-2,1]]]
+  ]};
+  map.addSource("case-continent-outline",{data:{geometry:outline}});
+  map.addLayer({id:"case-continent-outline",source:"case-continent-outline",type:"line"});
+  const coast=state.polygons.at(-1);
+  assert.equal(coast.options.style.fill,false);
+  assert.equal(coast.options.style.fillOpacity,0);
+  assert.equal(coast.options.style.opacity,0.28);
+  assert.equal(coast.options.style.color,"#ffd449");
   map.fitBounds([[-8,31],[-7,34]],{maxZoom:5,padding:{top:20,bottom:20,left:30,right:30}});
   assert.equal(state.fit.options.maxZoom,5);
   marker.remove();
