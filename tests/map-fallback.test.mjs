@@ -12,11 +12,17 @@ const bootstrap=readFileSync(new URL("map-bootstrap.js",root),"utf8");
 const workflow=readFileSync(new URL(".github/workflows/pages.yml",root),"utf8");
 
 function mockLeaflet(){
-  const state={tileUrl:null,controls:0,markers:[],lines:[],polygons:[],fit:null,events:{}};
+  const state={tileUrl:null,controls:0,markers:[],lines:[],polygons:[],groups:[],
+    fit:null,events:{},size:{x:440,y:280},pixelsPerDegree:4,centerLng:0};
   const leaflet={
     map(){return {
       on(name,cb){state.events[name]=cb;return this},
+      off(name,cb){if(state.events[name]===cb)delete state.events[name];return this},
       getContainer(){return {addEventListener(){}}},
+      getSize(){return state.size},
+      containerPointToLatLng(point){
+        return {lat:0,lng:state.centerLng+(point[0]-state.size.x/2)/state.pixelsPerDegree};
+      },
       getZoom(){return 3},
       setView(){return this},
       fitBounds(coords,options){state.fit={coords,options};return this},
@@ -27,8 +33,17 @@ function mockLeaflet(){
     control:{zoom(){return {addTo(){state.controls++}}}},
     DomEvent:{disableClickPropagation(){}},
     divIcon(props){return props},
+    layerGroup(){
+      const group={markers:[],addTo(){state.groups.push(this);return this},
+        clearLayers(){this.markers=[];return this}};
+      return group;
+    },
     marker(coordinate,options){
-      const item={coordinate,options,addTo(){state.markers.push(this);return this},
+      const item={coordinate,options,addTo(target){
+        if(target?.markers)this.group=target,target.markers.push(this);
+        else state.markers.push(this);
+        return this;
+      },
         getElement(){return {}},
         bindPopup(){return this},
         remove(){state.markers=state.markers.filter(x=>x!==this)}};
@@ -54,7 +69,7 @@ test("both keyless vector and fallback raster scripts are included in Pages",()=
   assert.match(app,/switchToFallback/);
   assert.match(app,/mapStyleTimeout/);
   assert.match(app,/typeof libre\.supported==="function"/);
-  assert.ok(html.includes('src="map-fallback.js?v=20261116-hemisphere-guide"'));
+  assert.ok(html.includes('src="map-fallback.js?v=20261116-equator-arrows"'));
   assert.match(html,/leaflet@1\.9\.4\/dist\/leaflet\.css/);
   assert.match(workflow,/map-fallback\.js/);
 });
@@ -97,14 +112,37 @@ test("Leaflet fallback restores map, markers, line and click coordinates",async(
   assert.equal(state.polygons.length,1);
   assert.equal(state.polygons[0].options.style.fillColor,"#ffd449");
   assert.equal(state.polygons[0].options.style.fillOpacity,0.10);
-  const arrows={type:"MultiPoint",coordinates:[[-30,1.8],[0,1.8],[30,1.8]]};
-  map.addSource("case-hemisphere-arrows",{data:{geometry:arrows}});
-  map.addLayer({id:"case-hemisphere-arrows",source:"case-hemisphere-arrows",
-    type:"symbol",layout:{"text-field":"↑"}});
-  assert.equal(state.polygons.length,2);
-  const arrowMarker=state.polygons[1].options.pointToLayer({},[1.8,0]);
-  assert.equal(arrowMarker.options.icon.html,"↑");
-  assert.equal(arrowMarker.options.interactive,false);
+  map.addLayer({id:"case-hemisphere-arrows",source:"case-hemisphere-line",
+    type:"symbol",layout:{"text-field":"↑","symbol-spacing":88}});
+  assert.equal(state.polygons.length,1);
+  const group=state.groups[0];
+  assert.ok(group.markers.length>=4);
+  const arrowsBefore=group.markers.map(p=>p.coordinate[1]);
+  assert.ok(group.markers.every(marker=>
+    marker.coordinate[0]===0&&marker.options.icon.html==="↑"&&
+    marker.options.icon.iconAnchor[1]===20&&marker.options.interactive===false));
+  // Simulate a much closer zoom: geographic longitudes change, but screen
+  // spacing, glyph dimensions and pixel offset from the Equator remain fixed.
+  state.pixelsPerDegree=18;
+  state.events.zoomend();
+  const arrowsAfter=group.markers.map(p=>p.coordinate[1]);
+  assert.equal(arrowsAfter.length,arrowsBefore.length);
+  assert.notDeepEqual(arrowsAfter,arrowsBefore);
+  const projected=group.markers.map(p=>
+    Math.round(state.size.x/2+(p.coordinate[1]-state.centerLng)*state.pixelsPerDegree));
+  assert.deepEqual(projected,[44,132,220,308,396]);
+  state.centerLng=65;
+  state.events.moveend();
+  assert.deepEqual(group.markers.map(p=>
+    Math.round(state.size.x/2+(p.coordinate[1]-state.centerLng)*state.pixelsPerDegree)),
+    projected);
+  map.removeLayer("case-hemisphere-arrows");
+  assert.equal(state.events.zoomend,undefined);
+  assert.equal(state.events.moveend,undefined);
+  map.addLayer({id:"case-hemisphere-arrows",source:"case-hemisphere-line",
+    type:"symbol",layout:{"text-field":"↓","symbol-spacing":88}});
+  assert.ok(state.groups.at(-1).markers.every(p=>p.options.icon.html==="↓"&&
+    p.options.icon.iconAnchor[1]===-2));
   map.fitBounds([[-8,31],[-7,34]],{maxZoom:5,padding:{top:20,bottom:20,left:30,right:30}});
   assert.equal(state.fit.options.maxZoom,5);
   marker.remove();

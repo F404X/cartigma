@@ -42,6 +42,7 @@
         }).addTo(this.root);
         this._sources = new Map();
         this._layers = new Map();
+        this._layerCleanups = new Map();
       }
       addControl() {L.control.zoom({position:"bottomleft"}).addTo(this.root);return this;}
       on(type,callback) {
@@ -75,22 +76,40 @@
       removeSource(id){this._sources.delete(id);}
       addLayer(layer){
         const geo=this._sources.get(layer.source)?.data?.geometry;
-        if(geo?.type==="LineString"){
+        if(layer.id==="case-hemisphere-arrows"&&layer.type==="symbol"
+          &&geo?.type==="LineString"){
+          const group=L.layerGroup().addTo(this.root);
+          const north=layer.layout?.["text-field"]!=="↓";
+          const glyph=north?"↑":"↓";
+          const icon=L.divIcon({
+            className:"hemisphere-direction-arrow",html:glyph,
+            iconSize:[18,18],iconAnchor:[9,north?20:-2]
+          });
+          const update=()=>{
+            group.clearLayers();
+            const size=this.root.getSize();
+            if(!size||!Number.isFinite(size.x)||size.x<=0)return;
+            // Project viewport X coordinates to longitude. Every arrow remains
+            // the same pixel size and approx. 88px apart at ANY zoom level.
+            for(let x=44;x<size.x-16;x+=88){
+              const lng=this.root.containerPointToLatLng([x,size.y/2]).lng;
+              L.marker([0,lng],{icon,interactive:false,keyboard:false}).addTo(group);
+            }
+          };
+          this._layers.set(layer.id,group);
+          this._layerCleanups.set(layer.id,()=>{
+            this.root.off("zoomend",update);
+            this.root.off("moveend",update);
+          });
+          this.root.on("zoomend",update);
+          this.root.on("moveend",update);
+          update();
+        }else if(geo?.type==="LineString"){
           const line=L.polyline(geo.coordinates.map(point=>[point[1],point[0]]),{
             color:"#ffd449",weight:2,opacity:.85,
             dashArray:layer.id==="case-hemisphere-line"?"6 9":"5 7"
           }).addTo(this.root);
           this._layers.set(layer.id,line);
-        }else if(geo?.type==="MultiPoint"&&layer.id==="case-hemisphere-arrows"){
-          const glyph=layer.layout?.["text-field"]==="↓"?"↓":"↑";
-          const icons=L.geoJSON({type:"Feature",properties:{},geometry:geo},{
-            pointToLayer:(_,latlng)=>L.marker(latlng,{
-              icon:L.divIcon({className:"hemisphere-direction-arrow",html:glyph,
-                iconSize:[18,18],iconAnchor:[9,9]}),
-              interactive:false,keyboard:false
-            })
-          }).addTo(this.root);
-          this._layers.set(layer.id,icons);
         }else if(geo?.type==="Polygon"||geo?.type==="MultiPolygon"){
           const polygon=L.geoJSON({type:"Feature",properties:{},geometry:geo},{
             style:{color:"#ffd449",weight:1,opacity:.45,fillColor:"#ffd449",
@@ -99,8 +118,17 @@
           this._layers.set(layer.id,polygon);
         }
       }
-      removeLayer(id){const layer=this._layers.get(id);if(layer)this.root.removeLayer(layer);this._layers.delete(id);}
-      remove(){this.root.remove();}
+      removeLayer(id){
+        this._layerCleanups.get(id)?.();
+        this._layerCleanups.delete(id);
+        const layer=this._layers.get(id);
+        if(layer)this.root.removeLayer(layer);
+        this._layers.delete(id);
+      }
+      remove(){
+        for(const id of [...this._layers.keys()])this.removeLayer(id);
+        this.root.remove();
+      }
     }
     class Marker {
       constructor(options){this.element=options.element;this.coordinate=[0,0];}

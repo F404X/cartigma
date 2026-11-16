@@ -614,13 +614,17 @@
     map.addLayer({id:lineId,type:"line",source:lineId,
       layout:{"line-cap":"butt","line-join":"round"},
       paint:{"line-color":"#ffd449","line-width":2,"line-opacity":0.9,"line-dasharray":[2,3]}});
+    // Repeat labels at fixed SCREEN-pixel intervals along the Equator instead
+    // of at fixed geographic coordinates, which drift far away when zoomed.
     const glyph=north?"↑":"↓";
-    const points=Array.from({length:13},(_,i)=>[-162+i*27,north?1.8:-1.8]);
-    map.addSource(arrowsId,{type:"geojson",data:{type:"Feature",properties:{},
-      geometry:{type:"MultiPoint",coordinates:points}}});
-    map.addLayer({id:arrowsId,type:"symbol",source:arrowsId,
-      layout:{"text-field":glyph,"text-size":16,"text-allow-overlap":true,"text-ignore-placement":true},
-      paint:{"text-color":"#ffd449","text-halo-color":"#172015","text-halo-width":1}});
+    map.addLayer({id:arrowsId,type:"symbol",source:lineId,
+      layout:{"symbol-placement":"line","symbol-spacing":88,
+        "text-field":glyph,"text-size":14,
+        "text-offset":[0,north?-0.85:0.85],
+        "text-rotation-alignment":"viewport",
+        "text-pitch-alignment":"viewport",
+        "text-allow-overlap":true,"text-ignore-placement":true},
+      paint:{"text-color":"#ffd449","text-halo-color":"#172015","text-halo-width":0.7}});
   }
   function addMarker(lat,lng,label,style,popupText=""){
     const pin=makeMarker(label,style).setLngLat([lng,lat]).addTo(map);

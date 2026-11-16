@@ -437,8 +437,8 @@ test("a correct fifth guess in Cape Town has no distance or bearing in history o
 });
 
 test("fresh deployments fingerprint both game engine and translated clues",()=>{
-  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-hemisphere-guide"'));
-  assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-hemisphere-guide"'));
+  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-equator-arrows"'));
+  assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-equator-arrows"'));
   assert.ok(files["map-bootstrap.js"].includes('new URL(import.meta.url).searchParams.get("v")'));
   assert.ok(files["app.js"].includes("function guessMetricText(g)"));
   const deploy=readFileSync(new URL("../.github/workflows/pages.yml",import.meta.url),"utf8");
@@ -541,10 +541,16 @@ test("paid hemisphere guidance draws the Equator dashed with arrows pointing to 
     assert.equal(layer.paint["line-dasharray"].join(","),"2,3");
     const arrowLayer=g.mapState.layers.get("case-hemisphere-arrows");
     assert.equal(arrowLayer.layout["text-field"],north?"↑":"↓");
-    const points=g.mapState.sources.get("case-hemisphere-arrows").data.geometry;
-    assert.equal(points.type,"MultiPoint");
-    assert.ok(points.coordinates.length>=10);
-    assert.ok(points.coordinates.every(p=>north?p[1]>0:p[1]<0));
+    assert.equal(arrowLayer.source,"case-hemisphere-line",
+      "Arrows must use the Equator line instead of fixed geographic points");
+    assert.equal(arrowLayer.layout["symbol-placement"],"line");
+    assert.equal(arrowLayer.layout["symbol-spacing"],88);
+    assert.equal(arrowLayer.layout["text-size"],14);
+    assert.equal(arrowLayer.layout["text-offset"][0],0);
+    assert.equal(arrowLayer.layout["text-offset"][1],north?-0.85:0.85);
+    assert.equal(arrowLayer.layout["text-rotation-alignment"],"viewport");
+    assert.equal(g.mapState.sources.has("case-hemisphere-arrows"),false,
+      "Fixed latitude/longitude arrows would drift away as the map zooms");
     assert.equal($("clueList").children[0].children[1].children[2].disabled,true);
     button.handlers.click(); // Clicking the original button again cannot charge twice.
     assert.equal(g.mapState.eases.at(-1).center[1],0);
@@ -578,6 +584,7 @@ test("hemisphere purchase survives daily reloading and map engine switching",asy
   assert.ok(g.mapState.layers.has("case-hemisphere-arrows"));
   await $("mapVectorBtn").handlers.click();
   assert.equal(g.mapState.layers.get("case-hemisphere-arrows").type,"symbol");
+  assert.equal(g.mapState.layers.get("case-hemisphere-arrows").layout["symbol-spacing"],88);
   const reopened=boot({map:true,storage,clock:FakeDate});
   assert.ok(reopened.mapState.sources.has("case-hemisphere-line"));
   assert.equal(reopened.get("clueList").children[0].children[1].children[2].disabled,true);
