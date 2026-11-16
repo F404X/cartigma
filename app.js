@@ -195,9 +195,34 @@
     }
     return [...unique.values()].sort((a,b)=>a.km-b.km);
   }
-  function roundedHintDistance(km,level,radius){
-    const step=level==="hard"?(radius>=3200?500:250):(radius>=3000?200:100);
-    return Math.min(radius,Math.max(step,Math.round(km/step)*step));
+  // Normal mode gives a broad geographic sector; Hard mode uses surveyor-style UTM notation.
+  function utmZone(latitude,longitude){
+    if(latitude>=56&&latitude<64&&longitude>=3&&longitude<12)return 32;
+    if(latitude>=72&&latitude<84&&longitude>=0&&longitude<42){
+      return longitude<9?31:longitude<21?33:longitude<33?35:37;
+    }
+    return Math.max(1,Math.min(60,Math.floor((longitude+180)/6)+1));
+  }
+  function utmLatitudeBand(latitude){
+    return "CDEFGHJKLMNPQRSTUVWX"[Math.min(19,Math.max(0,Math.floor((latitude+80)/8)))];
+  }
+  function coordinateClue(index,level){
+    const p=cityAt(index);
+    if(level==="hard")return {key:"utmZone",zone:utmZone(p[3],p[4])};
+    const from=Math.floor(p[4]/30)*30;
+    return {key:"longitude",from,to:from+30};
+  }
+  function landmarkClue(index,level){
+    const place=cityAt(index),name=LANDMARKS[index];
+    // Check the catalog name AND its English alias (e.g. Tóquio/Tokyo and Taipé/Taipei).
+    const revealsCity=[place[0],EN_CITY[place[0]]]
+      .filter(Boolean).some(candidate=>norm(name).includes(norm(candidate)));
+    if(level==="hard")return {key:"utmBand",band:utmLatitudeBand(place[3])};
+    if(revealsCity){
+      const from=Math.floor(place[3]/15)*15;
+      return {key:"latitude",from,to:from+15};
+    }
+    return {key:"landmark",name};
   }
   function referenceName(item){
     return item.name+", "+displayRegion(item.country);
@@ -209,15 +234,6 @@
     const radius=regionalHintRadius(index,level);
     const anchors=anchorDistances(index,level,radius);
     if(anchors.length<2)throw Error("Not enough regional references for "+p[0]);
-    // Avoid a near-neighbor that instantly reveals the destination.
-    // Prefer places in the same geographical region, about 65% of the local radius away.
-    const regionAnchors=anchors.filter(a=>a.regional&&a.km>=radius*.30);
-    const distantAnchors=anchors.filter(a=>a.km>=radius*.30);
-    const options=regionAnchors.length?regionAnchors:(distantAnchors.length?distantAnchors:anchors);
-    const desired=radius*.65;
-    const chosen=options.reduce((best,item)=>{
-      return Math.abs(item.km-desired)<Math.abs(best.km-desired)?item:best;
-    },options[0]);
     const regionalComparison=anchors.filter(a=>a.regional&&a.km>=radius*.25);
     const comparison=regionalComparison.length>=2?regionalComparison:anchors;
     const nearIndex=Math.floor((comparison.length-1)*.22);
@@ -243,9 +259,9 @@
       opening,
       {key:"continent",value:continentName(index)},
       third,
-      {key:"distance",km:number(roundedHintDistance(chosen.km,level,radius)),city:referenceName(chosen)},
+      coordinateClue(index,level),
       relationship,
-      {key:"landmark",name:LANDMARKS[index]}
+      landmarkClue(index,level)
     ];
     clueCache.set(cacheKey,clues);
     return clues;
@@ -324,7 +340,8 @@
   // Reuse the clue-category lookup instead of rebuilding it for every row.
   const CLUE_CATEGORY_KEYS=Object.freeze({
     terrain:"clueTerrain",continent:"clueRegion",zone:"clueClimate",
-    hemisphere:"clueRegion",capital:"clueCivic",distance:"clueDistance",
+    hemisphere:"clueRegion",capital:"clueCivic",longitude:"clueRegion",
+    latitude:"clueRegion",utmZone:"clueRegion",utmBand:"clueRegion",
     closer:"clueDistance",nearest:"clueDistance",landmark:"clueLandmark"
   });
   function renderClues(){
@@ -363,8 +380,14 @@
       const label=document.createElement("span");
       const idx=document.createElement("span");idx.className="history-number";idx.textContent=String(i+1).padStart(2,"0");
       label.append(idx,document.createTextNode(g.label||g.lat.toFixed(2)+"°, "+g.lng.toFixed(2)+"°"));
-      const distance=document.createElement("strong");distance.textContent=number(g.distance)+" km"+(difficulty==="hard"?"":" · "+direction(g.bearing));
-      row.append(label,distance);list.append(row);
+      row.append(label);
+      // A guess rounded to 0 km has no useful distance or direction to display.
+      if(Math.round(g.distance)!==0){
+        const distance=document.createElement("strong");
+        distance.textContent=number(g.distance)+" km"+(difficulty==="hard"?"":" · "+direction(g.bearing));
+        row.append(distance);
+      }
+      list.append(row);
     }
   }
   function bestGuess(){
@@ -407,9 +430,14 @@
       const n=document.createElement("span");n.className="report-log-index";n.textContent=String(i+1).padStart(2,"0");
       const label=document.createElement("span");label.className="report-log-place";
       label.textContent=g.label||g.lat.toFixed(3)+"°, "+g.lng.toFixed(3)+"°";
-      const metric=document.createElement("strong");metric.textContent=number(g.distance)+" km"
-        +(difficulty==="hard"?"":" · "+direction(g.bearing));
-      row.append(n,label,metric);log.append(row);
+      row.append(n,label);
+      if(Math.round(g.distance)!==0){
+        const metric=document.createElement("strong");
+        metric.textContent=number(g.distance)+" km"
+          +(difficulty==="hard"?"":" · "+direction(g.bearing));
+        row.append(metric);
+      }
+      log.append(row);
     }
     if(!game.guesses.length){
       const item=document.createElement("li");item.textContent=t("reportNoGuesses");log.append(item);

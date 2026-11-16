@@ -99,9 +99,36 @@
     vi:"Địa danh nổi tiếng: {name}",
     id:"Landmark terkenal: {name}"
   };
+  // Geographic reference grids are used instead of redundant distance evidence.
+  // In Hard mode UTM references deliberately require specialist map-reading knowledge.
+  const gridKeys=["longitude","latitude","utmZone","utmBand"];
+  const grids={
+    en:"Longitude sector: {from}° to {to}°|Latitude sector: {from}° to {to}°|UTM zone: {zone}|UTM latitude band: {band}",
+    pt:"Setor de longitude: {from}° a {to}°|Setor de latitude: {from}° a {to}°|Fuso UTM: {zone}|Banda latitudinal UTM: {band}",
+    es:"Sector de longitud: {from}° a {to}°|Sector de latitud: {from}° a {to}°|Huso UTM: {zone}|Banda latitudinal UTM: {band}",
+    zh:"经度区间：{from}° 至 {to}°|纬度区间：{from}° 至 {to}°|UTM 分带：{zone}|UTM 纬度带：{band}",
+    ja:"経度帯：{from}°～{to}°|緯度帯：{from}°～{to}°|UTM ゾーン：{zone}|UTM 緯度帯：{band}",
+    ru:"Сектор долготы: от {from}° до {to}°|Сектор широты: от {from}° до {to}°|Зона UTM: {zone}|Широтная полоса UTM: {band}",
+    fr:"Secteur de longitude : {from}° à {to}°|Secteur de latitude : {from}° à {to}°|Zone UTM : {zone}|Bande de latitude UTM : {band}",
+    de:"Längensektor: {from}° bis {to}°|Breitensektor: {from}° bis {to}°|UTM-Zone: {zone}|UTM-Breitenband: {band}",
+    it:"Settore di longitudine: da {from}° a {to}°|Settore di latitudine: da {from}° a {to}°|Zona UTM: {zone}|Fascia latitudinale UTM: {band}",
+    nl:"Lengtesector: {from}° tot {to}°|Breedtesector: {from}° tot {to}°|UTM-zone: {zone}|UTM-breedteband: {band}",
+    pl:"Sektor długości: {from}° do {to}°|Sektor szerokości: {from}° do {to}°|Strefa UTM: {zone}|Pas szerokości UTM: {band}",
+    sv:"Longitudsektor: {from}° till {to}°|Latitudsektor: {from}° till {to}°|UTM-zon: {zone}|UTM-latitudband: {band}",
+    tr:"Boylam aralığı: {from}° ile {to}°|Enlem aralığı: {from}° ile {to}°|UTM bölgesi: {zone}|UTM enlem bandı: {band}",
+    ar:"قطاع خط الطول: {from}° إلى {to}°|قطاع خط العرض: {from}° إلى {to}°|نطاق UTM: {zone}|حزام عرض UTM: {band}",
+    he:"מקטע קו אורך: {from}° עד {to}°|מקטע קו רוחב: {from}° עד {to}°|אזור UTM: {zone}|רצועת רוחב UTM: {band}",
+    ko:"경도 구간: {from}°~{to}°|위도 구간: {from}°~{to}°|UTM 구역: {zone}|UTM 위도대: {band}",
+    th:"ช่วงลองจิจูด: {from}° ถึง {to}°|ช่วงละติจูด: {from}° ถึง {to}°|เขต UTM: {zone}|แถบละติจูด UTM: {band}",
+    vi:"Khoảng kinh độ: {from}° đến {to}°|Khoảng vĩ độ: {from}° đến {to}°|Múi UTM: {zone}|Dải vĩ độ UTM: {band}",
+    id:"Sektor bujur: {from}° hingga {to}°|Sektor lintang: {from}° hingga {to}°|Zona UTM: {zone}|Pita lintang UTM: {band}"
+  };
   for(const language of Object.keys(localeData)) {
     if(!landmark[language]) throw Error("Missing landmark translation for "+language);
     localeData[language].templates.landmark=landmark[language];
+    const values=grids[language]?.split("|");
+    if(!values || values.length!==gridKeys.length)throw Error("Missing grid translation for "+language);
+    for(const [i,key] of gridKeys.entries())localeData[language].templates[key]=values[i];
   }
   // Explicit continent labels: Intl.DisplayNames may return raw UN M49 numbers
   // (e.g. 009) rather than names on some browsers.

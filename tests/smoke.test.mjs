@@ -357,69 +357,64 @@ test("map labels appear gradually with zoom instead of all at once",()=>{
 });
 
 
-test("distance clues adapt to geography; never use a fixed 1,000 km limit",()=>{
-  const samples=[
-    [8,"Paris","europe"],[13,"Marrakech","africa"],
-    [33,"Tóquio","asia"],[49,"Papeete","oceania"],
-    [51,"Nova York","northAmerica"],[65,"Goiânia","southAmerica"]
-  ];
-  const radiusBase={europe:2000,africa:2600,asia:2700,
-    oceania:2500,northAmerica:2500,southAmerica:2300};
+test("the fourth clue is longitude, never an extra distance hint",()=>{
   const places=boot().window.GEODETECTIVE_PLACES;
-  const regionFor=i=>i<=12?"europe":i<=20?"africa":i<=41?"asia"
-    :i<=49?"oceania":i<=58?"northAmerica":"southAmerica";
-  const radius=(i,level)=>{
-    const base=radiusBase[regionFor(i)],origin=[places[i][3],places[i][4]];
-    const others=places.map((p,j)=>({j,km:distanceKm(origin,[p[3],p[4]])}))
-      .filter(x=>x.j!==i&&regionFor(x.j)===regionFor(i))
-      .sort((a,b)=>a.km-b.km);
-    const local=others[Math.min(2,others.length-1)].km;
-    return Math.round(Math.min(6000,Math.min(5200,Math.max(base,.55*base+.65*local))
-      *(level==="hard"?1.2:1))/100)*100;
-  };
-  const observed=[];
-  for(const [i,name,region] of samples){
-    const g=boot({randomValue:i/places.length});
+  for(const [city,expected] of [
+    ["Taipé","Longitude sector: 120° to 150°"],
+    ["Papeete","Longitude sector: -150° to -120°"],
+    ["Reykjavík","Longitude sector: -30° to 0°"]
+  ]){
+    const index=places.findIndex(p=>p[0]===city);
+    const g=boot({randomValue:(index+.25)/places.length});
     g.get("freeBtn").handlers.click();
-    // Two initial clues, two additional reveals; distance is clue four.
-    g.get("revealBtn").handlers.click();
-    g.get("revealBtn").handlers.click();
-    const text=g.get("clueList").children[3].children[1].children[1].textContent;
-    const m=text.match(/Around ([\d,]+) km from (.+)/);
-    assert.ok(m,name+" should have a translated numeric distance clue: "+text);
-    const km=Number(m[1].replaceAll(",",""));
-    assert.ok(km>0&&km<=radius(i,"normal"),name+" has distance outside regional cap");
-    assert.ok(km%100===0,name+" should use rounded distances");
-    observed.push({name,region,km,cap:radius(i,"normal"),reference:m[2]});
+    for(let j=0;j<2;j++)g.get("revealBtn").handlers.click();
+    assert.equal(clueTexts(g)[3],expected,city);
+    assert.doesNotMatch(clueTexts(g)[3],/km|Around .* from/i);
   }
-  assert.ok(new Set(observed.map(x=>x.cap)).size>=4,"Several regions must have different radii");
-  assert.ok(observed.find(x=>x.name==="Marrakech").cap>observed.find(x=>x.name==="Paris").cap);
-  assert.ok(observed.find(x=>x.name==="Papeete").cap>observed.find(x=>x.name==="Paris").cap);
-  assert.ok(observed.some(x=>x.km>1000),"At least one clue must reach beyond the former fixed cap");
-  assert.doesNotMatch(observed.find(x=>x.name==="Marrakech").reference,/New York/i);
 });
 
-test("Hard mode uses a wider local radius and coarser distance approximation",()=>{
-  const i=13,places=boot().window.GEODETECTIVE_PLACES;
-  const normal=boot({randomValue:i/places.length});
-  normal.get("freeBtn").handlers.click();
-  for(let j=0;j<2;j++)normal.get("revealBtn").handlers.click();
-  const hard=boot({randomValue:i/places.length});
-  hard.difficulty("hard");
-  hard.get("freeBtn").handlers.click();
-  for(let j=0;j<3;j++)hard.get("revealBtn").handlers.click();
-  const hardText=hard.get("clueList").children[3].children[1].children[1].textContent;
-  const hardDistance=Number(hardText.match(/Around ([\d,]+) km from /)?.[1].replaceAll(",",""));
-  assert.ok(Number.isFinite(hardDistance));
-  assert.equal(hardDistance%500,0,"Hard distance in a large region must be rounded to 500 km");
-  assert.match(files["app.js"],/level==="hard"\?1\.2:1/);
-  assert.doesNotMatch(
-    hard.get("clueList").children[4].children[1].children[1].textContent,
-    /Nearest catalog city:/,
-    "Fifth clue should no longer reveal the nearest catalog city"
-  );
+test("landmarks that name their city are replaced by different latitude evidence",()=>{
+  const places=boot().window.GEODETECTIVE_PLACES;
+  for(const city of ["Tóquio","Taipé","Antananarivo","Sydney","Papeete"]){
+    const index=places.findIndex(p=>p[0]===city);
+    const g=boot({randomValue:(index+.25)/places.length});
+    g.get("freeBtn").handlers.click();
+    for(let j=0;j<4;j++)g.get("revealBtn").handlers.click();
+    assert.match(clueTexts(g)[5],/^Latitude sector: -?\\d+° to -?\\d+°$/,city);
+    assert.doesNotMatch(clueTexts(g)[5],/Associated landmark:/,city);
+  }
+  const paris=places.findIndex(p=>p[0]==="Paris");
+  const g=boot({randomValue:(paris+.25)/places.length});
+  g.get("freeBtn").handlers.click();
+  for(let j=0;j<4;j++)g.get("revealBtn").handlers.click();
+  assert.equal(clueTexts(g)[5],"Associated landmark: Eiffel Tower");
 });
 
+test("Hard mode uses expert-only UTM reference zones and bands, without landmark giveaways",()=>{
+  const places=boot().window.GEODETECTIVE_PLACES;
+  for(const [city,zone,band] of [["Taipé",51,"R"],["Tóquio",54,"S"],["Longyearbyen",33,"X"]]){
+    const index=places.findIndex(p=>p[0]===city);
+    const g=boot({randomValue:(index+.25)/places.length});
+    g.difficulty("hard");
+    g.get("freeBtn").handlers.click();
+    for(let j=0;j<5;j++)g.get("revealBtn").handlers.click();
+    assert.equal(clueTexts(g)[3],"UTM zone: "+zone,city);
+    assert.equal(clueTexts(g)[5],"UTM latitude band: "+band,city);
+    assert.equal(clueTexts(g).length,6);
+  }
+  assert.match(files["app.js"],/regionalHintRadius\\(index,level\\)/);
+});
+
+test("exact guesses omit distance and direction in history and final dossier",()=>{
+  const g=boot({map:true}),$=g.get;
+  $("freeBtn").handlers.click(); // Reykjavík is index 0.
+  g.select("Reykjavík");
+  $("guessBtn").handlers.click();
+  assert.equal($("reportBest").textContent,"0 km"); // The summary still reports exact accuracy.
+  assert.equal($("guessHistory").children[0].children.length,1);
+  assert.equal($("reportTimeline").children[0].children.length,2);
+  assert.doesNotMatch($("guessHistory").children[0].textContent,/km|·|↑|↗|→/);
+});
 
 test("hemisphere evidence never follows the continent and no generic river-valley clue remains",()=>{
   const places=boot().window.GEODETECTIVE_PLACES;
