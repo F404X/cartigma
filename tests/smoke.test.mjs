@@ -344,6 +344,36 @@ test("landlocked evidence and case profiles use affirmative sentences in all lan
     assert.equal(cell.children[0]?.className,"visually-hidden");
   }
 });
+test("sea-access cards never render the raw 'Região: Não' state",()=>{
+  for(const [city,want] of [["Lisboa","Tem acesso ao mar."],["Catmandu","Sem acesso ao mar."]]){
+    const places=boot().window.GEODETECTIVE_PLACES;
+    const index=places.findIndex(place=>place[0]===city);
+    assert.ok(index>=0,city+" missing");
+    const g=boot({randomValue:(index+.25)/places.length});
+    g.get("freeBtn").handlers.click();
+    g.language("pt");
+    revealAll(g);
+    const rows=g.get("clueList").children.filter(row=>
+      row.children[1].children[0].textContent==="Acesso ao mar");
+    assert.equal(rows.length,1,city+" must show one sea-access clue");
+    assert.equal(rows[0].children[1].children[1].textContent,want);
+    assert.notEqual(rows[0].children[1].children[1].textContent,"Não");
+    assert.notEqual(rows[0].children[1].children[1].textContent,"Sim");
+    g.language("en");
+    const translated=g.get("clueList").children.filter(row=>
+      row.children[1].children[0].textContent==="Sea access");
+    assert.equal(translated.length,1);
+    assert.equal(translated[0].children[1].children[1].textContent,
+      want==="Tem acesso ao mar."?"Has access to the sea.":"No access to the sea.");
+  }
+  const langs=boot().window.GeoCountryClueI18n;
+  for(const [language,pack] of Object.entries(langs)){
+    assert.ok(pack.countryLandlockedLabel,language+" needs a specific category");
+    assert.ok(pack.countryLandlockedYes&&pack.countryLandlockedNo,language);
+  }
+  assert.ok(files["app.js"].includes("const authoritative=COUNTRY_INSIGHTS[COUNTRY_CODES[game.index]]?.landlocked"));
+  assert.ok(files["index.html"].includes('src="country-clues-i18n.js?v=20261116-sea-access-fix"'));
+});
 test("obsolete hemisphere map purchases in northern-only daily cases are refunded",()=>{
   const world=boot().window,places=world.GEODETECTIVE_PLACES;
   const day=Array.from({length:200},(_,j)=>
@@ -511,7 +541,7 @@ test("country-area metrics always identify the country or territory in all local
   assert.equal(profile.pt.area,"Área do país ou território");
   assert.ok(clue.en.countryArea.includes("Country / territory area:"));
   assert.equal(profile.en.area,"Country / territory area");
-  assert.ok(files["index.html"].includes('src="country-clues-i18n.js?v=20261116-area-scope"'));
+  assert.ok(files["index.html"].includes('src="country-clues-i18n.js?v=20261116-sea-access-fix"'));
   assert.ok(files["index.html"].includes('src="country-profile-i18n.js?v=20261116-area-scope"'));
 });
 test("daily case file offers the other unfinished difficulty and a clear Free Play action",()=>{
@@ -946,7 +976,7 @@ test("a correct fifth guess in Cape Town has no distance or bearing in history o
 });
 
 test("fresh deployments fingerprint both game engine and translated clues",()=>{
-  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-profile-diversity"'));
+  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-sea-access-fix"'));
   assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-profile-diversity"'));
   assert.ok(files["map-bootstrap.js"].includes('new URL(import.meta.url).searchParams.get("v")'));
   assert.ok(files["app.js"].includes("function guessMetricText(g)"));

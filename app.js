@@ -331,7 +331,8 @@
         Math.round(area/roundedStep)*roundedStep))});
     }
     if(typeof data.landlocked==="boolean")
-      add("countryLandlocked",{value:tc(data.landlocked?"countryLandlockedYes":"countryLandlockedNo")});
+      // Keep the source boolean, not a translated yes/no string.
+      add("countryLandlocked",{landlocked:data.landlocked});
     // Pair one cultural/civic fact with one numeric fact. This prevents two
     // nearly identical population/GDP/area clues in a single investigation.
     // Both buckets are available for every country in the current catalogue.
@@ -385,7 +386,16 @@
     clueCache.set(cacheKey,clues);
     return clues;
   }
-  function clueText(clue){return tc(clue.key,clue)}
+  function clueText(clue){
+    if(clue.key==="countryLandlocked"){
+      // Resolve this clue from source geography, not a possibly stale cached value.
+      const authoritative=COUNTRY_INSIGHTS[COUNTRY_CODES[game.index]]?.landlocked;
+      const value=typeof authoritative==="boolean"?authoritative:clue.landlocked;
+      if(typeof value==="boolean")
+        return tc(value?"countryLandlockedYes":"countryLandlockedNo");
+    }
+    return tc(clue.key,clue);
+  }
   function maximum(){return DIFFICULTIES[difficulty].attempts}
   // Most Normal cases deliberately feature capitals or recognizable cities;
   // Hard still draws from the complete 500-location catalogue.
@@ -547,7 +557,10 @@
       const body=document.createElement("span");body.className="clue-body";
       const category=document.createElement("span");category.className="clue-category";
       const categoryKey=CLUE_CATEGORY_KEYS[clue.key]||"clueRegion";
-      category.textContent=t(categoryKey);
+      category.textContent=clue.key==="countryLandlocked"
+        ?(COUNTRY_CLUE_I18N[lang]?.countryLandlockedLabel||
+          COUNTRY_CLUE_I18N.en?.countryLandlockedLabel||"Sea access")
+        :t(categoryKey);
       const value=document.createElement("span");value.className="clue-text";
       const clueValue=i<revealed?clueText(clue):lockedText;
       value.textContent=clueValue;
