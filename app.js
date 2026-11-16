@@ -109,6 +109,7 @@
   let activeMapStyle=window.maplibregl?.isFallback?"osm":"vector";
   let controller = null, debounce = null, toastTimer = null;
   const regionFormatters = new Map();
+  const currencyFormatters = new Map();
   const clueCache = new Map();
 
   function t(key, variables={}) {
@@ -134,6 +135,23 @@
       }
       return formatter.of(code);
     }catch{return code}
+  }
+  // Names use CLDR in the selected language. The source dataset supplies
+  // descriptive English fallbacks for browsers without currency-name support.
+  function currencyName(code,fallbackName=""){
+    if(!code)return "";
+    try{
+      const language=locale();
+      let formatter=currencyFormatters.get(language);
+      if(!formatter){
+        formatter=new Intl.DisplayNames([language],{type:"currency",fallback:"none"});
+        currencyFormatters.set(language,formatter);
+      }
+      const localized=formatter.of(code);
+      if(typeof localized==="string"&&localized.trim()&&localized!==code)
+        return localized;
+    }catch(error){/* Currency display names are not supported everywhere. */}
+    return fallbackName||code;
   }
   function cityName(p) {
     return lang==="pt"?(PT_EXTRA_NAMES[p[0]]||p[0]):(EN_CITY[p[0]]||p[0]);
@@ -289,7 +307,9 @@
     if(!data)throw Error("Missing country insights for "+code);
     const candidates=[];
     const add=(key,props)=>candidates.push({key,...props});
-    if(data.currency)add("countryCurrency",{code:data.currency});
+    if(data.currency)add("countryCurrency",{
+      name:currencyName(data.currency,data.currencyName)
+    });
     if(data.languageFamily){
       const family=lang==="pt"?(COUNTRY_FAMILIES_PT[data.languageFamily]||data.languageFamily):data.languageFamily;
       add("countryLanguageFamily",{family});
@@ -656,7 +676,7 @@
     add("iso",code);
     add("region",place[2]);
     add("capital",countryWord(CAPITALS.has(place[0])));
-    add("currency",info?.currency);
+    add("currency",currencyName(info?.currency,info?.currencyName));
     if(info?.languageFamily)add("language",lang==="pt"
       ?COUNTRY_FAMILIES_PT[info.languageFamily]||info.languageFamily:info.languageFamily);
     if(info?.flagColor)add("flagColor",

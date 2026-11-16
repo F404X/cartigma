@@ -372,7 +372,7 @@ test("sea-access cards never render the raw 'Região: Não' state",()=>{
     assert.ok(pack.countryLandlockedYes&&pack.countryLandlockedNo,language);
   }
   assert.ok(files["app.js"].includes("const authoritative=COUNTRY_INSIGHTS[COUNTRY_CODES[game.index]]?.landlocked"));
-  assert.ok(files["index.html"].includes('src="country-clues-i18n.js?v=20261116-sea-access-fix"'));
+  assert.ok(files["index.html"].includes('src="country-clues-i18n.js?v=20261116-currency-names"'));
 });
 test("obsolete hemisphere map purchases in northern-only daily cases are refunded",()=>{
   const world=boot().window,places=world.GEODETECTIVE_PLACES;
@@ -428,7 +428,7 @@ test("hint costs follow the NEXT clue, are deducted once, and saved hint count r
 });
 test("country-data slots separate numeric and cultural facts through the five remaining positions",()=>{
   const world=boot().window,places=world.GEODETECTIVE_PLACES;
-  const civic=["Currency code:","Language family:","One flag color:","No access to the sea.","Has access to the sea."];
+  const civic=["Currency:","Language family:","One flag color:","No access to the sea.","Has access to the sea."];
   const numeric=["Population (","GDP per capita (","Country / territory area:"];
   const hit=new Set();
   for(let i=0;i<places.length;i+=11){
@@ -457,7 +457,7 @@ test("country-data evidence is distributed among positions three to seven",()=>{
     const clues=revealAll(g),country=[];
     assert.equal(clues.length,7);
     for(let j=0;j<clues.length;j++){
-      const type=["Currency code:","Language family:","One flag color:","Population (",
+      const type=["Currency:","Language family:","One flag color:","Population (",
         "GDP per capita (","Country / territory area:","No access to the sea.","Has access to the sea."].find(prefix=>clues[j].startsWith(prefix));
       if(type){counts[type]=(counts[type]||0)+1;positions.add(j);country.push(type);}
     }
@@ -495,6 +495,43 @@ test("a solved dossier shows the flag and a historical paragraph for every count
   }
 });
 
+test("currency evidence and case dossier use translated currency names instead of codes",()=>{
+  const places=boot().window.GEODETECTIVE_PLACES;
+  const sample=[
+    ["São Paulo","BRL","Moeda: Real brasileiro","Currency: Brazilian Real"],
+    ["Ōsaka","JPY","Moeda: Iene japonês","Currency: Japanese Yen"],
+    ["Paris","EUR","Moeda: Euro","Currency: Euro"]
+  ];
+  for(const [city,code,portuguese,english] of sample){
+    const index=places.findIndex(p=>p[0]===city);
+    assert.ok(index>=0,city+" missing");
+    const g=boot({randomValue:(index+.25)/places.length});
+    g.get("freeBtn").handlers.click();
+    g.language("pt");
+    assert.ok(revealAll(g).includes(portuguese),city+" needs a localized currency name");
+    g.language("en");
+    assert.ok(clueTexts(g).includes(english),city+" English currency name missing");
+    assert.ok(!clueTexts(g).some(t=>t.includes("Currency code: "+code)));
+  }
+  const g=boot({randomValue:(68+.25)/places.length});
+  g.get("freeBtn").handlers.click();
+  g.select("São Paulo");g.get("guessBtn").handlers.click();
+  g.language("pt");
+  const profile=g.get("reportCountryStats").children;
+  const field=profile.find(cell=>cell.children[0]?.textContent==="Moeda");
+  assert.ok(field,"Missing currency in case file");
+  assert.equal(field.children[1].textContent,"Real brasileiro");
+  assert.notEqual(field.children[1].textContent,"BRL");
+  const db=g.window.GeoCountryInsights;
+  assert.equal(Object.keys(db).length,165);
+  for(const [iso,record] of Object.entries(db))
+    assert.ok(record.currencyName&&record.currencyName!==record.currency,
+      iso+" needs a descriptive currency-name fallback");
+  for(const [lang,pack] of Object.entries(g.window.GeoCountryClueI18n)){
+    assert.ok(pack.countryCurrency.includes("{name}"),lang);
+    assert.ok(!pack.countryCurrency.includes("{code}"),lang);
+  }
+});
 test("all 19 country clue templates keep required values and annual provenance",()=>{
   const g=boot(),packs=g.window.GeoCountryClueI18n;
   const keys=["countryCurrency","countryLanguageFamily","countryFlagColor","countryPopulation",
@@ -503,14 +540,14 @@ test("all 19 country clue templates keep required values and annual provenance",
     for(const key of keys)assert.ok(t[key],lang+" missing "+key);
     for(const key of ["countryPopulation","countryGDP"])
       assert.match(t[key],/{year}/,lang+" must disclose the economic data year");
-    assert.match(t.countryCurrency,/{code}/);
+    assert.match(t.countryCurrency,/{name}/);
     assert.match(t.countryGDP,/{value}/);
     assert.match(t.countryArea,/{value}/);
     assert.equal(Object.keys(t.colors).length,7);
   }
   assert.ok(files["index.html"].includes('id="reportFlag"'));
   assert.ok(files["index.html"].includes('id="reportHistory"'));
-  assert.ok(files["index.html"].includes('src="country-insights.js?v=20261116-profile-diversity"'));
+  assert.ok(files["index.html"].includes('src="country-insights.js?v=20261116-currency-names"'));
 });
 test("national-capital metadata remains correct even with shuffled evidence",()=>{
   const places=boot().window.GEODETECTIVE_PLACES;
@@ -541,7 +578,7 @@ test("country-area metrics always identify the country or territory in all local
   assert.equal(profile.pt.area,"Área do país ou território");
   assert.ok(clue.en.countryArea.includes("Country / territory area:"));
   assert.equal(profile.en.area,"Country / territory area");
-  assert.ok(files["index.html"].includes('src="country-clues-i18n.js?v=20261116-sea-access-fix"'));
+  assert.ok(files["index.html"].includes('src="country-clues-i18n.js?v=20261116-currency-names"'));
   assert.ok(files["index.html"].includes('src="country-profile-i18n.js?v=20261116-area-scope"'));
 });
 test("daily case file offers the other unfinished difficulty and a clear Free Play action",()=>{
@@ -976,7 +1013,7 @@ test("a correct fifth guess in Cape Town has no distance or bearing in history o
 });
 
 test("fresh deployments fingerprint both game engine and translated clues",()=>{
-  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-sea-access-fix"'));
+  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-currency-names"'));
   assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-profile-diversity"'));
   assert.ok(files["map-bootstrap.js"].includes('new URL(import.meta.url).searchParams.get("v")'));
   assert.ok(files["app.js"].includes("function guessMetricText(g)"));
