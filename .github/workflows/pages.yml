@@ -33,6 +33,8 @@ jobs:
         run: |
           mkdir -p dist
           cp index.html styles.css themes.css mobile.css theme.js app.js map-bootstrap.js map-fallback.js language-picker.js places.js references.js i18n.js clues-i18n.js compass-i18n.js report-i18n.js facts.js favicon.svg dist/
+          # Fingerprint the public scripts on every deployment (not just once in source).
+          sed -i "s|v=20261116-exact-fix|v=${GITHUB_SHA}|g" dist/index.html
           touch dist/.nojekyll
 
       - name: Configurar GitHub Pages

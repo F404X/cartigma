@@ -46,4 +46,6 @@ try {
     window.maplibregl = null;
   }
 }
-await import("./app.js");
+// Propagate the release fingerprint so browsers cannot reuse an older game engine.
+const assetVersion=new URL(import.meta.url).searchParams.get("v");
+await import(assetVersion?"./app.js?v="+encodeURIComponent(assetVersion):"./app.js");

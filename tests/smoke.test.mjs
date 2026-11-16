@@ -419,6 +419,32 @@ test("exact guesses omit distance and direction in history and final dossier",()
   assert.doesNotMatch($("guessHistory").children[0].textContent,/km|·|↑|↗|→/);
 });
 
+test("a correct fifth guess in Cape Town has no distance or bearing in history or dossier",()=>{
+  const places=boot().window.GEODETECTIVE_PLACES;
+  const target=places.findIndex(p=>p[0]==="Cidade do Cabo");
+  assert.ok(target>=0);
+  const g=boot({randomValue:(target+.25)/places.length}),$=g.get;
+  $("freeBtn").handlers.click();
+  g.language("pt");
+  for(let i=0;i<4;i++){g.select("Oslo");$("guessBtn").handlers.click();}
+  g.select("Cidade do Cabo");$("guessBtn").handlers.click();
+  assert.equal($("historyCount").textContent,"05");
+  assert.equal($("guessHistory").children[0].children.length,1);
+  assert.equal($("reportTimeline").children[4].children.length,2);
+  assert.doesNotMatch($("guessHistory").children[0].textContent,/km|Norte|↑/);
+  assert.ok($("guessHistory").children[1].children[1].textContent.includes("km"),
+    "Incorrect guesses must keep their useful distance");
+});
+
+test("fresh deployments fingerprint both game engine and translated clues",()=>{
+  assert.match(files["index.html"],/src="map-bootstrap\\.js\\?v=20261116-exact-fix"/);
+  assert.match(files["index.html"],/src="clues-i18n\\.js\\?v=20261116-exact-fix"/);
+  assert.match(files["map-bootstrap.js"],/new URL\\(import\\.meta\\.url\\)\\.searchParams\\.get\\("v"\\)/);
+  assert.match(files["app.js"],/function guessMetricText\\(g\\)/);
+  const deploy=readFileSync(new URL("../.github/workflows/pages.yml",import.meta.url),"utf8");
+  assert.ok(deploy.includes("GITHUB_SHA"));
+});
+
 test("hemisphere evidence never follows the continent and no generic river-valley clue remains",()=>{
   const places=boot().window.GEODETECTIVE_PLACES;
   let hemisphereUsed=0;

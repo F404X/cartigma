@@ -366,6 +366,11 @@
     $("revealBtn").disabled=game.finished||revealed>=6;
     $("revealBtn").classList.toggle("hidden",game.finished);
   }
+  function guessMetricText(g){
+    // Hide both distance and bearing if the displayed result rounds to 0 km.
+    if(Math.round(g.distance)===0)return "";
+    return number(g.distance)+" km"+(difficulty==="hard"?"":" · "+direction(g.bearing));
+  }
   function renderHistory(){
     const list=$("guessHistory");list.replaceChildren();
     const count=game.guesses.length;
@@ -381,10 +386,10 @@
       const idx=document.createElement("span");idx.className="history-number";idx.textContent=String(i+1).padStart(2,"0");
       label.append(idx,document.createTextNode(g.label||g.lat.toFixed(2)+"°, "+g.lng.toFixed(2)+"°"));
       row.append(label);
-      // A guess rounded to 0 km has no useful distance or direction to display.
-      if(Math.round(g.distance)!==0){
+      const metricText=guessMetricText(g);
+      if(metricText){
         const distance=document.createElement("strong");
-        distance.textContent=number(g.distance)+" km"+(difficulty==="hard"?"":" · "+direction(g.bearing));
+        distance.textContent=metricText;
         row.append(distance);
       }
       list.append(row);
@@ -431,10 +436,10 @@
       const label=document.createElement("span");label.className="report-log-place";
       label.textContent=g.label||g.lat.toFixed(3)+"°, "+g.lng.toFixed(3)+"°";
       row.append(n,label);
-      if(Math.round(g.distance)!==0){
+      const metricText=guessMetricText(g);
+      if(metricText){
         const metric=document.createElement("strong");
-        metric.textContent=number(g.distance)+" km"
-          +(difficulty==="hard"?"":" · "+direction(g.bearing));
+        metric.textContent=metricText;
         row.append(metric);
       }
       log.append(row);
