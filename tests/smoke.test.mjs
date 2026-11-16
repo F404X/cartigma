@@ -148,9 +148,10 @@ test("national-capital evidence marks Taipei correctly and keeps non-capitals di
     g.get("revealBtn").handlers.click();
     assert.equal(clueTexts(g)[2],"Capital nacional: "+(isCapital?"Sim":"Não"),name);
   }
-  const capitalNames=files["app.js"].match(/const CAPITALS = new Set\\("([^"]+)"\\.split\\("\\|"\\)\\)/)?.[1]?.split("|");
-  assert.ok(capitalNames?.includes("Taipé"));
-  assert.ok(capitalNames?.includes("Cidade do Cabo"),"Cape Town is South Africa's legislative capital");
+  const capitalLine=files["app.js"].split("\n").find(line=>line.includes("const CAPITALS = new Set("));
+  assert.ok(capitalLine,"Missing national-capital metadata");
+  assert.ok(capitalLine.includes("|Taipé|"));
+  assert.ok(capitalLine.includes("|Cidade do Cabo|"),"Cape Town is South Africa\'s legislative capital");
 });
 
 test("Normal and Hard are the only modes and both have six translated clues",()=>{
