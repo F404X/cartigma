@@ -21,7 +21,7 @@
   const CONTINENT_BORDERS = window.GeoContinentBorders || {};
   const DIFFICULTIES = {normal:{attempts:6,initial:2},hard:{attempts:4,initial:1}};
   const SERIAL_PREFIX = "geodetective-case-counter-";
-  const EVIDENCE_COUNT = 7;
+  const EVIDENCE_COUNT = 10;
   const WIN_RADIUS = 100, HINT_COST = 300, DAILY_KEY = "geodetective-daily-v3-";
   // 300 is preserved only for loading older saved games. New charges reflect
   // information gain; the price for the NEXT clue is always shown before purchase.
@@ -363,7 +363,13 @@
     const id="country-evidence:"+code+":"+index+":"+level;
     const first=cultural[hash(id+":cultural")%cultural.length];
     const second=numeric[hash(id+":numeric")%numeric.length];
-    return hash(id+":order")%2?[second,first]:[first,second];
+    // Keep the two previously selected facts in their original order so
+    // in-progress daily cases retain all the hints they already purchased.
+    const chosen=hash(id+":order")%2?[second,first]:[first,second];
+    const remaining=candidates.filter(item=>!chosen.some(pick=>pick.key===item.key))
+      .sort((a,b)=>hash(id+":more:"+a.key)-hash(id+":more:"+b.key));
+    if(remaining.length<3)throw Error("Not enough additional verified evidence for "+code);
+    return [...chosen,...remaining.slice(0,3)];
   }
   function cluesFor(index,level){
     const cacheKey=index+":"+level+":"+lang;
@@ -402,7 +408,28 @@
     }
     let next=0;
     for(let i=0;i<mixed.length;i++)if(!mixed[i])mixed[i]=geographic[next++];
+    // Preserve the first seven clues for already-started daily cases.
+    // Three more distinct clues are appended; they can be purchased at any
+    // time, independently of the remaining guesses.
     const clues=[opening,{key:"continent",value:continentName(index)},...mixed];
+    const usedKeys=new Set(clues.map(clue=>clue.key));
+    const extraGeographic=[
+      zone,terrain,
+      ...(reliableCapital||index>=BASE_CITIES?[capital]:[]),
+      ...(safeRegion?[{key:"adminRegion",value:p[2]}]:[])
+    ].find(clue=>!usedKeys.has(clue.key));
+    const additional=extraGeographic
+      ?[countryFacts[2],extraGeographic,countryFacts[3]]
+      :[countryFacts[2],countryFacts[3],countryFacts[4]];
+    if(additional.some(clue=>usedKeys.has(clue.key))||
+      new Set(additional.map(clue=>clue.key)).size!==3)
+      throw Error("Repeated evidence in case "+index);
+    // When the seventh clue is already a country fact, show the new
+    // geographic clue first rather than producing three facts in a row.
+    if(extraGeographic&&mixed[4]?.key.startsWith("country"))
+      [additional[0],additional[1]]=[additional[1],additional[0]];
+    clues.push(...additional);
+    if(clues.length!==EVIDENCE_COUNT)throw Error("Incomplete evidence set for "+index);
     clueCache.set(cacheKey,clues);
     return clues;
   }

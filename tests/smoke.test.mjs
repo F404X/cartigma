@@ -140,11 +140,11 @@ function clueTexts(g){
   return g.get("clueList").children.map(row=>row.children[1].children[1].textContent);
 }
 function revealAll(g){
-  for(let i=0;i<7&&!g.get("revealBtn").disabled;i++)g.get("revealBtn").handlers.click();
+  for(let i=0;i<10&&!g.get("revealBtn").disabled;i++)g.get("revealBtn").handlers.click();
   return clueTexts(g);
 }
 function unlockClue(g,pattern){
-  for(let i=0;i<8;i++){
+  for(let i=0;i<11;i++){
     const index=clueTexts(g).findIndex(value=>pattern.test(value));
     if(index>=0){
       const button=g.get("clueList").children[index].children[1].children[2];
@@ -269,13 +269,13 @@ test("Normal selection favors capitals and major cities; Hard retains the full c
   forced.difficulty("hard");
   forced.get("freeBtn").handlers.click();
   for(let n=0;n<6;n++)forced.get("revealBtn").handlers.click();
-  assert.equal(clueTexts(forced).length,7);
+  assert.equal(clueTexts(forced).length,10);
   const difficultClues=revealAll(forced);
   assert.ok(difficultClues.some(x=>/^UTM zone: \d+$/.test(x)));
   assert.ok(difficultClues.some(x=>/^UTM latitude band: [A-Z]$/.test(x)));
 });
 
-test("new cities have seven meaningful clues without a redundant distance comparison",()=>{
+test("new cities have ten meaningful clues without a redundant distance comparison",()=>{
   const places=boot().window.GEODETECTIVE_PLACES;
   for(const city of ["Berlin","Moscow","Manila","Ankara","İzmir","Edirne","Los Angeles","Abidjan","Canberra"]){
     const index=places.findIndex(p=>p[0]===city);
@@ -283,13 +283,13 @@ test("new cities have seven meaningful clues without a redundant distance compar
     const g=boot({randomValue:(index+.25)/places.length});
     g.get("freeBtn").handlers.click();
     const clues=revealAll(g);
-    assert.equal(clues.length,7);
+    assert.equal(clues.length,10);
     assert.match(clues[1],/Continent:/);
     assert.ok(clues.some(text=>/^Longitude sector:/.test(text)),city);
     assert.ok(clues.some(text=>/^Latitude sector:/.test(text)),city);
     assert.doesNotMatch(clues.join(" "),/Closer to |Distance clue|from [^\n]+ km/i);
     const national=clues.filter(text=>["Currency code","Language family","One flag color", "Population (","GDP per capita","Country / territory area:","No access to the sea.","Has access to the sea."].some(x=>text.startsWith(x)));
-    assert.equal(national.length,2,city+" must have two distinct country facts");
+    assert.equal(national.length,4,city+" must have four distinct country facts");
     if(g.window.GeoExtendedPlaceMetadata[index-74].capital)
       assert.ok(clues.some(x=>x==="National capital: Yes"),city);
   }
@@ -455,14 +455,15 @@ test("country-data evidence is distributed among positions three to seven",()=>{
     const g=boot({randomValue:(index+.25)/places.length});
     g.get("freeBtn").handlers.click();
     const clues=revealAll(g),country=[];
-    assert.equal(clues.length,7);
+    assert.equal(clues.length,10);
     for(let j=0;j<clues.length;j++){
       const type=["Currency:","Language family:","One flag color:","Population (",
         "GDP per capita (","Country / territory area:","No access to the sea.","Has access to the sea."].find(prefix=>clues[j].startsWith(prefix));
       if(type){counts[type]=(counts[type]||0)+1;positions.add(j);country.push(type);}
     }
-    assert.equal(country.length,2,"Two country facts per case: "+index);
-    assert.notEqual(country[0],country[1],"Country facts must differ: "+index);
+    assert.ok(country.length>=4&&country.length<=5,
+      "Four or five distinct country facts per case: "+index);
+    assert.equal(new Set(country).size,country.length,"Country facts must differ: "+index);
     assert.ok(!clues.some(text=>/Closer to |Distance from reference/.test(text)));
   }
   assert.ok(Object.keys(counts).length>=6,"Country evidence must be varied by type");
@@ -483,7 +484,7 @@ test("a solved dossier shows the flag and a historical paragraph for every count
     const iso=city==="Taipé"?"tw":city==="Papeete"?"pf":city==="Ankara"||city==="Istambul"?"tr":city==="São Paulo"?"br":"is";
     assert.equal($("reportFlag").src,"https://flagcdn.com/w160/"+iso+".png",city);
     assert.ok($("reportFlag").alt.length>2);
-    assert.equal($("reportEvidenceList").children.length,7);
+    assert.equal($("reportEvidenceList").children.length,10);
     if(city==="Taipé"){
       g.language("pt");
       assert.match($("reportHistory").textContent,/Taiwan esteve sob administração japonesa/);
@@ -682,18 +683,103 @@ test("touch, mouse and keyboard map rotation are all disabled",()=>{
   assert.equal(g.mapState.keyboardRotationDisabled,true);
   assert.ok(files["map-fallback.js"].includes("L.map("));
 });
-test("Normal and Hard have seven translated clues with unchanged guess limits",()=>{
+test("all 10 evidence cards are purchasable before the first guess without consuming attempts",()=>{
+  const base=boot().window.GEODETECTIVE_PLACES;
+  for(const [level,initial,attempts] of [["normal",2,6],["hard",1,4]]){
+    const idx=base.findIndex(x=>x[0]==="Lisboa"),g=boot({randomValue:(idx+.25)/base.length}),$=g.get;
+    g.difficulty(level);$("freeBtn").handlers.click();
+    assert.equal($("hintCount").textContent,initial+" / 10");
+    assert.equal($("attemptCount").textContent,attempts+" / "+attempts);
+    const costBeforeReveal=[];
+    for(let i=initial;i<10;i++){
+      const cost=Number($("revealCost").textContent.replace(/[^0-9]/g,""));
+      assert.ok(cost>=150&&cost<=500,"Expected a priced clue "+(i+1));
+      costBeforeReveal.push(cost);
+      $("revealBtn").handlers.click();
+      assert.equal($("hintCount").textContent,(i+1)+" / 10");
+      assert.equal($("attemptCount").textContent,attempts+" / "+attempts,
+        "Revealing clues must not use guesses");
+    }
+    assert.equal($("revealBtn").disabled,true);
+    assert.equal(clueTexts(g).length,10);
+    const newFacts=clueTexts(g).slice(7);
+    assert.equal(newFacts.length,3);
+    assert.equal(new Set(newFacts).size,3,"New clues should not repeat each other");
+    assert.ok(!newFacts.some(x=>/Closer to|Distance clue/i.test(x)));
+    g.select("Lisboa");$("guessBtn").handlers.click();
+    assert.equal($("reportEvidenceList").children.length,10);
+    assert.equal($("reportHints").textContent,String(10-initial));
+    assert.equal($("reportScore").textContent,
+      new Intl.NumberFormat("en-US").format(5000-costBeforeReveal.reduce((a,b)=>a+b,0))+" / 5,000");
+  }
+});
+
+test("reloading a seven-clue saved daily case preserves its first seven and unlocks three more",()=>{
+  const date=new Date().toISOString().slice(0,10);
+  const world=boot().window,index=normalIndexForDay(date,world);
+  const dayKey="geodetective-daily-v3-"+date+"-normal";
+  const storage=new Map([[dayKey,JSON.stringify({
+    mode:"daily",index,difficulty:"normal",date,serial:1,guesses:[],
+    revealed:7,penalty:1100,paidHints:5,sectorMapPenalty:0,sectorReveals:[],
+    finished:false,won:false,score:0
+  })]]);
+  const g=boot({storage}),$=g.get;
+  assert.equal($("hintCount").textContent,"7 / 10");
+  assert.equal($("attemptCount").textContent,"6 / 6");
+  assert.equal(clueTexts(g).length,10);
+  const previouslyVisible=clueTexts(g).slice(0,7);
+  for(let i=0;i<3;i++)$("revealBtn").handlers.click();
+  assert.equal($("hintCount").textContent,"10 / 10");
+  assert.deepEqual(clueTexts(g).slice(0,7),previouslyVisible);
+  const saved=JSON.parse(storage.get(dayKey));
+  assert.equal(saved.revealed,10);
+  assert.equal(saved.paidHints,8);
+  assert.equal(saved.guesses.length,0);
+  const reopened=boot({storage});
+  assert.equal(reopened.get("hintCount").textContent,"10 / 10");
+  assert.equal(reopened.get("attemptCount").textContent,"6 / 6");
+});
+
+test("ten clue types are unique and complete across representative cities and both difficulties",()=>{
+  const world=boot().window,p=world.GEODETECTIVE_PLACES;
+  const national=["Currency:","Language family:","One flag color:",
+    "No access to the sea.","Has access to the sea.","Population (",
+    "GDP per capita (","Country / territory area:"];
+  for(const level of ["normal","hard"]){
+    for(let i=0;i<p.length;i+=17){
+      const g=boot({randomValue:(i+.25)/p.length});
+      g.difficulty(level);g.get("freeBtn").handlers.click();
+      const all=revealAll(g);
+      assert.equal(all.length,10,p[i][0]);
+      assert.equal(new Set(all).size,10,"Duplicate evidence text for "+p[i][0]);
+      const factCount=all.filter(x=>national.some(prefix=>x.startsWith(prefix))).length;
+      assert.ok(factCount>=4&&factCount<=5,p[i][0]+" should have four or five sourced country facts");
+      assert.equal(all[1].startsWith("Continent:"),true,p[i][0]);
+      assert.ok(!all.some(x=>/Closer to|Distance clue/i.test(x)));
+      if(level==="hard"){
+        assert.ok(all.some(x=>x.startsWith("UTM zone:")),p[i][0]);
+        assert.ok(all.some(x=>x.startsWith("UTM latitude band:")),p[i][0]);
+      }else{
+        assert.ok(all.some(x=>x.startsWith("Longitude sector:")),p[i][0]);
+        assert.ok(all.some(x=>x.startsWith("Latitude sector:")||
+          x.startsWith("Associated landmark:")),p[i][0]);
+      }
+    }
+  }
+});
+
+test("Normal and Hard have ten translated clues with unchanged guess limits",()=>{
   const g=boot(),$=g.get;
   assert.doesNotMatch(files["index.html"],/value="easy"/);
   assert.equal($("attemptCount").textContent,"6 / 6");
-  assert.equal($("hintCount").textContent,"2 / 7");
+  assert.equal($("hintCount").textContent,"2 / 10");
   assert.equal(clueTexts(g).length,7);
   assert.equal(g.document.documentElement.lang,"en");
   g.difficulty("hard");
   assert.equal($("attemptCount").textContent,"4 / 4");
-  assert.equal($("hintCount").textContent,"1 / 7");
-  for(let i=0;i<6;i++)$("revealBtn").handlers.click();
-  assert.equal($("hintCount").textContent,"7 / 7");
+  assert.equal($("hintCount").textContent,"1 / 10");
+  for(let i=0;i<9;i++)$("revealBtn").handlers.click();
+  assert.equal($("hintCount").textContent,"10 / 10");
   assert.ok(clueTexts(g).every(x=>x.length));
   assert.doesNotMatch(clueTexts(g).join(" "),/Country \/ territory:/);
   g.difficulty("normal");
@@ -764,7 +850,7 @@ test("final dossier records all guesses, fact, continent, score and coordinate",
   assert.equal($("reportScore").textContent,"5,000 / 5,000");
   assert.ok($("reportFact").textContent.length>30);
   assert.match($("reportCoordinates").textContent,/64\.1466/);
-  assert.equal($("reportEvidenceList").children.length,7);
+  assert.equal($("reportEvidenceList").children.length,10);
   assert.equal($("reportTimeline").children.length,1);
   assert.equal($("reportBest").textContent,"0 km");
   assert.ok(g.mapState.fits.at(-1).options.maxZoom>=6);
@@ -951,7 +1037,7 @@ test("longitude stays accurate but moves to different evidence positions",()=>{
     g.get("freeBtn").handlers.click();
     const clues=revealAll(g);
     const idx=clues.findIndex(x=>x.startsWith("Longitude sector:"));
-    assert.ok(idx>=2&&idx<7,name);
+    assert.ok(idx>=2&&idx<10,name);
     assert.ok(clues[idx].includes(want),name);
     seen.add(idx);
     assert.doesNotMatch(clues.join(" "),/Closer to |Distance clue:/);
@@ -980,7 +1066,7 @@ test("Hard mode still uses UTM zone and latitude bands without city giveaways",(
     const clues=revealAll(g);
     assert.ok(clues.includes("UTM zone: "+zone),name);
     assert.ok(clues.includes("UTM latitude band: "+band),name);
-    assert.equal(clues.length,7);
+    assert.equal(clues.length,10);
     assert.doesNotMatch(clues.join(" "),/Closer to |Associated landmark:/);
   }
 });
@@ -1033,7 +1119,7 @@ test("paid longitude sector remains available regardless of shuffled evidence or
     $("revealBtn").handlers.click();
   }
   const {index:slot,button}=unlockClue(g,/^Longitude sector:/);
-  assert.ok(slot>=2&&slot<=6&&button&&!button.disabled);
+  assert.ok(slot>=2&&slot<=9&&button&&!button.disabled);
   const revealed=Number($("hintCount").textContent.split("/")[0]);
   button.handlers.click();
   const geo=g.mapState.sources.get("case-sector-longitude").data.geometry;
