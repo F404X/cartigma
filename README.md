@@ -7,7 +7,7 @@ A browser-based geographic detective game. Read the evidence, place pins on a wo
 ## Game rules
 
 - **Daily case:** one shared location for each difficulty on each UTC date. The daily progress and case ID are saved locally.
-- **Free play:** new random investigations without an account.
+- **Free play:** new random investigations without an account. Normal mode favors capitals and widely recognizable destinations through a bounded preference system; Hard mode can choose from all 500 cities.
 - **Normal:** 6 guesses, 2 starting clues, distance and a **localized full cardinal direction with matching arrow** after an incorrect guess (for example, *Nordeste ↗* in Portuguese).
 - **Hard:** 4 guesses, 1 starting clue, **only the distance** after an incorrect guess. Direction remains hidden even in the final case report.
 - Win when a guess falls within **100 km straight-line distance** of the city's approximate coordinates.
@@ -26,7 +26,7 @@ When an investigation ends, an interactive detective dossier is displayed with:
 - Case ID, outcome, city, country or territory, and continent.
 - Approximate target coordinates, mode, difficulty, guesses used, extra hints and score.
 - The **closest** attempt, all guess distances, and the final evidence list.
-- A location-specific **did-you-know** fact for every city, curated in English and Portuguese; in other languages, a localized note identifying an important landmark is used.
+- The original 74 cities retain curated English/Portuguese trivia. The 426 supplemental cities have factual, source-derived bilingual location notes (administrative region and approximate latitude), rather than invented landmarks; other languages use localized fallback information.
 - Buttons to share the result, examine the final map and begin a new case.
 
 The map automatically frames the **closest guess and the actual city**, with zoom caps adjusted to their separation, viewport padding and a line connecting both. The map also handles points that straddle the international date line. The case file opens as a **non-modal side panel on the right**, keeping the map visible (on phones it becomes a bottom panel).
@@ -68,13 +68,13 @@ Open http://localhost:8000. The tests also run automatically on pushes and pull 
 | `mobile.css` | Square map and readable scrolling investigation panel for smartphones |
 | `themes.css` | Semantic dark/white palettes and contrast-safe appearance overrides |
 | `theme.js` | Localized appearance toggle, persistence, and map theme notification |
-| `places.js` | 74 cities with approximate locations |
+| `places.js` | 500 cities with approximate locations |
 | `references.js` | Curated named regional reference coordinates used for distance clues |
 | `map-bootstrap.js` | Loads the vector engine from redundant CDNs and selects fallback when needed |
 | `map-fallback.js` | Loads Leaflet and adapts OpenStreetMap map interactions without WebGL |
 | `compass-i18n.js` | Cardinal directions, arrow labels, rose abbreviations and map selector labels in 19 languages |
 | `language-picker.js` | Searchable native-language list with national flags and keyboard support |
-| `facts.js` | 74 English and Portuguese location facts |
+| `facts.js` | 500 English and Portuguese location notes |
 | `i18n.js` | Main user interface translations |
 | `clues-i18n.js` | Geographic clue vocabulary and continent translations |
 | `report-i18n.js` | Case report and updated game-rule translations |
@@ -85,6 +85,8 @@ The [GitHub Pages deployment workflow](.github/workflows/pages.yml) publishes th
 
 ## Data accuracy
 
+The first 74 manually curated localities remain in their original order. A separate, static 426-city supplement was selected from the public-domain [Natural Earth 1:50m populated places](https://www.naturalearthdata.com/) dataset with additional Turkish destinations. The two European and Asian parts of Türkiye are separated by the Bosporus, Sea of Marmara and Dardanelles; Natural Earth's East Thrace polygon is assigned to Europe. Istanbul, on both sides of the straits, has a transcontinental clue. The Normal case selection heavily favors national capitals and major world cities; Hard can use the full catalogue. The additional notes describe geography rather than bespoke historical trivia.
+ 
 The city center coordinates are approximate. Distances use the haversine formula, which describes straight-line distance on a sphere, **not** road distance. Physical landscape labels are simplified. Geographic comparison references draw from the city catalogue and a separately validated local reference dataset. The region-specific clue radius depends on the available locations in the catalog; this is a game-design heuristic, not an official geographic boundary. Location facts are educational descriptions, not live measurements. The vector map uses WebGL, while the fallback can work without it; both require internet access to download tiles. Not every map feature has names translated into all 19 languages.
 
 ### Map outline data

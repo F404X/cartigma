@@ -177,5 +177,14 @@
     if(!continentPurchasedText[language])throw Error("Missing continent outline translation: "+language);
     localeData[language].templates.continentMapPurchased=continentPurchasedText[language];
   }
+  // Supplemental cities use verified coordinates and administrative divisions,
+  // not a made-up landmark or inferred physical terrain.
+  const expandedCatalogueLabels={"en":"Urban landscape|Administrative region: {value}","pt":"Paisagem urbana|Região administrativa: {value}","es":"Paisaje urbano|Región administrativa: {value}","zh":"城市景观|行政区域：{value}","ja":"都市景観|行政地域：{value}","ru":"Городская местность|Административный регион: {value}","fr":"Paysage urbain|Région administrative : {value}","de":"Stadtlandschaft|Verwaltungsregion: {value}","it":"Paesaggio urbano|Regione amministrativa: {value}","nl":"Stedelijk gebied|Bestuurlijke regio: {value}","pl":"Krajobraz miejski|Region administracyjny: {value}","sv":"Stadsmiljö|Administrativ region: {value}","tr":"Kentsel alan|İdari bölge: {value}","ar":"منطقة حضرية|المنطقة الإدارية: {value}","he":"אזור עירוני|אזור מנהלי: {value}","ko":"도시 지역|행정 구역: {value}","th":"เขตเมือง|เขตปกครอง: {value}","vi":"Khu vực đô thị|Khu vực hành chính: {value}","id":"Kawasan perkotaan|Wilayah administratif: {value}"};
+  for(const code of Object.keys(localeData)){
+    const parts=expandedCatalogueLabels[code]?.split("|");
+    if(!parts||parts.length!==2)throw Error("Missing expanded catalogue labels: "+code);
+    localeData[code].features.urban=parts[0];
+    localeData[code].templates.adminRegion=parts[1];
+  }
   window.GeoCluesI18n = localeData;
 })();

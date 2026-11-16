@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {runInNewContext} from "node:vm";
 
-const names=["places.js","continent-borders.js","references.js","i18n.js","map-filters-i18n.js","clues-i18n.js","report-i18n.js","facts.js","compass-i18n.js","app.js","index.html","styles.css","map-bootstrap.js"];
+const names=["places.js","continent-borders.js","references.js","i18n.js","map-filters-i18n.js","clues-i18n.js","report-i18n.js","facts.js","cities-extended.js","compass-i18n.js","app.js","index.html","styles.css","map-bootstrap.js"];
 const files=Object.fromEntries(names.map(n=>[n,readFileSync(new URL("../"+n,import.meta.url),"utf8")]));
 
 class Element {
@@ -117,6 +117,13 @@ function boot({storage=new Map(),map=false,randomValue=0,mobile=false,clock=Date
   const language=value=>get("langSelect").handlers.change({target:{value}});
   return {get,window,document,storage,select,difficulty,language,mapState,mobileCase,perf};
 }
+function normalIndexForDay(date,window){
+  const places=window.GEODETECTIVE_PLACES,extra=window.GeoExtendedPlaceMetadata;
+  const preferred=places.map((_,i)=>i).filter(i=>i<74||
+    Boolean(extra[i-74]?.capital)||Number(extra[i-74]?.populationRank)<=2);
+  const h=hash("GEODETECTIVE-v3|"+date+"|normal");
+  return h%10!==0&&preferred.length?preferred[h%preferred.length]:h%places.length;
+}
 function clueTexts(g){
   return g.get("clueList").children.map(row=>row.children[1].children[1].textContent);
 }
@@ -126,8 +133,9 @@ function makeWrong(g,tries,name){
 
 test("city catalogue, trivia and report translations remain aligned",()=>{
   const g=boot();
-  assert.equal(g.window.GEODETECTIVE_PLACES.length,74);
-  assert.equal(g.window.GEODETECTIVE_FACTS.length,74);
+  assert.equal(g.window.GEODETECTIVE_PLACES.length,500);
+  assert.equal(g.window.GEODETECTIVE_FACTS.length,500);
+  assert.equal(g.window.GeoExtendedPlaceMetadata.length,426);
   for(const facts of g.window.GEODETECTIVE_FACTS){
     assert.equal(facts.length,2);
     assert.ok(facts[0].length>22);
@@ -140,6 +148,121 @@ test("city catalogue, trivia and report translations remain aligned",()=>{
     assert.ok(g.window.GeoReportI18n[lang].reportArchive);
     assert.ok(g.window.GeoCluesI18n[lang].continents.oceania);
     assert.doesNotMatch(g.window.GeoCluesI18n[lang].continents.oceania,/^\d+$/);
+  }
+});
+
+
+test("500 locations preserve the original 74 and all aligned catalog metadata",()=>{
+  const g=boot(),places=g.window.GEODETECTIVE_PLACES;
+  const extras=g.window.GeoExtendedPlaceMetadata;
+  assert.equal(places.length,500);
+  assert.equal(extras.length,426);
+  const originalKeys=files["places.js"].split("\n").filter(line=>line.startsWith("[")).length;
+  assert.equal(originalKeys,74);
+  assert.equal(g.window.GEODETECTIVE_FACTS.length,500);
+  const unique=new Set();
+  for(let i=0;i<places.length;i++){
+    const place=places[i];
+    assert.equal(place.length,7,"All city entries need seven fields: "+i);
+    assert.ok(place[0]&&place[1]&&place[2],i+" needs meaningful locality metadata");
+    assert.ok(Number.isFinite(place[3])&&Math.abs(place[3])<=90);
+    assert.ok(Number.isFinite(place[4])&&Math.abs(place[4])<=180);
+    assert.ok(place[5]&&place[6]);
+    assert.ok(g.window.GEODETECTIVE_FACTS[i].every(x=>x.length>22));
+    if(i>=74){
+      const meta=extras[i-74];
+      assert.match(meta.countryCode,/^[A-Z]{2}$/);
+      assert.ok(["europe","asia","africa","oceania","northAmerica","southAmerica"].includes(meta.continent));
+      const id=meta.countryCode+":"+place[0].toLowerCase();
+      assert.ok(!unique.has(id),"Duplicate supplemental city "+id);
+      unique.add(id);
+    }
+  }
+  assert.equal(g.get("placeCount").textContent,"500");
+  assert.equal(g.window.GeoCluesI18n.pt.features.urban,"Paisagem urbana");
+  assert.ok(g.window.GeoCluesI18n.en.templates.adminRegion.includes("{value}"));
+});
+
+test("Eastern Thrace lies in Europe, Anatolia in Asia, and Istanbul is transcontinental",()=>{
+  const g=boot(),p=g.window.GEODETECTIVE_PLACES,borders=g.window.GeoContinentBorders;
+  function inRing(x,y,ring){
+    let hit=false;
+    for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+      const a=ring[i],b=ring[j];
+      if((a[1]>y)!==(b[1]>y)&&x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0])hit=!hit;
+    }
+    return hit;
+  }
+  function inside(x,y,key){
+    return borders[key].geometry.coordinates.some(poly=>
+      inRing(x,y,poly[0])&&!poly.slice(1).some(hole=>inRing(x,y,hole)));
+  }
+  assert.equal(inside(26.5557,41.6771,"europe"),true,"Edirne is in Europe");
+  assert.equal(inside(26.5557,41.6771,"asia"),false,"Edirne must no longer be Asian");
+  assert.equal(inside(28.85,41.06,"europe"),true,"Western Istanbul lies in Europe");
+  assert.equal(inside(29.2,41.06,"asia"),true,"Eastern Istanbul lies in Asia");
+  assert.equal(inside(32.8624,39.9292,"asia"),true,"Ankara lies in Asia");
+  for(const [city,region] of [["Edirne","europe"],["Tekirdağ","europe"],
+    ["Ankara","asia"],["İzmir","asia"],["Bursa","asia"]]){
+    const i=p.findIndex(x=>x[0]===city);
+    assert.ok(i>=0,city+" missing");
+    assert.equal(g.window.GeoExtendedPlaceMetadata[i-74]?.continent,region,city);
+  }
+  const ist=p.findIndex(x=>x[0]==="Istambul");
+  assert.equal(ist,12);
+  const forced=boot({randomValue:(ist+.25)/p.length});
+  forced.get("freeBtn").handlers.click();
+  assert.equal(clueTexts(forced)[1],"Continent: Europe / Asia");
+  forced.language("pt");
+  assert.equal(clueTexts(forced)[1],"Continente: Europa / Ásia");
+});
+
+test("Normal selection favors capitals and major cities; Hard retains the full catalogue",()=>{
+  const g=boot(),w=g.window,places=w.GEODETECTIVE_PLACES;
+  const capitalCities=["Ankara","Moscow","Madrid","Berlin","Manila"];
+  for(const name of capitalCities){
+    const i=places.findIndex(x=>x[0]===name);
+    assert.ok(i>=74,"Missing additional national capital "+name);
+    assert.equal(w.GeoExtendedPlaceMetadata[i-74].capital,true,name);
+  }
+  let inPriority=0;
+  const normalPriority=new Set(places.map((_,i)=>i).filter(i=>i<74||
+    w.GeoExtendedPlaceMetadata[i-74]?.capital||
+    Number(w.GeoExtendedPlaceMetadata[i-74]?.populationRank)<=2));
+  for(let i=0;i<100;i++){
+    const date=new Date(Date.UTC(2027,0,i+1)).toISOString().slice(0,10);
+    if(normalPriority.has(normalIndexForDay(date,w)))inPriority++;
+  }
+  assert.ok(inPriority>=90,"Most Normal daily locations should be major or capital cities");
+  assert.ok(normalPriority.size<places.length,"Hard mode must retain less-known cities");
+  const lesser=places.findIndex((_,i)=>i>=74&&!normalPriority.has(i));
+  assert.ok(lesser>=74);
+  const forced=boot({randomValue:(lesser+.25)/places.length});
+  forced.difficulty("hard");
+  forced.get("freeBtn").handlers.click();
+  for(let n=0;n<6;n++)forced.get("revealBtn").handlers.click();
+  assert.equal(clueTexts(forced).length,6);
+  assert.match(clueTexts(forced)[3],/^UTM zone: \d+$/);
+  assert.match(clueTexts(forced)[5],/^UTM latitude band: [A-Z]$/);
+});
+
+test("new locations have playable region clues and never invent landmark names",()=>{
+  const original=boot().window.GEODETECTIVE_PLACES;
+  for(const city of ["Berlin","Moscow","Manila","Ankara","İzmir","Edirne",
+    "Los Angeles","Abidjan","Canberra"]){
+    const i=original.findIndex(p=>p[0]===city);
+    assert.ok(i>=74,city);
+    const g=boot({randomValue:(i+.25)/original.length}),$=g.get;
+    $("freeBtn").handlers.click();
+    for(let k=0;k<6;k++)$("revealBtn").handlers.click();
+    const clues=clueTexts(g);
+    assert.equal(clues.length,6);
+    assert.ok(clues[1].includes("Continent"),city);
+    assert.match(clues[3],/Longitude sector:/);
+    assert.match(clues[4],/Closer to /);
+    assert.match(clues[5],/Latitude sector:/);
+    if(g.window.GeoExtendedPlaceMetadata[i-74].capital)
+      assert.match(clues[2],/National capital: Yes/);
   }
 });
 
@@ -219,7 +342,7 @@ test("Normal mode shows direction and switches language without losing the dossi
   const g=boot(),$=g.get;
   g.select("London");$("guessBtn").handlers.click();
   const day=new Date().toISOString().slice(0,10);
-  const index=hash("GEODETECTIVE-v3|"+day+"|normal")%g.window.GEODETECTIVE_PLACES.length;
+  const index=normalIndexForDay(day,g.window);
   if(g.window.GEODETECTIVE_PLACES[index][0]!=="Londres")
     assert.match($("feedback").textContent,/ · (?:North|South|East|West)[a-z]* [↑↗→↘↓↙←↖]/);
   for(const code of Object.keys(g.window.GeoI18n.PACKS)){
@@ -292,8 +415,8 @@ const distanceKm=(a,b)=>{
 };
 test("all 74 cities have at least two named reference locations within 1,000 km",()=>{
   const g=boot(),p=g.window.GEODETECTIVE_PLACES,refs=g.window.GEODETECTIVE_NEARBY_REFERENCES;
-  assert.equal(p.length,74);
-  for(let i=0;i<p.length;i++){
+  assert.equal(p.length,500);
+  for(let i=0;i<74;i++){
     const origin=[p[i][3],p[i][4]];
     const catalog=p.filter((q,j)=>j!==i&&distanceKm(origin,[q[3],q[4]])<=1000
       &&distanceKm(origin,[q[3],q[4]])>=10).length;
@@ -645,7 +768,8 @@ test("hemisphere purchase survives daily reloading and map engine switching",asy
   const places=boot().window.GEODETECTIVE_PLACES;
   const day=Array.from({length:120},(_,i)=>new Date(Date.UTC(2027,0,i+1)).toISOString().slice(0,10))
     .find(d=>{
-      const index=hash("GEODETECTIVE-v3|"+d+"|normal")%places.length;
+      const index=normalIndexForDay(d,{GEODETECTIVE_PLACES:places,
+        GeoExtendedPlaceMetadata:boot().window.GeoExtendedPlaceMetadata});
       return ![7,8,10,35].includes(index)&&hash("opening:"+places[index][0])%3===2;
     });
   assert.ok(day);

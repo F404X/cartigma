@@ -2,6 +2,9 @@
 (() => {
   "use strict";
   const PLACES = window.GEODETECTIVE_PLACES || [];
+  // Indices 0–73 retain their curated coordinates, facts and saved-case identity.
+  const BASE_CITIES=74, EXTENDED=window.GeoExtendedPlaceMetadata || [];
+  const PT_EXTRA_NAMES=window.GeoExtendedCityPortugueseNames || {};
   const TRANSLATIONS = window.GeoI18n?.PACKS || {};
   const CLUE_I18N = window.GeoCluesI18n || {};
   const FILTER_TRANSLATIONS = window.GeoMapFilterLabels || {};
@@ -14,8 +17,8 @@
   const DIFFICULTIES = {normal:{attempts:6,initial:2},hard:{attempts:4,initial:1}};
   const SERIAL_PREFIX = "geodetective-case-counter-";
   const WIN_RADIUS = 100, HINT_COST = 300, MAP_OVERLAY_COSTS = Object.freeze({longitude:1200,latitude:1200,hemisphere:600,continent:600}), DAILY_KEY = "geodetective-daily-v3-";
-  const COUNTRY_CODES = "IS NO NO NO FI SE DK GB FR PT IT GR TR MA EG SN NG KE ET ZA MG AE JO IL IN IN IN NP BD TH SG ID ID JP JP KR CN CN CN TW MN KZ AU AU AU AU NZ NZ FJ PF CA US US US US MX MX CU GT CO EC PE PE BO BR BR BR BR BR BR AR CL AR CL".split(" ");
-  const FEATURES = "volcanic fjord polar fjord coast islands coast river river estuary river mountains strait desert desert peninsula delta plateau plateau peninsula plateau desert plateau mountains coast plain delta mountains delta delta islands delta islands coast mountains river plain delta bay mountains plateau mountains harbor coast coast islands volcanic harbor islands volcanic coast estuary bay mountains islands plateau plateau coast volcanic plateau mountains desert mountains plateau plateau plateau forest bay plateau bay estuary mountains islands strait".split(" ");
+  const COUNTRY_CODES = "IS NO NO NO FI SE DK GB FR PT IT GR TR MA EG SN NG KE ET ZA MG AE JO IL IN IN IN NP BD TH SG ID ID JP JP KR CN CN CN TW MN KZ AU AU AU AU NZ NZ FJ PF CA US US US US MX MX CU GT CO EC PE PE BO BR BR BR BR BR BR AR CL AR CL".split(" ").concat(EXTENDED.map(item=>item.countryCode));
+  const FEATURES = "volcanic fjord polar fjord coast islands coast river river estuary river mountains strait desert desert peninsula delta plateau plateau peninsula plateau desert plateau mountains coast plain delta mountains delta delta islands delta islands coast mountains river plain delta bay mountains plateau mountains harbor coast coast islands volcanic harbor islands volcanic coast estuary bay mountains islands plateau plateau coast volcanic plateau mountains desert mountains plateau plateau plateau forest bay plateau bay estuary mountains islands strait".split(" ").concat(EXTENDED.map(()=>"urban"));
   const LANDMARKS = [
     "Hallgrímskirkja","Arctic Cathedral","Svalbard Global Seed Vault","Vigeland Sculpture Park","Suomenlinna","Gamla Stan","Nyhavn","Tower Bridge",
     "Eiffel Tower","Belém Tower","Colosseum","Acropolis","Hagia Sophia","Jemaa el-Fnaa","Pyramids of Giza","Gorée Island",
@@ -29,8 +32,10 @@
     "Monserrate","Mitad del Mundo","Plaza Mayor","Sacsayhuamán","Mi Teleférico","National Congress","Art Deco architecture",
     "Meeting of the Waters","Sugarloaf Mountain","Paulista Avenue","Pelourinho","Casa Rosada","Cerro San Cristóbal",
     "Beagle Channel","Strait of Magellan"
-  ];
+  ].concat(EXTENDED.map(item=>item.landmark));
   const CAPITALS = new Set("Reykjavík|Oslo|Helsinque|Estocolmo|Copenhague|Londres|Paris|Lisboa|Roma|Atenas|Cairo|Dacar|Nairóbi|Adis Abeba|Cidade do Cabo|Antananarivo|Amã|Nova Délhi|Catmandu|Daca|Bangcoc|Singapura|Tóquio|Seul|Pequim|Taipé|Ulan Bator|Wellington|Suva|Cidade do México|Havana|Cidade da Guatemala|Bogotá|Quito|Lima|Brasília|Buenos Aires|Santiago".split("|"));
+  for(let i=0;i<EXTENDED.length;i++)
+    if(EXTENDED[i].capital)CAPITALS.add(PLACES[BASE_CITIES+i][0]);
   const EN_CITY = {
     "Estocolmo":"Stockholm","Copenhague":"Copenhagen","Londres":"London","Lisboa":"Lisbon",
     "Roma":"Rome","Atenas":"Athens","Istambul":"Istanbul","Cidade do Cabo":"Cape Town",
@@ -47,7 +52,8 @@
   const norm = s => String(s).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
   // Index immutable search terms once instead of normalizing 74 cities per keystroke.
   const LOCAL_SEARCH_INDEX = PLACES.map((place,index)=>({
-    place,index,terms:norm(place[0]+" "+(EN_CITY[place[0]]||"")+" "+place[1])
+    place,index,terms:norm(place[0]+" "+(EN_CITY[place[0]]||"")+" "+
+      (PT_EXTRA_NAMES[place[0]]||"")+" "+place[1])
   }));
   const GEOCODER_LANGUAGES=new Set(["en","pt","es","fr","de","it","ru","zh","ja","nl","pl","tr"]);
   const rad = n => n*Math.PI/180;
@@ -105,9 +111,12 @@
       return formatter.of(code);
     }catch{return code}
   }
-  function cityName(p) {return lang==="pt"?p[0]:(EN_CITY[p[0]]||p[0]);}
+  function cityName(p) {
+    return lang==="pt"?(PT_EXTRA_NAMES[p[0]]||p[0]):(EN_CITY[p[0]]||p[0]);
+  }
   function countryName(index){return displayRegion(COUNTRY_CODES[index])}
   function continentKey(index){
+    if(index>=BASE_CITIES)return EXTENDED[index-BASE_CITIES]?.continent||"asia";
     if(index<=12)return "europe";
     if(index<=20)return "africa";
     if(index<=41)return "asia";
@@ -116,8 +125,10 @@
     return "southAmerica";
   }
   function continentName(index){
+    const names=CLUE_I18N[lang]?.continents||CLUE_I18N.en?.continents||{};
+    if(index===12)return [names.europe||"Europe",names.asia||"Asia"].join(" / ");
     const key=continentKey(index);
-    return CLUE_I18N[lang]?.continents?.[key] || CLUE_I18N.en?.continents?.[key] || key;
+    return names[key]||CLUE_I18N.en?.continents?.[key]||key;
   }
   function updateCompassRose(){
     const pack=COMPASS_I18N[lang]||COMPASS_I18N.en;
@@ -140,7 +151,7 @@
       const template=COMPASS_I18N[lang]?.river||COMPASS_I18N.en?.river||"Along the {name} River";
       return template.replace("{name}",RIVER_NAMES[index]);
     }
-    const key = FEATURES[index] || "plain";
+    const key = FEATURES[index] || "urban";
     return CLUE_I18N[lang]?.features?.[key] || CLUE_I18N.en?.features?.[key] || key;
   }
   function latitudeZone(latitude) {
@@ -195,6 +206,19 @@
       const key=norm(item.name);
       if(!unique.has(key)||unique.get(key).km>item.km)unique.set(key,item);
     }
+    // Very isolated additions may have no second catalog city nearby.
+    // Expand only in that case: the comparison stays geographically true.
+    if(unique.size<2){
+      const extra=PLACES.map((place,i)=>({
+        name:cityName(place),country:COUNTRY_CODES[i],
+        km:i===index?0:dist(origin,[place[3],place[4]]),
+        regional:continentKey(i)===region
+      })).filter(item=>item.km>=10).sort((a,b)=>a.km-b.km);
+      for(const candidate of extra){
+        if(unique.size>=2)break;
+        if(!unique.has(norm(candidate.name)))unique.set(norm(candidate.name),candidate);
+      }
+    }
     return [...unique.values()].sort((a,b)=>a.km-b.km);
   }
   // Normal mode gives a broad geographic sector; Hard mode uses surveyor-style UTM notation.
@@ -216,6 +240,13 @@
   }
   function landmarkClue(index,level){
     const place=cityAt(index),name=LANDMARKS[index];
+    // Supplemental cities have reliable coordinates but no curated landmark:
+    // offer a reproducible latitude sector, never an invented attraction.
+    if(index>=BASE_CITIES){
+      if(level==="hard")return {key:"utmBand",band:utmLatitudeBand(place[3])};
+      const from=Math.floor(place[3]/15)*15;
+      return {key:"latitude",from,to:from+15};
+    }
     // Check the catalog name AND its English alias (e.g. Tóquio/Tokyo and Taipé/Taipei).
     const revealsCity=[place[0],EN_CITY[place[0]]]
       .filter(Boolean).some(candidate=>norm(name).includes(norm(candidate)));
@@ -251,8 +282,12 @@
     // It must never appear in a later evidence slot after the continent.
     const choice=hash("opening:"+p[0])%3;
     const opening=[7,8,10,35].includes(index)?terrain:(choice===2?hemisphere:(choice===0?terrain:zone));
-    const third=reliableCapital&&hash("profile:"+p[0])%3===0?capital:
-      (opening===terrain?zone:terrain);
+    const extra=index>=BASE_CITIES?EXTENDED[index-BASE_CITIES]:null;
+    const safeRegion=extra&&p[2]&&!norm(p[2]).includes(norm(p[0]));
+    const third=extra
+      ?(extra.capital?capital:(safeRegion?{key:"adminRegion",value:p[2]}:capital))
+      :(reliableCapital&&hash("profile:"+p[0])%3===0?capital:
+        (opening===terrain?zone:terrain));
     // Comparison replaces the precise "nearest city" clue, which was too revealing.
     const relationship={
       key:"closer",a:referenceName(nearReference),b:referenceName(farReference)
@@ -270,8 +305,16 @@
   }
   function clueText(clue){return tc(clue.key,clue)}
   function maximum(){return DIFFICULTIES[difficulty].attempts}
+  // Most Normal cases deliberately feature capitals or recognizable cities;
+  // Hard still draws from the complete 500-location catalogue.
+  const NORMAL_FOCUS=PLACES.map((_,index)=>index).filter(index=>
+    index<BASE_CITIES||Boolean(EXTENDED[index-BASE_CITIES]?.capital)||
+    Number(EXTENDED[index-BASE_CITIES]?.populationRank)<=2);
   function dailyIndex(){
-    return hash("GEODETECTIVE-v3|"+today()+"|"+difficulty)%PLACES.length;
+    const seed=hash("GEODETECTIVE-v3|"+today()+"|"+difficulty);
+    if(difficulty==="normal"&&seed%10!==0&&NORMAL_FOCUS.length)
+      return NORMAL_FOCUS[seed%NORMAL_FOCUS.length];
+    return seed%PLACES.length;
   }
   function dailyStorageKey(){return DAILY_KEY+today()+"-"+difficulty}
   function nextCaseNumber(date=today()){
@@ -298,7 +341,13 @@
   function save(){if(game?.mode==="daily")store.set(dailyStorageKey(),game)}
   function chooseFree(){
     const options=PLACES.map((_,i)=>i).filter(i=>i!==freeIndex);
-    freeIndex=options[Math.floor(Math.random()*options.length)];
+    // Bounded rerolls: Normal strongly favors capitals/famous cities,
+    // without banning lesser-known places or biasing the Hard catalogue.
+    for(let attempt=0;attempt<(difficulty==="normal"?4:1);attempt++){
+      const pick=options[Math.floor(Math.random()*options.length)];
+      freeIndex=pick;
+      if(difficulty!=="normal"||NORMAL_FOCUS.includes(pick))break;
+    }
     return freeIndex;
   }
   function startDaily(){
@@ -342,7 +391,7 @@
   }
   // Reuse the clue-category lookup instead of rebuilding it for every row.
   const CLUE_CATEGORY_KEYS=Object.freeze({
-    terrain:"clueTerrain",continent:"clueRegion",zone:"clueClimate",
+    terrain:"clueTerrain",continent:"clueRegion",zone:"clueClimate",adminRegion:"clueRegion",
     hemisphere:"clueRegion",capital:"clueCivic",longitude:"clueRegion",
     latitude:"clueRegion",utmZone:"clueRegion",utmBand:"clueRegion",
     closer:"clueDistance",nearest:"clueDistance",landmark:"clueLandmark"
@@ -622,8 +671,15 @@
     const shape=CONTINENT_BORDERS[continentKey(game.index)];
     if(!shape)return;
     const id="case-continent-outline";
+    // Istanbul spans the Bosporus, so both continental sides are relevant.
+    const geometry=game.index===12
+      ?{type:"MultiPolygon",coordinates:[
+        ...CONTINENT_BORDERS.europe.geometry.coordinates,
+        ...CONTINENT_BORDERS.asia.geometry.coordinates
+      ]}
+      :shape.geometry;
     map.addSource(id,{type:"geojson",data:{
-      type:"Feature",properties:{},geometry:shape.geometry
+      type:"Feature",properties:{},geometry
     }});
     // Only outline: no fill layer. Remains subtle against geographic labels.
     map.addLayer({id,type:"line",source:id,
@@ -1152,7 +1208,9 @@
     });
   }
   function init(){
-    if(!PLACES.length||PLACES.length!==FEATURES.length||PLACES.length!==COUNTRY_CODES.length||PLACES.length!==LANDMARKS.length||PLACES.length!==FACTS.length||Object.keys(NEARBY_REFERENCES).length<45)
+    if(PLACES.length!==500||EXTENDED.length!==426||PLACES.length!==FEATURES.length||
+       PLACES.length!==COUNTRY_CODES.length||PLACES.length!==LANDMARKS.length||
+       PLACES.length!==FACTS.length||Object.keys(NEARBY_REFERENCES).length<45)
       throw new Error("Location catalogue and metadata are out of sync");
     document.documentElement.lang="en";
     $("difficultySelect").value=difficulty;
