@@ -639,8 +639,8 @@ test("a correct fifth guess in Cape Town has no distance or bearing in history o
 });
 
 test("fresh deployments fingerprint both game engine and translated clues",()=>{
-  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-map-filters"'));
-  assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-map-filters"'));
+  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-global-500"'));
+  assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-global-500"'));
   assert.ok(files["map-bootstrap.js"].includes('new URL(import.meta.url).searchParams.get("v")'));
   assert.ok(files["app.js"].includes("function guessMetricText(g)"));
   const deploy=readFileSync(new URL("../.github/workflows/pages.yml",import.meta.url),"utf8");
@@ -880,7 +880,7 @@ test("Equator arrows pop in and out without fade animations",()=>{
   assert.match(files["app.js"],/"text-opacity-transition":\{duration:0,delay:0\}/);
   assert.ok(!g.mapState.layers.has("case-continent-outline"),
     "No unpaid continent guide should appear");
-  assert.ok(files["index.html"].includes('src="continent-borders.js?v=20261116-map-filters"'));
+  assert.ok(files["index.html"].includes('src="continent-borders.js?v=20261116-global-500"'));
 });
 
 test("hemisphere evidence never follows the continent and no generic river-valley clue remains",()=>{
