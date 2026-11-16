@@ -471,6 +471,16 @@ test("the case file displays all country facts including GDP per capita and sour
   assert.ok(files["styles.css"].includes("flex:0 0 82px"));
   assert.equal(Object.keys(boot().window.GeoCountryProfileI18n).length,19);
 });
+test("case file footer aligns two equal actions and full-width follow-up buttons",()=>{
+  const css=files["styles.css"];
+  assert.match(css,/\.report-footer\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.doesNotMatch(css,/\.report-footer\{display:grid;grid-template-columns:1fr 1fr 1\.3fr/);
+  assert.match(css,/\.report-footer #reportMapBtn\{grid-column:1\}/);
+  assert.match(css,/\.report-footer #reportShareBtn\{grid-column:2\}/);
+  assert.match(css,/\.report-footer #reportAlternateBtn:not\(\.hidden\)\{grid-column:1\/-1\}/);
+  assert.match(css,/\.report-footer #reportNextBtn\{grid-column:1\/-1\}/);
+});
+
 test("new case replaces Share on the result card while dossier retains Share and New case",()=>{
   const g=boot(),$=g.get;
   assert.ok(!files["index.html"].includes('id="shareBtn"'));

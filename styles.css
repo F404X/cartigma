@@ -265,7 +265,7 @@ dialog.case-report::backdrop{background:#060807c9;backdrop-filter:blur(2px)}
 .report-log-place{overflow-wrap:anywhere}
 .report-log-row strong{font:600 11px var(--mono);color:#e4cf85;white-space:nowrap}
 .report-evidence-row{grid-template-columns:28px minmax(0,1fr)}
-.report-footer{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:8px;padding:13px 22px;border-top:1px solid var(--border-strong);background:#24271c}
+.report-footer{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:13px 22px;border-top:1px solid var(--border-strong);background:#24271c}
 .report-footer button{min-height:38px;font-size:12px}
 @media(max-width:960px){
   .clue{min-height:43px;padding:7px 7px;grid-template-columns:22px minmax(0,1fr)}
@@ -285,7 +285,7 @@ dialog.case-report::backdrop{background:#060807c9;backdrop-filter:blur(2px)}
   .report-stamp{font-size:10px;letter-spacing:1px;padding:7px;max-width:88px}
   .report-body{padding:12px}
   .report-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
-  .report-footer{padding:9px;gap:5px;grid-template-columns:1fr 1fr}
+  .report-footer{padding:9px;gap:5px;grid-template-columns:repeat(2,minmax(0,1fr))}
   #reportNextBtn{grid-column:1/-1}
   .report-footer button{font-size:10px;min-height:35px}
   .report-fact p{font-size:12px}
@@ -677,6 +677,9 @@ dialog.case-report .report-heading h2{font-size:24px}
 
 /* Case navigation: supplementary daily difficulty stays secondary and full-width.
    The main action explicitly opens Free Play from a completed daily case. */
+/* Two equal first-row actions; optional daily link and the primary action each span both columns. */
+.report-footer #reportMapBtn{grid-column:1}
+.report-footer #reportShareBtn{grid-column:2}
 .report-footer #reportAlternateBtn:not(.hidden){grid-column:1/-1}
 .report-footer #reportNextBtn{grid-column:1/-1}
 .report-footer #reportAlternateBtn.hidden{display:none!important}
