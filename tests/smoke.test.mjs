@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {runInNewContext} from "node:vm";
 
-const names=["places.js","continent-borders.js","references.js","i18n.js","map-filters-i18n.js","clues-i18n.js","report-i18n.js","facts.js","cities-extended.js","city-indicators.js","urban-2025.js","city-clues-i18n.js","country-insights.js","country-clues-i18n.js","country-profile-i18n.js","compass-i18n.js","app.js","index.html","styles.css","map-bootstrap.js","map-fallback.js"];
+const names=["places.js","continent-borders.js","references.js","i18n.js","map-filters-i18n.js","clues-i18n.js","report-i18n.js","facts.js","cities-extended.js","city-indicators.js","urban-2025.js","city-clues-i18n.js","atlas-i18n.js","country-insights.js","country-clues-i18n.js","country-profile-i18n.js","compass-i18n.js","app.js","index.html","styles.css","map-bootstrap.js","map-fallback.js"];
 const files=Object.fromEntries(names.map(n=>[n,readFileSync(new URL("../"+n,import.meta.url),"utf8")]));
 
 class Element {
@@ -22,6 +22,8 @@ class Element {
   get open(){return this._open}
   get outerHTML(){return "<span></span>"}
   addEventListener(name,fn){this.handlers[name]=fn}
+  click(){this.handlers.click?.({target:this})}
+  focus(){this.focused=true}
   setAttribute(k,v){this.attributes[k]=v}
   replaceChildren(...nodes){this.children=nodes}
   append(...nodes){this.children.push(...nodes);for(const node of nodes)node.parentElement=this}
@@ -159,6 +161,154 @@ function makeWrong(g,tries,name){
   for(let i=0;i<tries;i++){g.select(name);g.get("guessBtn").handlers.click()}
 }
 
+test("city archive opens from the header with 500 accessible searchable entries and does not alter the game",()=>{
+  const g=boot({map:true}),$=g.get;
+  const guesses=$("attemptCount").textContent,hints=$("hintCount").textContent;
+  const source=clueTexts(g);
+  const initialStorage=JSON.stringify([...g.storage.entries()]);
+  const fitCount=g.mapState.fits.length,markerCount=g.mapState.markers.length;
+  assert.match(files["index.html"],/id="atlasBtn"/);
+  assert.match(files["index.html"],/id="atlasDialog"/);
+  assert.match(files["index.html"],/class="header-button atlas-trigger"/);
+  $("atlasBtn").handlers.click();
+  assert.equal($("atlasDialog").open,true);
+  assert.equal($("atlasOptions").children.length,500);
+  assert.equal($("atlasCount").textContent,"500 of 500 cities");
+  const labels=$("atlasOptions").children.map(x=>x.children[1].children[0].textContent);
+  assert.equal(new Set(labels).size,500,"All 500 list entries must be distinct");
+  assert.ok(labels.includes("São Paulo")&&labels.includes("Tokyo")&&labels.includes("Reykjavík"));
+  assert.equal($("atlasCityName").textContent,"Reykjavík");
+  assert.equal($("atlasNormalEvidence").children.length,10);
+  assert.equal($("atlasHardEvidence").children.length,10);
+  assert.ok($("atlasCityFacts").children.length>=10);
+  assert.ok($("atlasCountryStats").children.length>=7);
+  assert.ok($("atlasHistory").textContent.length>30);
+  assert.equal($("attemptCount").textContent,guesses);
+  assert.equal($("hintCount").textContent,hints);
+  assert.deepEqual(clueTexts(g),source);
+  assert.equal(JSON.stringify([...g.storage.entries()]),initialStorage);
+  assert.equal(g.mapState.fits.length,fitCount);
+  assert.equal(g.mapState.markers.length,markerCount);
+  $("atlasCloseBtn").handlers.click();
+  assert.equal($("atlasDialog").open,false);
+});
+
+test("archive search handles accents, city aliases, country, region and empty results",()=>{
+  const g=boot(),$=g.get;
+  $("atlasBtn").handlers.click();
+  const search=$("atlasSearch"),options=$("atlasOptions");
+  search.value="sao paulo";search.handlers.input();
+  assert.equal(options.children.length,1);
+  assert.equal(options.children[0].children[1].children[0].textContent,"São Paulo");
+  options.children[0].handlers.click();
+  assert.equal($("atlasCityName").textContent,"São Paulo");
+  assert.equal($("atlasCityCountry").textContent,"Brazil");
+  assert.equal($("atlasFlag").src,"https://flagcdn.com/w160/br.png");
+  assert.equal($("atlasNormalEvidence").children.length,10);
+  assert.equal($("atlasHardEvidence").children.length,10);
+  assert.ok($("atlasCityFacts").children.some(x=>x.children[1]?.textContent.includes("875 km from the capital")));
+  assert.ok($("atlasCityFacts").children.some(x=>x.children[1]?.textContent.includes("18,950,000")));
+  assert.ok($("atlasCountryStats").children.some(x=>x.children[1]?.textContent.includes("BRL")||
+    /Real/.test(x.children[1]?.textContent||"")));
+  assert.ok($("atlasHistory").textContent.length>30);
+  search.value="tokyo";search.handlers.input();
+  assert.ok(options.children.some(x=>x.children[1]?.children[0]?.textContent==="Tokyo"));
+  search.value="Moskva";search.handlers.input();
+  assert.ok(options.children.some(x=>x.children[1]?.children[0]?.textContent==="Moscow"));
+  search.value="nonexistent-city-999";search.handlers.input();
+  assert.equal(options.children.length,1);
+  assert.equal(options.children[0].textContent,"No matching cities");
+  search.value="";search.handlers.input();
+  assert.equal(options.children.length,500);
+  assert.equal($("atlasCityName").textContent,"São Paulo",
+    "Search must not accidentally change the selected dossier");
+  const last=options.children.find(x=>x.dataset.index==="499");
+  assert.ok(last);
+  last.handlers.click();
+  assert.equal($("atlasEntryNo").textContent,"500 / 500");
+  assert.equal($("atlasNormalEvidence").children.length,10);
+  assert.equal($("atlasHardEvidence").children.length,10);
+});
+
+test("city archive keeps its selected entry and properly relocalizes all profile labels",()=>{
+  const g=boot(),$=g.get;
+  $("atlasBtn").handlers.click();
+  $("atlasSearch").value="São Paulo";$("atlasSearch").handlers.input();
+  $("atlasOptions").children[0].handlers.click();
+  g.language("pt");
+  assert.equal($("atlasTitle").textContent,"Arquivo de cidades");
+  assert.equal($("atlasCount").textContent,"1 de 500 cidades");
+  assert.equal($("atlasCityName").textContent,"São Paulo");
+  assert.equal($("atlasCityCountry").textContent,"Brasil");
+  const stats=$("atlasCityFacts").children;
+  assert.ok(stats.some(x=>x.children[0].textContent==="Distância à capital"&&
+    x.children[1].textContent==="≈ 875 km da capital"));
+  assert.ok(stats.some(x=>x.children[0].textContent==="Descrição geográfica (fonte: PT)"));
+  assert.ok(stats.some(x=>x.children[0].textContent==="Nota da localidade (fonte: PT)"));
+  assert.equal($("atlasNormalLabel").textContent,"Evidências Normal (10)");
+  assert.equal($("atlasHardEvidence").children.length,10);
+  assert.ok($("atlasFact").textContent.length>25);
+  assert.ok($("atlasHistory").textContent.length>30);
+  g.language("en");
+  assert.equal($("atlasTitle").textContent,"City archive");
+  assert.equal($("atlasCityName").textContent,"São Paulo");
+  assert.equal($("atlasCount").textContent,"1 of 500 cities");
+  assert.equal($("atlasNormalEvidence").children.length,10);
+  assert.equal($("atlasHardEvidence").children.length,10);
+  const pack=g.window.CartigmaAtlasI18n;
+  assert.equal(Object.keys(pack).length,19);
+  const labelSet=Object.keys(pack.en);
+  for(const [code,labels] of Object.entries(pack)){
+    assert.deepEqual(Object.keys(labels),labelSet,code+" has incomplete archive translations");
+    assert.ok(labels.title&&labels.search&&labels.cityDetails);
+    assert.ok(labels.count.includes("{count}"));
+  }
+});
+
+test("atlas shows only known city statistics and never guesses data for unsupported locations",()=>{
+  const g=boot(),$=g.get;
+  $("atlasBtn").handlers.click();
+  const selectName=name=>{
+    $("atlasSearch").value=name;$("atlasSearch").handlers.input();
+    const target=$("atlasOptions").children.find(x=>x.children[1]?.children[0]?.textContent===name);
+    assert.ok(target,"Missing archive entry "+name);
+    target.handlers.click();
+    return $("atlasCityFacts").children.map(x=>x.children[0].textContent+": "+x.children[1].textContent);
+  };
+  const papeete=selectName("Papeete");
+  assert.ok(!papeete.some(x=>x.startsWith("Urban population:")||
+    x.startsWith("Urban density:")||x.startsWith("Distance to coast:")));
+  assert.ok(papeete.some(x=>x.startsWith("Coordinates:")));
+  assert.ok(papeete.some(x=>x.startsWith("Geographic description")));
+  assert.equal($("atlasNormalEvidence").children.length,10);
+  const mumbai=selectName("Mumbai");
+  assert.ok(mumbai.some(x=>x.includes("20,203,000")&&x.includes("2025")));
+  assert.ok(mumbai.some(x=>x.includes("27,000")&&x.includes("2025")));
+  assert.ok($("atlasCountryStats").children.some(x=>x.children[1].textContent.includes("INR")||
+    x.children[1].textContent.toLowerCase().includes("rupee")));
+  assert.ok($("atlasCityFacts").children.every(x=>x.children[1].textContent!=="undefined"));
+});
+
+test("500 archive selections preserve both current mode and game score",()=>{
+  const g=boot(),$=g.get;
+  g.difficulty("hard");
+  $("atlasBtn").handlers.click();
+  const remaining=$("attemptCount").textContent,clues=$("hintCount").textContent;
+  const saved=JSON.stringify([...g.storage.entries()]);
+  for(const idx of [0,12,35,73,74,125,199,255,349,420,499]){
+    $("atlasSearch").value="";
+    $("atlasSearch").handlers.input();
+    const button=$("atlasOptions").children.find(x=>x.dataset.index===String(idx));
+    assert.ok(button);
+    button.handlers.click();
+    assert.equal($("atlasNormalEvidence").children.length,10);
+    assert.equal($("atlasHardEvidence").children.length,10);
+    assert.equal($("atlasEntryNo").textContent,String(idx+1).padStart(3,"0")+" / 500");
+  }
+  assert.equal($("attemptCount").textContent,remaining);
+  assert.equal($("hintCount").textContent,clues);
+  assert.equal(JSON.stringify([...g.storage.entries()]),saved);
+});
 test("city catalogue, trivia and report translations remain aligned",()=>{
   const g=boot();
   assert.equal(g.window.GEODETECTIVE_PLACES.length,500);

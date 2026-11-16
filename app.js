@@ -12,6 +12,7 @@
   const CITY_INDICATORS = window.CartigmaCityIndicators || [];
   const CITY_URBAN_2025 = window.CartigmaUrban2025 || {};
   const CITY_CLUES_I18N = window.CartigmaCityClueI18n || {};
+  const ATLAS_I18N = window.CartigmaAtlasI18n || {};
   const COUNTRY_FAMILIES_PT = window.GeoCountryLanguageFamiliesPT || {};
   const EXTRA_CLUE_KEYS = new Set(["countryCurrency","countryLanguageFamily","countryFlagColor",
     "countryPopulation","countryGDP","countryArea","countryLandlocked"]);
@@ -487,10 +488,10 @@
     clueCache.set(cacheKey,clues);
     return clues;
   }
-  function clueText(clue){
+  function clueText(clue,referenceIndex=game.index){
     if(clue.key==="countryLandlocked"){
       // Resolve this clue from source geography, not a possibly stale cached value.
-      const authoritative=COUNTRY_INSIGHTS[COUNTRY_CODES[game.index]]?.landlocked;
+      const authoritative=COUNTRY_INSIGHTS[COUNTRY_CODES[referenceIndex]]?.landlocked;
       const value=typeof authoritative==="boolean"?authoritative:clue.landlocked;
       if(typeof value==="boolean")
         return tc(value?"countryLandlockedYes":"countryLandlockedNo");
@@ -601,6 +602,7 @@
     document.querySelectorAll("[data-i18n]").forEach(element=>{element.textContent=t(element.dataset.i18n)});
     $("citySearch").placeholder=t("searchPlaceholder");
     $("helpBtn").setAttribute("aria-label",t("help"));
+    syncAtlasLanguage();
     $("resetViewBtn").title=t("reset");
     $("difficultySelect").value=difficulty;
     if(game)render();
@@ -758,13 +760,16 @@
     return t("reportFactFallback",{landmark:LANDMARKS[index]});
   }
 
-  function renderCountryProfile(info,code,place){
+  function renderCountryProfile(info,code,place,targets={
+    title:"reportCountryStatsTitle",source:"reportCountryStatsSource",
+    list:"reportCountryStats"
+  }){
     const locale=window.GeoCountryProfileI18n?.[lang]||
       window.GeoCountryProfileI18n?.en||{};
-    $("reportCountryStatsTitle").textContent=locale.title||"Country profile";
-    $("reportCountryStatsSource").textContent=locale.source||
+    $(targets.title).textContent=locale.title||"Country profile";
+    $(targets.source).textContent=locale.source||
       "Country metadata and historical World Bank indicators";
-    const list=$("reportCountryStats");list.replaceChildren();
+    const list=$(targets.list);list.replaceChildren();
     const fmt=value=>new Intl.NumberFormat(
       TRANSLATIONS[lang]?.numberLocale||({pt:"pt-BR",en:"en-US"}[lang]||lang)
     ).format(value);
@@ -806,6 +811,208 @@
       cell.append(label,value);list.append(cell);
     }
   }
+  // Public 500-city archive: it only reads the same static catalogue and
+  // translated clue sources as the game. Neither selection nor opening it
+  // changes the active investigation, location marker, score, or saved state.
+  let atlasSelected=0;
+  let atlasButtons=[];
+  const ATLAS_ROWS=PLACES.map((place,index)=>({place,index}));
+  function atlasText(key,vars={}){
+    const template=ATLAS_I18N[lang]?.[key]||ATLAS_I18N.en?.[key]||key;
+    return template.replace(/\{(\w+)\}/g,(_,name)=>String(vars[name]??""));
+  }
+  function atlasFacts(index){
+    const place=cityAt(index),code=COUNTRY_CODES[index],details=COUNTRY_INSIGHTS[code]||{};
+    const list=$("atlasCityFacts");list.replaceChildren();
+    const add=(key,value)=>{
+      if(value===undefined||value===null||value==="")return;
+      const cell=document.createElement("div");
+      const dt=document.createElement("dt"),dd=document.createElement("dd");
+      dt.textContent=atlasText(key);dd.textContent=String(value);
+      cell.append(dt,dd);list.append(cell);
+    };
+    add("region",place[2]);
+    // Keep both descriptive fields recorded with every source city. They are
+    // Portuguese source text even when another interface language is active.
+    if(place[5])add("geoNote",place[5]);
+    if(place[6])add("catalogNote",place[6]);
+    add("coordinates",place[3].toFixed(4)+"°, "+place[4].toFixed(4)+"°");
+    add("continent",continentName(index));
+    // A missing or disputed capital definition should not become a false fact.
+    if(!["Jerusalém","La Paz","Jacarta"].includes(place[0]))
+      add("nationalCapital",tc(CAPITALS.has(place[0])?"yes":"no"));
+    if(index<BASE_CITIES&&FEATURES[index]!=="urban")
+      add("landscape",locationFeature(index));
+    add("climateZone",latitudeZone(place[3]));
+    add("hemisphere",tc(place[3]>=0?"north":"south"));
+    const longitudeStart=Math.floor(place[4]/30)*30;
+    const latitudeStart=Math.floor(place[3]/15)*15;
+    add("longitudeSector",tc("longitude",{from:longitudeStart,to:longitudeStart+30}));
+    add("latitudeSector",tc("latitude",{from:latitudeStart,to:latitudeStart+15}));
+    if(place[3]>=-80&&place[3]<84){
+      add("utmZone",String(utmZone(place[3],place[4])));
+      add("utmBand",utmLatitudeBand(place[3]));
+    }
+    if(index<BASE_CITIES&&LANDMARKS[index])
+      add("landmark",LANDMARKS[index]);
+    for(const clue of extraCityClues(index)){
+      const key={
+        cityCapitalDistance:"capitalDistance",cityCoastDistance:"coastDistance",
+        cityPopulation:"cityPopulation",cityDensity:"cityDensity",cityTimezone:"timezone"
+      }[clue.key];
+      if(key)add(key,clueText(clue,index));
+    }
+    if(!list.children.length){
+      const p=document.createElement("p");p.textContent=atlasText("notAvailable");list.append(p);
+    }
+  }
+  function atlasEvidence(index,level,target){
+    const list=$(target);list.replaceChildren();
+    cluesFor(index,level).forEach((clue,i)=>{
+      const row=document.createElement("li");row.className="report-evidence-row";
+      const count=document.createElement("span");count.textContent=String(i+1).padStart(2,"0");
+      const value=document.createElement("span");value.textContent=clueText(clue,index);
+      row.append(count,value);list.append(row);
+    });
+  }
+  function renderAtlasCity(index){
+    if(!Number.isInteger(index)||index<0||index>=PLACES.length)return;
+    atlasSelected=index;
+    const place=cityAt(index),code=COUNTRY_CODES[index],details=COUNTRY_INSIGHTS[code]||{};
+    $("atlasEntryNo").textContent=String(index+1).padStart(3,"0")+" / 500";
+    $("atlasCityName").textContent=cityName(place);
+    $("atlasCityCountry").textContent=countryName(index);
+    const flag=$("atlasFlag"),fallback=$("atlasFlagFallback");
+    fallback.textContent=details.flag||"";
+    fallback.classList.add("hidden");flag.classList.remove("hidden");
+    flag.alt=countryName(index);
+    flag.onerror=()=>{flag.classList.add("hidden");fallback.classList.remove("hidden")};
+    flag.src=/^[A-Z]{2}$/.test(code)?"https://flagcdn.com/w160/"+code.toLowerCase()+".png":"";
+    atlasFacts(index);
+    $("atlasFact").textContent=factFor(index);
+    $("atlasHistory").textContent=details.history?.[lang==="pt"?"pt":"en"]||
+      details.history?.en||atlasText("notAvailable");
+    $("atlasHistorySource").textContent=COUNTRY_CLUE_I18N[lang]?.countryHistorySource||
+      COUNTRY_CLUE_I18N.en?.countryHistorySource||"";
+    renderCountryProfile(details,code,place,{
+      title:"atlasCountryTitle",source:"atlasCountrySource",list:"atlasCountryStats"
+    });
+    atlasEvidence(index,"normal","atlasNormalEvidence");
+    atlasEvidence(index,"hard","atlasHardEvidence");
+    for(const button of atlasButtons){
+      const active=Number(button.dataset.index)===index;
+      button.classList.toggle("selected",active);
+      button.setAttribute("aria-selected",String(active));
+    }
+  }
+  function renderAtlasOptions(query=""){
+    const text=norm(query),tokens=text.split(/\s+/).filter(Boolean);
+    const matches=ATLAS_ROWS.map(({place,index})=>({
+      place,index,name:cityName(place),country:countryName(index)
+    })).filter(({place,index,name,country})=>{
+      const searchable=norm([place[0],EN_CITY[place[0]]||"",
+        PT_EXTRA_NAMES[place[0]]||"",place[1],place[2],
+        COUNTRY_CODES[index],name,country].join(" "));
+      return tokens.every(term=>searchable.includes(term));
+    }).sort((a,b)=>a.name.localeCompare(b.name,locale())||a.index-b.index);
+    $("atlasCount").textContent=atlasText("count",{count:matches.length});
+    const options=$("atlasOptions");
+    atlasButtons=[];
+    if(!matches.length){
+      const message=document.createElement("div");message.className="atlas-no-results";
+      message.textContent=atlasText("noResults");options.replaceChildren(message);
+      return;
+    }
+    const nodes=matches.map(item=>{
+      const button=document.createElement("button");
+      button.type="button";button.className="atlas-option";
+      button.dataset.index=String(item.index);
+      button.setAttribute("role","option");
+      button.setAttribute("aria-selected",String(atlasSelected===item.index));
+      button.setAttribute("aria-label",item.name+", "+item.country);
+      if(atlasSelected===item.index)button.classList.add("selected");
+      const flag=document.createElement("span");flag.className="atlas-option-flag";
+      flag.textContent=COUNTRY_INSIGHTS[COUNTRY_CODES[item.index]]?.flag||"";
+      flag.setAttribute("aria-hidden","true");
+      const info=document.createElement("span");info.className="atlas-option-info";
+      const title=document.createElement("span");title.className="atlas-option-name";
+      title.textContent=item.name;
+      const country=document.createElement("span");country.className="atlas-option-country";
+      country.textContent=item.country;
+      info.append(title,country);
+      const ordinal=document.createElement("span");ordinal.className="atlas-option-number";
+      ordinal.textContent=String(item.index+1).padStart(3,"0");
+      button.append(flag,info,ordinal);
+      button.addEventListener("click",()=>{
+        renderAtlasCity(item.index);
+        // On phones the dossier scrolls below the compact city picker.
+        if(window.matchMedia?.("(max-width: 760px)")?.matches)
+          $("atlasSheet").scrollTop=0;
+      });
+      button.addEventListener("keydown",event=>{
+        if(["ArrowDown","ArrowUp","Home","End"].includes(event.key)){
+          event.preventDefault();
+          const current=atlasButtons.indexOf(button);
+          const next=event.key==="Home"?0:event.key==="End"?atlasButtons.length-1:
+            (current+(event.key==="ArrowDown"?1:-1)+atlasButtons.length)%atlasButtons.length;
+          atlasButtons[next]?.focus?.();
+        }
+      });
+      return button;
+    });
+    atlasButtons=nodes;
+    options.replaceChildren(...nodes);
+  }
+  function syncAtlasLanguage(){
+    $("atlasTitle").textContent=atlasText("title");
+    $("atlasSubtitle").textContent=atlasText("subtitle");
+    $("atlasSearch").placeholder=atlasText("search");
+    $("atlasSearch").setAttribute("aria-label",atlasText("search"));
+    $("atlasSearchLabel").textContent=atlasText("search");
+    $("atlasOptions").setAttribute("aria-label",atlasText("title"));
+    $("atlasBtn").setAttribute("aria-label",atlasText("title"));
+    $("atlasBtn").title=atlasText("title");
+    $("atlasCloseBtn").setAttribute("aria-label",atlasText("close"));
+    $("atlasCloseBtn").title=atlasText("close");
+    $("atlasCitySectionTitle").textContent=atlasText("cityDetails");
+    $("atlasFactTitle").textContent=atlasText("story");
+    $("atlasHistoryTitle").textContent=atlasText("history");
+    $("atlasNormalLabel").textContent=atlasText("normalEvidence");
+    $("atlasHardLabel").textContent=atlasText("hardEvidence");
+    $("atlasDataNote").textContent=atlasText("availableNote");
+    if($("atlasDialog").open){
+      renderAtlasOptions($("atlasSearch").value);
+      renderAtlasCity(atlasSelected);
+    }
+  }
+  function initAtlas(){
+    const dialog=$("atlasDialog"),search=$("atlasSearch");
+    $("atlasBtn").addEventListener("click",()=>{
+      syncAtlasLanguage();
+      search.value="";
+      renderAtlasOptions("");
+      renderAtlasCity(atlasSelected);
+      dialog.showModal();
+      if(window.matchMedia?.("(max-width: 760px)")?.matches)
+        $("atlasCloseBtn").focus?.();
+      else search.focus?.();
+    });
+    $("atlasCloseBtn").addEventListener("click",()=>dialog.close());
+    dialog.addEventListener("click",event=>{
+      if(event.target===dialog)dialog.close();
+    });
+    dialog.addEventListener("close",()=>{$("atlasBtn").focus?.()});
+    search.addEventListener("input",()=>renderAtlasOptions(search.value));
+    search.addEventListener("keydown",event=>{
+      if(event.key!=="ArrowDown"&&event.key!=="Enter")return;
+      if(atlasButtons.length){
+        event.preventDefault();
+        atlasButtons[0].focus?.();
+        if(event.key==="Enter")atlasButtons[0].click?.();
+      }
+    });
+  }
+
   function renderCaseNavigation(){
     const daily=game?.mode==="daily";
     const newLabel=t(daily?"newFreeCase":"newCase");
@@ -1673,6 +1880,7 @@
       setDifficulty(other);
     });
     $("reportShareBtn").addEventListener("click",share);
+    initAtlas();
     $("helpBtn").addEventListener("click",()=>$("helpDialog").showModal());
     $("closeHelpBtn").addEventListener("click",()=>$("helpDialog").close());
     $("startHelpBtn").addEventListener("click",()=>$("helpDialog").close());

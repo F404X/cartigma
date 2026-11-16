@@ -182,3 +182,29 @@ and [2025 UN city comparison](https://progrss.com/p/343-karachi-eleventh-biggest
 The closest guess is underlined in the history and in the final dossier;
 ties favor the earliest closest attempt. Existing daily cases with paid
 positions 8–10 retain their original clues and prices.
+
+### Browse the 500-city archive
+
+The **list icon immediately beside “How to play”** opens a searchable city
+archive without starting a case, changing the map, revealing the daily
+answer, spending hints or consuming guesses. The picker lists all 500
+catalogue cities with country flags; searching is accent-insensitive and
+accepts city aliases, countries, ISO codes and administrative regions.
+Keyboard navigation works with the arrow, Home and End keys.
+
+Selecting a city shows its complete **known** static profile: name, country,
+flag, region, original Portuguese geographic descriptions (explicitly
+labelled as source language), coordinates, continent, capital status where
+unambiguous, physical/latitude context, hemisphere, longitude/latitude
+sectors, UTM zone and latitude band where defined, curated landmarks where
+available, 2025 urban population/density where sourced, rounded distances
+to the national capital/ocean coast for eligible cities, local IANA time
+zone where verified, the city note, national historical context, national
+currency/language family/flag color/population/year/GDP per capita/area/
+coastal access, and the **10 normal and 10 hard evidence cards** in
+collapsible sections. Unknown data are omitted, not invented. Source dates
+remain with the statistics; capital and coast distance clue values remain
+short and do not name the capital or show a year, as in gameplay.
+
+The panel works in all 19 UI languages and adapts to a compact phone
+layout. It is a separate modal archive and never mutates the active case.
