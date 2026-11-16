@@ -32,7 +32,7 @@ jobs:
       - name: Preparar arquivos estáticos
         run: |
           mkdir -p dist
-          cp index.html styles.css themes.css mobile.css theme.js app.js continent-borders.js cities-extended.js country-insights.js country-clues-i18n.js country-profile-i18n.js map-filters-i18n.js map-bootstrap.js map-fallback.js language-picker.js places.js references.js i18n.js clues-i18n.js compass-i18n.js report-i18n.js facts.js favicon.svg sitemap.xml robots.txt dist/
+          cp index.html styles.css themes.css mobile.css theme.js app.js continent-borders.js cities-extended.js city-indicators.js urban-2025.js city-clues-i18n.js country-insights.js country-clues-i18n.js country-profile-i18n.js map-filters-i18n.js map-bootstrap.js map-fallback.js language-picker.js places.js references.js i18n.js clues-i18n.js compass-i18n.js report-i18n.js facts.js favicon.svg sitemap.xml robots.txt dist/
           # Fingerprint the public scripts on every deployment (not just once in source).
           sed -i "s|v=20261116-profile-diversity|v=${GITHUB_SHA}|g" dist/index.html
           sed -i "s|v=20261116-area-scope|v=${GITHUB_SHA}|g" dist/index.html
@@ -41,6 +41,7 @@ jobs:
           sed -i "s|v=20261116-currency-names|v=${GITHUB_SHA}|g" dist/index.html
           sed -i "s|v=20261116-ten-evidence|v=${GITHUB_SHA}|g" dist/index.html
           sed -i "s|v=20261116-utm-ruler|v=${GITHUB_SHA}|g" dist/index.html
+          sed -i "s|v=20261116-city-evidence|v=${GITHUB_SHA}|g" dist/index.html
           touch dist/.nojekyll
 
       - name: Configurar GitHub Pages

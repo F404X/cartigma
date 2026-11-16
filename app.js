@@ -9,6 +9,9 @@
   const CLUE_I18N = window.GeoCluesI18n || {};
   const COUNTRY_INSIGHTS = window.GeoCountryInsights || {};
   const COUNTRY_CLUE_I18N = window.GeoCountryClueI18n || {};
+  const CITY_INDICATORS = window.CartigmaCityIndicators || [];
+  const CITY_URBAN_2025 = window.CartigmaUrban2025 || {};
+  const CITY_CLUES_I18N = window.CartigmaCityClueI18n || {};
   const COUNTRY_FAMILIES_PT = window.GeoCountryLanguageFamiliesPT || {};
   const EXTRA_CLUE_KEYS = new Set(["countryCurrency","countryLanguageFamily","countryFlagColor",
     "countryPopulation","countryGDP","countryArea","countryLandlocked"]);
@@ -30,7 +33,9 @@
     adminRegion:350,landmark:500,
     longitude:400,latitude:450,utmZone:450,utmBand:450,
     countryCurrency:250,countryLanguageFamily:250,countryFlagColor:200,
-    countryPopulation:300,countryGDP:350,countryArea:300,countryLandlocked:200
+    countryPopulation:300,countryGDP:350,countryArea:300,countryLandlocked:200,
+    cityCapitalDistance:500,cityCoastDistance:350,cityPopulation:300,
+    cityDensity:400,cityTimezone:200
   });
   // Overlay costs differ by how tightly each display constrains the target.
   const MAP_OVERLAY_COSTS=Object.freeze({hemisphere:250,continent:500,
@@ -125,7 +130,9 @@
   function tc(key,variables={}) {
     const template = CLUE_I18N[lang]?.templates?.[key] ??
       COUNTRY_CLUE_I18N[lang]?.[key] ??
+      CITY_CLUES_I18N[lang]?.templates?.[key] ??
       CLUE_I18N.en?.templates?.[key] ??
+      CITY_CLUES_I18N.en?.templates?.[key] ??
       COUNTRY_CLUE_I18N.en?.[key] ?? key;
     return template.replace(/\{(\w+)\}/g,(_,name)=>String(variables[name]??""));
   }
@@ -377,8 +384,38 @@
     if(remaining.length<3)throw Error("Not enough additional verified evidence for "+code);
     return [...chosen,...remaining.slice(0,3)];
   }
+  // City measurements are optional, never inferred from countrywide figures.
+  function extraCityClues(index){
+    const data=CITY_INDICATORS[index]||{},urban=CITY_URBAN_2025[index]||{};
+    const clues=[],add=(key,props)=>clues.push({key,...props});
+    const city=cityAt(index);
+    if(data.cap&&Number.isFinite(data.cap[0])&&data.cap[0]>0)
+      add("cityCapitalDistance",{value:number(data.cap[0]),capital:data.cap[1],year:2026});
+    // Natural Earth includes the Caspian Sea among its coastlines even
+    // though it is a lake: omit uncertain Caspian-basin coastal distances.
+    const nearCaspian=city[3]>=32&&city[3]<=50&&city[4]>=40&&city[4]<=61;
+    if(data.coast&&!nearCaspian)
+      add("cityCoastDistance",{value:number(data.coast),year:2026});
+    if(urban.population>0&&urban.year===2025)
+      add("cityPopulation",{value:number(urban.population),year:2025});
+    if(urban.density>0&&urban.year===2025)
+      add("cityDensity",{value:number(urban.density),year:2025});
+    if(data.tz){
+      try{
+        const stamp=new Date();
+        const offset=new Intl.DateTimeFormat("en-US",{timeZone:data.tz,
+          timeZoneName:"shortOffset"}).formatToParts(stamp)
+          .find(part=>part.type==="timeZoneName")?.value;
+        if(offset&&/^GMT(?:[+-][0-9]{1,2}(?::[0-9]{2})?)?$/.test(offset))
+          add("cityTimezone",{offset:offset.replace("GMT","UTC"),
+            year:stamp.getUTCFullYear()});
+      }catch(error){/* Unknown local zone: skip, never guess an offset. */}
+    }
+    return clues;
+  }
   function cluesFor(index,level){
-    const cacheKey=index+":"+level+":"+lang;
+    const legacy=game?.index===index&&game.evidenceVersion===1;
+    const cacheKey=index+":"+level+":"+lang+":"+(legacy?"legacy":"city");
     if(clueCache.has(cacheKey))return clueCache.get(cacheKey);
     const p=cityAt(index);
      const terrain={key:"terrain",value:locationFeature(index)};
@@ -424,16 +461,27 @@
       ...(reliableCapital||index>=BASE_CITIES?[capital]:[]),
       ...(safeRegion?[{key:"adminRegion",value:p[2]}]:[])
     ].find(clue=>!usedKeys.has(clue.key));
-    const additional=extraGeographic
-      ?[countryFacts[2],extraGeographic,countryFacts[3]]
-      :[countryFacts[2],countryFacts[3],countryFacts[4]];
-    if(additional.some(clue=>usedKeys.has(clue.key))||
+    let additional;
+    if(legacy){
+      // Keep all three purchased late clues in pre-update daily cases.
+      additional=extraGeographic
+        ?[countryFacts[2],extraGeographic,countryFacts[3]]
+        :[countryFacts[2],countryFacts[3],countryFacts[4]];
+      if(extraGeographic&&mixed[4]?.key.startsWith("country"))
+        [additional[0],additional[1]]=[additional[1],additional[0]];
+    }else{
+      additional=[];
+      const fallbacks=[...(extraGeographic?[extraGeographic]:[]),
+        ...countryFacts.slice(2)];
+      for(const item of [...extraCityClues(index),...fallbacks]){
+        if(usedKeys.has(item.key)||additional.some(x=>x.key===item.key))continue;
+        additional.push(item);
+        if(additional.length===3)break;
+      }
+    }
+    if(additional.length!==3||additional.some(clue=>usedKeys.has(clue.key))||
       new Set(additional.map(clue=>clue.key)).size!==3)
-      throw Error("Repeated evidence in case "+index);
-    // When the seventh clue is already a country fact, show the new
-    // geographic clue first rather than producing three facts in a row.
-    if(extraGeographic&&mixed[4]?.key.startsWith("country"))
-      [additional[0],additional[1]]=[additional[1],additional[0]];
+      throw Error("Repeated or missing evidence in case "+index);
     clues.push(...additional);
     if(clues.length!==EVIDENCE_COUNT)throw Error("Incomplete evidence set for "+index);
     clueCache.set(cacheKey,clues);
@@ -479,7 +527,8 @@
   function newGame(mode,index) {
     return {mode,index,difficulty,date:today(),serial:nextCaseNumber(),guesses:[],
       revealed:DIFFICULTIES[difficulty].initial,penalty:0,paidHints:0,
-      sectorMapPenalty:0,sectorReveals:[],finished:false,won:false,score:0};
+      sectorMapPenalty:0,sectorReveals:[],evidenceVersion:2,
+      finished:false,won:false,score:0};
   }
   function caseCode(){
     return "#"+difficulty[0].toUpperCase()+"-"+game.date.replaceAll("-","")+"-"+String(game.serial).padStart(2,"0");
@@ -491,6 +540,12 @@
       &&Number.isFinite(s.revealed)
       &&s.guesses.every(g=>Number.isFinite(g.lat)&&Number.isFinite(g.lng)&&Number.isFinite(g.distance));
     if(!valid)return null;
+    if(!Number.isInteger(s.evidenceVersion)){
+      // Older saved cases with slots 8–10 already revealed retain the
+      // original evidence, protecting points already spent.
+      s.evidenceVersion=s.revealed>7?1:2;
+      store.set(dailyStorageKey(),s);
+    }
     // Before this release, northern-only regions could receive a hemisphere
     // map purchase. Refund its previous 600-point cost on open cases now that
     // the evidence no longer appears in those continents.
@@ -563,7 +618,9 @@
     countryLandlocked:"clueRegion",
     hemisphere:"clueRegion",capital:"clueCivic",longitude:"clueRegion",
     latitude:"clueRegion",utmZone:"clueRegion",utmBand:"clueRegion",
-    landmark:"clueLandmark"
+    landmark:"clueLandmark",
+    cityCapitalDistance:"clueRegion",cityCoastDistance:"clueRegion",
+    cityPopulation:"clueCivic",cityDensity:"clueCivic",cityTimezone:"clueRegion"
   });
   function revealGeographyOnMap(clue){
     const cost=overlayCost(clue.key);
@@ -622,10 +679,12 @@
       const body=document.createElement("span");body.className="clue-body";
       const category=document.createElement("span");category.className="clue-category";
       const categoryKey=CLUE_CATEGORY_KEYS[clue.key]||"clueRegion";
-      category.textContent=clue.key==="countryLandlocked"
-        ?(COUNTRY_CLUE_I18N[lang]?.countryLandlockedLabel||
-          COUNTRY_CLUE_I18N.en?.countryLandlockedLabel||"Sea access")
-        :t(categoryKey);
+      category.textContent=CITY_CLUES_I18N[lang]?.categories?.[clue.key]||
+        CITY_CLUES_I18N.en?.categories?.[clue.key]||
+        (clue.key==="countryLandlocked"
+          ?(COUNTRY_CLUE_I18N[lang]?.countryLandlockedLabel||
+            COUNTRY_CLUE_I18N.en?.countryLandlockedLabel||"Sea access")
+          :t(categoryKey));
       const value=document.createElement("span");value.className="clue-text";
       const clueValue=i<revealed?clueText(clue):lockedText;
       value.textContent=clueValue;
@@ -664,10 +723,12 @@
     if(!count){
       const li=document.createElement("li");li.className="empty-history";li.textContent=t("empty");list.append(li);return;
     }
-    // Render newest first without copying and reversing the guesses array.
+    // The closest guess is underlined, including before a case finishes.
+    const closest=bestGuess();
     for(let i=count-1;i>=0;i--){
       const g=game.guesses[i];
       const row=document.createElement("li");row.className="history-item";
+      if(g===closest)row.classList.add("closest");
       const label=document.createElement("span");
       const idx=document.createElement("span");idx.className="history-number";idx.textContent=String(i+1).padStart(2,"0");
       label.append(idx,document.createTextNode(g.label||g.lat.toFixed(2)+"°, "+g.lng.toFixed(2)+"°"));
@@ -798,7 +859,7 @@
     const log=$("reportTimeline");log.replaceChildren();
     for(const [i,g] of game.guesses.entries()){
       const row=document.createElement("li");row.className="report-log-row";
-      if(g===best)row.classList.add("best");
+      if(g===best){row.classList.add("best");row.classList.add("closest");}
       const n=document.createElement("span");n.className="report-log-index";n.textContent=String(i+1).padStart(2,"0");
       const label=document.createElement("span");label.className="report-log-place";
       label.textContent=g.label||g.lat.toFixed(3)+"°, "+g.lng.toFixed(3)+"°";

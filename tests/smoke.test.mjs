@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {runInNewContext} from "node:vm";
 
-const names=["places.js","continent-borders.js","references.js","i18n.js","map-filters-i18n.js","clues-i18n.js","report-i18n.js","facts.js","cities-extended.js","country-insights.js","country-clues-i18n.js","country-profile-i18n.js","compass-i18n.js","app.js","index.html","styles.css","map-bootstrap.js","map-fallback.js"];
+const names=["places.js","continent-borders.js","references.js","i18n.js","map-filters-i18n.js","clues-i18n.js","report-i18n.js","facts.js","cities-extended.js","city-indicators.js","urban-2025.js","city-clues-i18n.js","country-insights.js","country-clues-i18n.js","country-profile-i18n.js","compass-i18n.js","app.js","index.html","styles.css","map-bootstrap.js","map-fallback.js"];
 const files=Object.fromEntries(names.map(n=>[n,readFileSync(new URL("../"+n,import.meta.url),"utf8")]));
 
 class Element {
@@ -289,7 +289,8 @@ test("new cities have ten meaningful clues without a redundant distance comparis
     assert.ok(clues.some(text=>/^Latitude sector:/.test(text)),city);
     assert.doesNotMatch(clues.join(" "),/Closer to |Distance clue|from [^\n]+ km/i);
     const national=clues.filter(text=>["Currency:","Language family","One flag color", "Population (","GDP per capita","Country / territory area:","No access to the sea.","Has access to the sea."].some(x=>text.startsWith(x)));
-    assert.equal(national.length,4,city+" must have four distinct country facts");
+    assert.ok(national.length>=2&&national.length<=5,
+      city+" must keep the original two country facts");
     if(g.window.GeoExtendedPlaceMetadata[index-74].capital)
       assert.ok(clues.some(x=>x==="National capital: Yes"),city);
   }
@@ -755,7 +756,8 @@ test("ten clue types are unique and complete across representative cities and bo
       assert.equal(all.length,10,p[i][0]);
       assert.equal(new Set(all).size,10,"Duplicate evidence text for "+p[i][0]);
       const factCount=all.filter(x=>national.some(prefix=>x.startsWith(prefix))).length;
-      assert.ok(factCount>=4&&factCount<=5,p[i][0]+" should have four or five sourced country facts");
+      assert.ok(factCount>=2&&factCount<=5,
+        p[i][0]+" should keep two country facts and fill missing city hints");
       assert.equal(all[1].startsWith("Continent:"),true,p[i][0]);
       assert.ok(!all.some(x=>/Closer to|Distance clue/i.test(x)));
       if(level==="hard"){
@@ -770,6 +772,117 @@ test("ten clue types are unique and complete across representative cities and bo
   }
 });
 
+test("five city-specific evidence types are sourced, dated, and conditional",()=>{
+  const g=boot(),w=g.window,geo=w.CartigmaCityIndicators,urban=w.CartigmaUrban2025;
+  const places=w.GEODETECTIVE_PLACES;
+  assert.equal(geo.length,500);
+  assert.equal(Object.keys(urban).length,21);
+  const full=(index,level="normal")=>{
+    const play=boot({randomValue:(index+.25)/places.length});
+    play.difficulty(level);play.get("freeBtn").handlers.click();
+    return {play,clues:revealAll(play)};
+  };
+  const sao=full(places.findIndex(p=>p[0]==="São Paulo"));
+  assert.ok(sao.clues.some(x=>x.includes("inhabitants (est. 2025)")&&
+    x.includes("18,950,000")),"São Paulo: verified 2025 UN agglomeration population");
+  assert.ok(sao.clues.some(x=>/^≈ 875 km to Brasília \(2026\)/.test(x)),
+    "São Paulo: capital distance as calculated in 2026");
+  assert.ok(sao.clues.some(x=>/^UTC-3 \(2026\)$/.test(x)),
+    "São Paulo: correct IANA time zone for the 2026 reference date");
+  const goiania=full(places.findIndex(p=>p[0]==="Goiânia"));
+  assert.ok(goiania.clues.some(x=>x.startsWith("≈ 175 km to Brasília (2026)")));
+  assert.ok(goiania.clues.some(x=>x.startsWith("≈ 900 km to the ocean coast (2026)")));
+  assert.ok(!goiania.clues.some(x=>x.includes("inhabitants (est. 2025)")),
+    "No city census may be invented from country or old metropolitan figures");
+  const mumbai=full(places.findIndex(p=>p[0]==="Mumbai"));
+  assert.ok(mumbai.clues.some(x=>x.includes("20,203,000")&&x.includes("2025")));
+  assert.ok(mumbai.clues.some(x=>x.includes("27,000")&&x.includes("2025")),
+    "UN 2025 urban density must be available for Mumbai");
+  const papeete=full(places.findIndex(p=>p[0]==="Papeete"));
+  assert.equal(papeete.clues.length,10);
+  assert.ok(!papeete.clues.some(x=>x.includes("inhabitants (est. 2025)")||
+    x.includes("people/km²")||x.includes("to the ocean coast")),
+    "Sparse island must never receive false coastal or city-population values");
+  for(const entry of geo){
+    if(entry.cap)assert.ok(entry.cap[0]>0&&entry.cap[1]);
+    if(entry.coast)assert.ok(entry.coast>=150);
+    if(entry.tz)assert.doesNotThrow(()=>new Intl.DateTimeFormat("en-US",{timeZone:entry.tz}));
+  }
+  for(const [idx,facts] of Object.entries(urban)){
+    assert.ok(+idx>=0&&+idx<500);
+    assert.equal(facts.year,2025);
+    assert.ok(facts.population>0||facts.density>0);
+  }
+  for(const [lang,p] of Object.entries(w.CartigmaCityClueI18n)){
+    assert.equal(Object.keys(p.templates).length,5);
+    for(const key of Object.keys(p.templates)){
+      assert.ok(p.templates[key].includes("{year}"),lang+" "+key);
+      assert.ok(p.categories[key],lang+" "+key);
+    }
+  }
+});
+
+test("city-specific clues remain 10 and translated on Normal and Hard",()=>{
+  const all=boot().window.GEODETECTIVE_PLACES;
+  const i=all.findIndex(x=>x[0]==="São Paulo");
+  for(const difficulty of ["normal","hard"]){
+    const g=boot({randomValue:(i+.25)/all.length});
+    g.difficulty(difficulty);g.get("freeBtn").handlers.click();
+    g.language("pt");
+    const clues=revealAll(g);
+    assert.equal(clues.length,10);
+    assert.ok(clues.some(x=>x.includes("até Brasília (2026)")));
+    assert.ok(clues.some(x=>x.includes("18.950.000")&&x.includes("2025")));
+    assert.ok(clues.some(x=>x.includes("UTC-3 (2026)")));
+    assert.equal(new Set(clues).size,10);
+    assert.equal(g.get("attemptCount").textContent,
+      difficulty==="normal"?"6 / 6":"4 / 4");
+    g.language("en");
+    assert.ok(clueTexts(g).some(x=>x.includes("to Brasília (2026)")));
+  }
+});
+
+test("closest guess is underlined live and in final dossier, not other guesses",()=>{
+  const g=boot(),$=g.get;
+  $("freeBtn").handlers.click();
+  g.select("Tóquio");$("guessBtn").handlers.click();
+  assert.equal($("guessHistory").children.length,1);
+  assert.equal($("guessHistory").children[0].classList.contains("closest"),true);
+  g.select("Oslo");$("guessBtn").handlers.click();
+  assert.equal($("guessHistory").children.length,2);
+  assert.equal($("guessHistory").children[0].classList.contains("closest"),true);
+  assert.equal($("guessHistory").children[1].classList.contains("closest"),false);
+  // Winning the case with a 0-km guess should update the closest marker.
+  g.select("Reykjavík");$("guessBtn").handlers.click();
+  assert.equal($("guessHistory").children[0].classList.contains("closest"),true);
+  assert.equal($("guessHistory").children[1].classList.contains("closest"),false);
+  assert.equal($("reportTimeline").children[2].classList.contains("closest"),true);
+  assert.equal($("reportTimeline").children[1].classList.contains("closest"),false);
+  assert.match(files["styles.css"],/\.history-item\.closest>span:first-child/);
+  assert.match(files["styles.css"],/\.report-log-row\.closest \.report-log-place/);
+});
+
+test("old eight-hint daily games keep original evidence without new source substitutions",()=>{
+  const day=new Date().toISOString().slice(0,10);
+  const tmp=boot().window,idx=normalIndexForDay(day,tmp);
+  const key="geodetective-daily-v3-"+day+"-normal";
+  const storage=new Map([[key,JSON.stringify({
+    mode:"daily",index:idx,difficulty:"normal",date:day,serial:1,
+    guesses:[],revealed:8,penalty:1500,paidHints:6,
+    sectorMapPenalty:0,sectorReveals:[],finished:false,won:false,score:0
+  })]]);
+  const g=boot({storage}),$=g.get;
+  assert.equal($("hintCount").textContent,"8 / 10");
+  assert.equal(JSON.parse(storage.get(key)).evidenceVersion,1);
+  assert.ok(!clueTexts(g).slice(7).some(x=>
+    /Urban population:|Urban density:|to the ocean coast|to .* \(2026\)|UTC.*2026/.test(x)));
+  const prior=clueTexts(g).slice(0,8);
+  g.get("revealBtn").handlers.click();
+  assert.deepEqual(clueTexts(g).slice(0,8),prior);
+  const loaded=boot({storage});
+  assert.deepEqual(clueTexts(loaded).slice(0,8),prior);
+  assert.equal(JSON.parse(storage.get(key)).evidenceVersion,1);
+});
 test("Normal and Hard have ten translated clues with unchanged guess limits",()=>{
   const g=boot(),$=g.get;
   assert.doesNotMatch(files["index.html"],/value="easy"/);
@@ -1101,7 +1214,7 @@ test("a correct fifth guess in Cape Town has no distance or bearing in history o
 });
 
 test("fresh deployments fingerprint both game engine and translated clues",()=>{
-  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-utm-ruler"'));
+  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-city-evidence"'));
   assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-profile-diversity"'));
   assert.ok(files["map-bootstrap.js"].includes('new URL(import.meta.url).searchParams.get("v")'));
   assert.ok(files["app.js"].includes("function guessMetricText(g)"));

@@ -138,3 +138,44 @@ with costs rounded up to the nearest 50 points. UTM zone and UTM latitude-band
 overlays have base costs 1,200/1,300 and therefore cost **1,800/1,950 points**
 on Hard. Normal-mode pricing remains unchanged. Existing charges from saved
 cases are not recalculated.
+
+### New city-specific evidence with source years
+
+Slots 8–10 now prioritize five additional conditional city-specific facts; 
+when a fact cannot be supported, an existing verified country clue fills
+its position. This avoids claiming all 500 cities have complete municipal
+statistics.
+
+- **Distance to the national capital**: 2026 rounded geodesic calculation
+  using Natural Earth 1:110m capital points. Shown only for non-capitals
+  with one unambiguous national capital; multi-capital cases are skipped.
+- **Distance to the ocean coastline**: 2026 approximate map calculation,
+  1:110m Natural Earth coastline v4.1.0. Shown only when the point is
+  inside mapped land and safely inland (>=150 km); omitted for landlocked
+  countries, missing islands and the uncertain Caspian basin.
+- **Urban population (2025)** and **urban density (2025)**: estimates of
+  URBAN AGGLOMERATIONS, not municipalities, from the UN 2025 World
+  Urbanization Prospects Degree of Urbanization tables, with rounded
+  estimates from the official 2025 report. Population currently has 20
+  curated city values; density has three. More are deliberately omitted
+  until independently verifiable, rather than reusing older natural-earth
+  urban-population projections as if they were 2025 censuses.
+- **Local UTC time zone (2026)**: IANA zone.tab cross-checks plus
+  current `Intl.DateTimeFormat` daylight-saving rules. Where the country
+  contains several zones and no verified city zone exists, omit the clue.
+
+The year on each *distance* clue means **2026 calculation vintage**,
+not a survey date for the coastline or coordinates. New facts have no
+additional map overlays, and are available to buy using the existing
+points-based reveal system.
+
+Sources: [Natural Earth capitals](https://www.naturalearthdata.com/downloads/110m-cultural-vectors/110m-populated-places/),
+[Natural Earth coastline](https://www.naturalearthdata.com/downloads/110m-physical-vectors/110m-coastline/),
+[IANA zone.tab](https://github.com/eggert/tz/blob/main/zone.tab),
+[UN World Urbanization Prospects 2025](https://population.un.org/wup/downloads/?tab=Cities),
+[UN Summary of Results](https://population.un.org/wup/assets/Publications/undesa_pd_2025_wup2025_summary_of_results_final.pdf)
+and [2025 UN city comparison](https://progrss.com/p/343-karachi-eleventh-biggest-city).
+
+The closest guess is underlined in the history and in the final dossier;
+ties favor the earliest closest attempt. Existing daily cases with paid
+positions 8–10 retain their original clues and prices.

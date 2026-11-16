@@ -695,3 +695,11 @@ dialog.case-report .report-heading h2{font-size:24px}
 .utm-grid-label{background:#23291dd9;color:#ffe28a;border:1px solid #ba9e4b99;
   border-radius:2px;display:grid;place-items:center;width:26px;height:16px;
   font:600 10px/1 var(--mono);pointer-events:none;box-shadow:0 1px 3px #0008}
+
+/* Underline the best-ever guess in live history and in the final dossier. */
+.history-item.closest>span:first-child,
+.report-log-row.closest .report-log-place{
+  text-decoration:underline;
+  text-decoration-thickness:1.5px;
+  text-underline-offset:3px;
+}
