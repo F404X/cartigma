@@ -28,7 +28,7 @@
     "Meeting of the Waters","Sugarloaf Mountain","Paulista Avenue","Pelourinho","Casa Rosada","Cerro San Cristóbal",
     "Beagle Channel","Strait of Magellan"
   ];
-  const CAPITALS = new Set("Reykjavík|Oslo|Helsinque|Estocolmo|Copenhague|Londres|Paris|Lisboa|Roma|Atenas|Cairo|Dacar|Nairóbi|Adis Abeba|Antananarivo|Amã|Nova Délhi|Catmandu|Daca|Bangcoc|Singapura|Tóquio|Seul|Pequim|Ulan Bator|Wellington|Suva|Cidade do México|Havana|Cidade da Guatemala|Bogotá|Quito|Lima|Brasília|Buenos Aires|Santiago".split("|"));
+  const CAPITALS = new Set("Reykjavík|Oslo|Helsinque|Estocolmo|Copenhague|Londres|Paris|Lisboa|Roma|Atenas|Cairo|Dacar|Nairóbi|Adis Abeba|Cidade do Cabo|Antananarivo|Amã|Nova Délhi|Catmandu|Daca|Bangcoc|Singapura|Tóquio|Seul|Pequim|Taipé|Ulan Bator|Wellington|Suva|Cidade do México|Havana|Cidade da Guatemala|Bogotá|Quito|Lima|Brasília|Buenos Aires|Santiago".split("|"));
   const EN_CITY = {
     "Estocolmo":"Stockholm","Copenhague":"Copenhagen","Londres":"London","Lisboa":"Lisbon",
     "Roma":"Rome","Atenas":"Athens","Istambul":"Istanbul","Cidade do Cabo":"Cape Town",

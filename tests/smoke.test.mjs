@@ -137,6 +137,22 @@ test("city catalogue, trivia and report translations remain aligned",()=>{
   }
 });
 
+test("national-capital evidence marks Taipei correctly and keeps non-capitals distinct",()=>{
+  const all=boot().window.GEODETECTIVE_PLACES;
+  for(const [name,isCapital] of [["Taipé",true],["Brasília",true],["Goiânia",false]]){
+    const index=all.findIndex(p=>p[0]===name);
+    assert.ok(index>=0,"Missing city "+name);
+    const g=boot({randomValue:(index+0.25)/all.length});
+    g.get("freeBtn").handlers.click();
+    g.language("pt");
+    g.get("revealBtn").handlers.click();
+    assert.equal(clueTexts(g)[2],"Capital nacional: "+(isCapital?"Sim":"Não"),name);
+  }
+  const capitalNames=files["app.js"].match(/const CAPITALS = new Set\\("([^"]+)"\\.split\\("\\|"\\)\\)/)?.[1]?.split("|");
+  assert.ok(capitalNames?.includes("Taipé"));
+  assert.ok(capitalNames?.includes("Cidade do Cabo"),"Cape Town is South Africa's legislative capital");
+});
+
 test("Normal and Hard are the only modes and both have six translated clues",()=>{
   const g=boot(),$=g.get;
   assert.doesNotMatch(files["index.html"],/value="easy"/);
