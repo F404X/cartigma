@@ -160,5 +160,12 @@
       throw new Error("Incomplete continent translation for " + language);
     localeData[language].continents = Object.fromEntries(continentKeys.map((key,i) => [key,labels[i]]));
   }
+  const sectorButtonKeys=["sectorMapButton","sectorMapped","sectorMapPurchased"];
+  const sectorButtonText={"en":"Map −{cost}|On map ✓|Sector displayed · −{cost} points","pt":"Mapa −{cost}|No mapa ✓|Setor exibido · −{cost} pontos","es":"Mapa −{cost}|En mapa ✓|Sector mostrado · −{cost} puntos","zh":"地图 −{cost}|已显示 ✓|已显示区域 · −{cost} 分","ja":"地図 −{cost}|表示済み ✓|範囲を表示 · −{cost} 点","ru":"Карта −{cost}|На карте ✓|Сектор показан · −{cost} очков","fr":"Carte −{cost}|Sur carte ✓|Secteur affiché · −{cost} points","de":"Karte −{cost}|Auf Karte ✓|Sektor angezeigt · −{cost} Punkte","it":"Mappa −{cost}|Su mappa ✓|Settore mostrato · −{cost} punti","nl":"Kaart −{cost}|Op kaart ✓|Sector getoond · −{cost} punten","pl":"Mapa −{cost}|Na mapie ✓|Sektor pokazany · −{cost} pkt","sv":"Karta −{cost}|På karta ✓|Sektor visad · −{cost} poäng","tr":"Harita −{cost}|Haritada ✓|Bölge gösterildi · −{cost} puan","ar":"الخريطة −{cost}|على الخريطة ✓|تم عرض القطاع · −{cost} نقطة","he":"מפה −{cost}|במפה ✓|האזור מוצג · −{cost} נקודות","ko":"지도 −{cost}|지도 표시 ✓|영역 표시 · −{cost}점","th":"แผนที่ −{cost}|แสดงแล้ว ✓|แสดงพื้นที่แล้ว · −{cost} คะแนน","vi":"Bản đồ −{cost}|Trên bản đồ ✓|Đã hiện khu vực · −{cost} điểm","id":"Peta −{cost}|Di peta ✓|Sektor ditampilkan · −{cost} poin"};
+  for(const language of Object.keys(localeData)){
+    const parts=sectorButtonText[language]?.split("|");
+    if(!parts||parts.length!==sectorButtonKeys.length)throw Error("Missing sector-map translations: "+language);
+    for(const [i,key] of sectorButtonKeys.entries())localeData[language].templates[key]=parts[i];
+  }
   window.GeoCluesI18n = localeData;
 })();

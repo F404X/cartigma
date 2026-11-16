@@ -80,6 +80,12 @@
             color:"#ffd449",weight:2,opacity:.85,dashArray:"5 7"
           }).addTo(this.root);
           this._layers.set(layer.id,line);
+        }else if(geo?.type==="Polygon"||geo?.type==="MultiPolygon"){
+          const polygon=L.geoJSON({type:"Feature",properties:{},geometry:geo},{
+            style:{color:"#ffd449",weight:1,opacity:.45,fillColor:"#ffd449",
+              fillOpacity:0.10,interactive:false}
+          }).addTo(this.root);
+          this._layers.set(layer.id,polygon);
         }
       }
       removeLayer(id){const layer=this._layers.get(id);if(layer)this.root.removeLayer(layer);this._layers.delete(id);}

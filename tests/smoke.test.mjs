@@ -437,12 +437,70 @@ test("a correct fifth guess in Cape Town has no distance or bearing in history o
 });
 
 test("fresh deployments fingerprint both game engine and translated clues",()=>{
-  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-exact-fix"'));
-  assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-exact-fix"'));
+  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-sector-map"'));
+  assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-sector-map"'));
   assert.ok(files["map-bootstrap.js"].includes('new URL(import.meta.url).searchParams.get("v")'));
   assert.ok(files["app.js"].includes("function guessMetricText(g)"));
   const deploy=readFileSync(new URL("../.github/workflows/pages.yml",import.meta.url),"utf8");
   assert.ok(deploy.includes("GITHUB_SHA"));
+});
+
+test("purchased longitude sector paints ten-percent yellow and costs 1200 once",()=>{
+  const places=boot().window.GEODETECTIVE_PLACES,index=places.findIndex(p=>p[0]==="Taipé");
+  const g=boot({map:true,randomValue:(index+.25)/places.length}),$=g.get;
+  $("freeBtn").handlers.click();
+  assert.equal($("clueList").children[3].children[1].children.length,2);
+  $("revealBtn").handlers.click();$("revealBtn").handlers.click();
+  const btn=$("clueList").children[3].children[1].children[2];
+  assert.ok(btn&&!btn.disabled);btn.handlers.click();
+  const geo=g.mapState.sources.get("case-sector-longitude").data.geometry;
+  assert.equal(geo.type,"Polygon");
+  assert.equal(geo.coordinates[0][0][0],120);
+  assert.equal(geo.coordinates[0][1][0],150);
+  assert.equal(g.mapState.layers.get("case-sector-longitude").paint["fill-color"],"#ffd449");
+  assert.equal(g.mapState.layers.get("case-sector-longitude").paint["fill-opacity"],.1);
+  assert.equal($("clueList").children[3].children[1].children[2].disabled,true);
+  assert.ok(g.mapState.fits.length>0);
+  g.language("pt");
+  assert.match($("clueList").children[3].children[1].children[2].textContent,/No mapa/);
+  g.select("Taipé");$("guessBtn").handlers.click();
+  assert.equal($("reportScore").textContent,"3.200 / 5,000");
+  assert.equal($("reportHints").textContent,"2");
+});
+
+test("latitude band covers the world in six parts and survives map engine changes",async()=>{
+  const places=boot().window.GEODETECTIVE_PLACES,index=places.findIndex(p=>p[0]==="Tóquio");
+  const g=boot({map:true,randomValue:(index+.25)/places.length}),$=g.get;
+  $("freeBtn").handlers.click();
+  for(let i=0;i<4;i++)$("revealBtn").handlers.click();
+  const btn=$("clueList").children[5].children[1].children[2];
+  assert.ok(btn&&!btn.disabled);btn.handlers.click();
+  const geo=g.mapState.sources.get("case-sector-latitude").data.geometry;
+  assert.equal(geo.type,"MultiPolygon");
+  assert.equal(geo.coordinates.length,6);
+  assert.equal(geo.coordinates[0][0][0][1],30);
+  assert.equal(geo.coordinates[0][0][2][1],45);
+  assert.equal(g.mapState.layers.get("case-sector-latitude").paint["fill-opacity"],.1);
+  await $("mapOsmBtn").handlers.click();
+  assert.equal(g.mapState.layers.get("case-sector-latitude").paint["fill-opacity"],.1);
+  await $("mapVectorBtn").handlers.click();
+  assert.ok(g.mapState.sources.has("case-sector-latitude"));
+});
+
+test("daily purchased map sectors reload without double deduction and Hard has no map buttons",()=>{
+  const storage=new Map(),g=boot({map:true,storage}),$=g.get;
+  $("revealBtn").handlers.click();$("revealBtn").handlers.click();
+  $("clueList").children[3].children[1].children[2].handlers.click();
+  const day=new Date().toISOString().slice(0,10);
+  const saved=JSON.parse(storage.get("geodetective-daily-v3-"+day+"-normal"));
+  assert.equal(saved.sectorMapPenalty,1200);
+  assert.deepEqual(saved.sectorReveals,["longitude"]);
+  const again=boot({map:true,storage});
+  assert.ok(again.mapState.sources.has("case-sector-longitude"));
+  assert.equal(again.get("clueList").children[3].children[1].children[2].disabled,true);
+  assert.equal(JSON.parse(storage.get("geodetective-daily-v3-"+day+"-normal")).sectorMapPenalty,1200);
+  again.difficulty("hard");
+  assert.equal(again.get("clueList").children.some(row=>row.children[1].children.length===3),false);
 });
 
 test("hemisphere evidence never follows the continent and no generic river-valley clue remains",()=>{

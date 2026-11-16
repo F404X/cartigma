@@ -11,7 +11,7 @@
   const NEARBY_REFERENCES = window.GEODETECTIVE_NEARBY_REFERENCES || {};
   const DIFFICULTIES = {normal:{attempts:6,initial:2},hard:{attempts:4,initial:1}};
   const SERIAL_PREFIX = "geodetective-case-counter-";
-  const WIN_RADIUS = 100, HINT_COST = 300, DAILY_KEY = "geodetective-daily-v3-";
+  const WIN_RADIUS = 100, HINT_COST = 300, SECTOR_MAP_COST = 1200, DAILY_KEY = "geodetective-daily-v3-";
   const COUNTRY_CODES = "IS NO NO NO FI SE DK GB FR PT IT GR TR MA EG SN NG KE ET ZA MG AE JO IL IN IN IN NP BD TH SG ID ID JP JP KR CN CN CN TW MN KZ AU AU AU AU NZ NZ FJ PF CA US US US US MX MX CU GT CO EC PE PE BO BR BR BR BR BR BR AR CL AR CL".split(" ");
   const FEATURES = "volcanic fjord polar fjord coast islands coast river river estuary river mountains strait desert desert peninsula delta plateau plateau peninsula plateau desert plateau mountains coast plain delta mountains delta delta islands delta islands coast mountains river plain delta bay mountains plateau mountains harbor coast coast islands volcanic harbor islands volcanic coast estuary bay mountains islands plateau plateau coast volcanic plateau mountains desert mountains plateau plateau plateau forest bay plateau bay estuary mountains islands strait".split(" ");
   const LANDMARKS = [
@@ -281,7 +281,7 @@
   }
   function newGame(mode,index) {
     return {mode,index,difficulty,date:today(),serial:nextCaseNumber(),guesses:[],
-      revealed:DIFFICULTIES[difficulty].initial,penalty:0,finished:false,won:false,score:0};
+      revealed:DIFFICULTIES[difficulty].initial,penalty:0,sectorMapPenalty:0,sectorReveals:[],finished:false,won:false,score:0};
   }
   function caseCode(){
     return "#"+difficulty[0].toUpperCase()+"-"+game.date.replaceAll("-","")+"-"+String(game.serial).padStart(2,"0");
@@ -344,6 +344,20 @@
     latitude:"clueRegion",utmZone:"clueRegion",utmBand:"clueRegion",
     closer:"clueDistance",nearest:"clueDistance",landmark:"clueLandmark"
   });
+  function revealSectorOnMap(clue){
+    if(game.finished||!map||!mapStyleReady||!["longitude","latitude"].includes(clue.key))return;
+    if(!cluesFor(game.index,difficulty).slice(0,game.revealed)
+      .some(item=>item.key===clue.key&&item.from===clue.from&&item.to===clue.to))return;
+    if(!Array.isArray(game.sectorReveals))game.sectorReveals=[];
+    if(game.sectorReveals.includes(clue.key))return;
+    game.sectorReveals.push(clue.key);
+    game.sectorMapPenalty=(game.sectorMapPenalty||0)+SECTOR_MAP_COST;
+    save();renderClues();renderMap();
+    const bounds=clue.key==="longitude"?
+      [[clue.from,-75],[clue.to,75]]:[[-179.5,clue.from],[179.5,clue.to]];
+    map.fitBounds(bounds,{padding:{top:20,bottom:20,left:20,right:20},maxZoom:3,duration:450});
+    toast(tc("sectorMapPurchased",{cost:number(SECTOR_MAP_COST)}));
+  }
   function renderClues(){
     const clues=cluesFor(game.index,difficulty);
     const revealed=game.revealed;
@@ -361,7 +375,21 @@
       const clueValue=i<revealed?clueText(clue):lockedText;
       value.textContent=clueValue;
       value.title=clueValue;
-      body.append(category,value);row.append(idx,body);list.append(row);
+      body.append(category,value);
+      if(i<revealed&&(clue.key==="longitude"||clue.key==="latitude")){
+        const purchased=Array.isArray(game.sectorReveals)&&game.sectorReveals.includes(clue.key);
+        const button=document.createElement("button");
+        button.type="button";
+        button.className="sector-map-btn"+(purchased?" purchased":"");
+        button.textContent=purchased?tc("sectorMapped"):tc("sectorMapButton",{cost:number(SECTOR_MAP_COST)});
+        button.title=button.textContent;
+        button.setAttribute("aria-label",button.textContent);
+        button.disabled=game.finished||purchased||!map||!mapStyleReady;
+        button.addEventListener("click",()=>revealSectorOnMap(clue));
+        body.classList.add("with-sector-map");
+        body.append(button);
+      }
+      row.append(idx,body);list.append(row);
     });
     $("revealBtn").disabled=game.finished||revealed>=6;
     $("revealBtn").classList.toggle("hidden",game.finished);
@@ -544,7 +572,30 @@
     if(!map||!mapStyleReady)return;
     if(map.getLayer("case-distance-line"))map.removeLayer("case-distance-line");
     if(map.getSource("case-distance-line"))map.removeSource("case-distance-line");
+    for(const key of ["longitude","latitude"]){
+      const id="case-sector-"+key;
+      if(map.getLayer(id))map.removeLayer(id);
+      if(map.getSource(id))map.removeSource(id);
+    }
     activeLine=false;
+  }
+  // Full geographic strips, not a marker for the hidden city.
+  function sectorRectangle(west,south,east,north){
+    return [[[west,south],[east,south],[east,north],[west,north],[west,south]]];
+  }
+  function drawSectorOverlays(){
+    if(!map||!mapStyleReady||!Array.isArray(game.sectorReveals))return;
+    for(const clue of cluesFor(game.index,difficulty)){
+      if(!game.sectorReveals.includes(clue.key)||!["longitude","latitude"].includes(clue.key))continue;
+      const geometry=clue.key==="longitude"
+        ?{type:"Polygon",coordinates:sectorRectangle(clue.from,-85,clue.to,85)}
+        :{type:"MultiPolygon",coordinates:Array.from({length:6},(_,i)=>
+          sectorRectangle(-180+i*60,clue.from,-120+i*60,clue.to))};
+      const id="case-sector-"+clue.key;
+      map.addSource(id,{type:"geojson",data:{type:"Feature",properties:{},geometry}});
+      map.addLayer({id,type:"fill",source:id,
+        paint:{"fill-color":"#ffd449","fill-opacity":0.10,"fill-outline-color":"#ffd449"}});
+    }
   }
   function addMarker(lat,lng,label,style,popupText=""){
     const pin=makeMarker(label,style).setLngLat([lng,lat]).addTo(map);
@@ -639,6 +690,7 @@
   function renderMap(){
     if(!map)return;
     clearMapOverlays();
+    drawSectorOverlays();
     const target=cityCoords(game.index);
     const best=game.finished?bestGuess():null;
     game.guesses.forEach((g,i)=>addMarker(g.lat,g.lng,i+1,g===best?"best":"past"));
@@ -682,7 +734,7 @@
     if(game.won||game.guesses.length>=maximum()){
       game.finished=true;game.revealed=6;
       game.score=game.won
-        ?Math.max(250,Math.round(5000*Math.pow(.78,game.guesses.length-1)*Math.max(.76,1-distance/425)-game.penalty))
+        ?Math.max(0,Math.max(250,Math.round(5000*Math.pow(.78,game.guesses.length-1)*Math.max(.76,1-distance/425)-game.penalty))-(game.sectorMapPenalty||0))
         :0;
     }else game.revealed=Math.min(6,Math.max(game.revealed,DIFFICULTIES[difficulty].initial+game.guesses.length));
     save();selected=null;render();

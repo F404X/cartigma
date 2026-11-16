@@ -12,7 +12,7 @@ const bootstrap=readFileSync(new URL("map-bootstrap.js",root),"utf8");
 const workflow=readFileSync(new URL(".github/workflows/pages.yml",root),"utf8");
 
 function mockLeaflet(){
-  const state={tileUrl:null,controls:0,markers:[],lines:[],fit:null,events:{}};
+  const state={tileUrl:null,controls:0,markers:[],lines:[],polygons:[],fit:null,events:{}};
   const leaflet={
     map(){return {
       on(name,cb){state.events[name]=cb;return this},
@@ -34,7 +34,8 @@ function mockLeaflet(){
         remove(){state.markers=state.markers.filter(x=>x!==this)}};
       return item;
     },
-    polyline(coords,options){return {coords,options,addTo(){state.lines.push(this);return this}}}
+    polyline(coords,options){return {coords,options,addTo(){state.lines.push(this);return this}}},
+    geoJSON(feature,options){return {feature,options,addTo(){state.polygons.push(this);return this}}}
   };
   return {leaflet,state};
 }
@@ -53,7 +54,7 @@ test("both keyless vector and fallback raster scripts are included in Pages",()=
   assert.match(app,/switchToFallback/);
   assert.match(app,/mapStyleTimeout/);
   assert.match(app,/typeof libre\.supported==="function"/);
-  assert.match(html,/src="map-fallback\.js"/);
+  assert.ok(html.includes('src="map-fallback.js?v=20261116-sector-map"'));
   assert.match(html,/leaflet@1\.9\.4\/dist\/leaflet\.css/);
   assert.match(workflow,/map-fallback\.js/);
 });
@@ -86,6 +87,12 @@ test("Leaflet fallback restores map, markers, line and click coordinates",async(
   map.addLayer({id:"case-distance-line",source:"case-distance-line"});
   assert.equal(state.lines.length,1);
   assert.equal(state.lines[0].coords[0][0],31.63);
+  const strip={type:"Polygon",coordinates:[[[-30,-85],[0,-85],[0,85],[-30,85],[-30,-85]]]};
+  map.addSource("case-sector-longitude",{data:{geometry:strip}});
+  map.addLayer({id:"case-sector-longitude",source:"case-sector-longitude",type:"fill"});
+  assert.equal(state.polygons.length,1);
+  assert.equal(state.polygons[0].options.style.fillColor,"#ffd449");
+  assert.equal(state.polygons[0].options.style.fillOpacity,0.10);
   map.fitBounds([[-8,31],[-7,34]],{maxZoom:5,padding:{top:20,bottom:20,left:30,right:30}});
   assert.equal(state.fit.options.maxZoom,5);
   marker.remove();

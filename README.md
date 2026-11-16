@@ -12,7 +12,7 @@ A browser-based geographic detective game. Read the evidence, place pins on a wo
 - **Hard:** 4 guesses, 1 starting clue, **only the distance** after an incorrect guess. Direction remains hidden even in the final case report.
 - Win when a guess falls within **100 km straight-line distance** of the city's approximate coordinates.
 - Six evidence cards: landscape or latitude zone, continent, regional profile, **longitude sector (30° wide) in Normal or UTM zone in Hard**, proximity comparison between two regional reference locations, and a local landmark. If a landmark's name contains the target city's name (including English aliases), Normal replaces it with a **15° latitude sector** rather than giving away the answer. Hard replaces all obvious landmarks with a **UTM latitude band**: the combined UTM references require advanced map-reading knowledge. The distance evidence card was removed as redundant with guess feedback. Hemisphere evidence still appears before the continent when selected. Regional proximity comparisons prefer nearby places in the same geographic region; the reference radius adapts to regional geographic spread (about 2,000–6,000 km).
-- Extra hints cost **300 points** each. A successful investigation earns up to **5,000 points**, depending on guess count, accuracy and penalties.
+- Extra hints cost **300 points** each. Latitude/longitude sector evidence offers a **Map −1,200** button that highlights the entire sector in **yellow at 10% opacity**, persists across map styles and daily-game reloads, and only charges once per sector. This charge reduces final score separately from the extra hint count. A successful investigation earns up to **5,000 points**, depending on guess count, accuracy and penalties.
 
 ### Case numbering
 
