@@ -487,6 +487,17 @@ test("latitude band covers the world in six parts and survives map engine change
   assert.ok(g.mapState.sources.has("case-sector-latitude"));
 });
 
+test("vector map style finishing later enables the paid-sector action",()=>{
+  const g=boot({map:true}),$=g.get;
+  $("revealBtn").handlers.click();$("revealBtn").handlers.click();
+  let button=$("clueList").children[3].children[1].children[2];
+  assert.ok(button&&!button.disabled);
+  button.disabled=true; // Simulate the transient disabled state during map style loading.
+  g.mapState.events["style.load"]();
+  button=$("clueList").children[3].children[1].children[2];
+  assert.equal(button.disabled,false);
+});
+
 test("daily purchased map sectors reload without double deduction and Hard has no map buttons",()=>{
   const storage=new Map(),g=boot({map:true,storage}),$=g.get;
   $("revealBtn").handlers.click();$("revealBtn").handlers.click();

@@ -899,7 +899,7 @@
       mapStyleReady=true;
       configureMapLabelDensity();
       updateMapLanguage();
-      if(game)renderMap();
+      if(game){renderMap();renderClues();}
     });
     if(!libre.isFallback){
       map.on("error",event=>{
