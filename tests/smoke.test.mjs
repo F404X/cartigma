@@ -772,6 +772,24 @@ test("ten clue types are unique and complete across representative cities and bo
   }
 });
 
+test("capital and coastal distances omit names and years in every supported language",()=>{
+  const g=boot();
+  const locales=g.window.CartigmaCityClueI18n;
+  assert.equal(Object.keys(locales).length,19);
+  for(const [locale,data] of Object.entries(locales)){
+    for(const key of ["cityCapitalDistance","cityCoastDistance"]){
+      const phrase=data.templates[key];
+      assert.ok(phrase.includes("{value}"),locale+" missing distance value");
+      assert.ok(!phrase.includes("{capital}"),locale+" leaks capital name");
+      assert.ok(!phrase.includes("{year}"),locale+" includes source year");
+    }
+    for(const key of ["cityPopulation","cityDensity","cityTimezone"])
+      assert.ok(data.templates[key].includes("{year}"),locale+" must retain its source year");
+  }
+  assert.equal(locales.pt.templates.cityCapitalDistance,"≈ {value} km da capital");
+  assert.equal(locales.pt.templates.cityCoastDistance,"≈ {value} km do litoral");
+  assert.ok(files["index.html"].includes('src="city-clues-i18n.js?v=20261116-short-distances"'));
+});
 test("five city-specific evidence types are sourced, dated, and conditional",()=>{
   const g=boot(),w=g.window,geo=w.CartigmaCityIndicators,urban=w.CartigmaUrban2025;
   const places=w.GEODETECTIVE_PLACES;
@@ -785,13 +803,13 @@ test("five city-specific evidence types are sourced, dated, and conditional",()=
   const sao=full(places.findIndex(p=>p[0]==="São Paulo"));
   assert.ok(sao.clues.some(x=>x.includes("inhabitants (est. 2025)")&&
     x.includes("18,950,000")),"São Paulo: verified 2025 UN agglomeration population");
-  assert.ok(sao.clues.some(x=>/^≈ 875 km to Brasília \(2026\)/.test(x)),
-    "São Paulo: capital distance as calculated in 2026");
+  assert.ok(sao.clues.some(x=>x==="≈ 875 km from the capital"),
+    "São Paulo: capital distance without the city's name or calculation year");
   assert.ok(sao.clues.some(x=>/^UTC-3 \(2026\)$/.test(x)),
     "São Paulo: correct IANA time zone for the 2026 reference date");
   const goiania=full(places.findIndex(p=>p[0]==="Goiânia"));
-  assert.ok(goiania.clues.some(x=>x.startsWith("≈ 175 km to Brasília (2026)")));
-  assert.ok(goiania.clues.some(x=>x.startsWith("≈ 900 km to the ocean coast (2026)")));
+  assert.ok(goiania.clues.some(x=>x==="≈ 175 km from the capital"));
+  assert.ok(goiania.clues.some(x=>x==="≈ 900 km from the coast"));
   assert.ok(!goiania.clues.some(x=>x.includes("inhabitants (est. 2025)")),
     "No city census may be invented from country or old metropolitan figures");
   const mumbai=full(places.findIndex(p=>p[0]==="Mumbai"));
@@ -801,7 +819,7 @@ test("five city-specific evidence types are sourced, dated, and conditional",()=
   const papeete=full(places.findIndex(p=>p[0]==="Papeete"));
   assert.equal(papeete.clues.length,10);
   assert.ok(!papeete.clues.some(x=>x.includes("inhabitants (est. 2025)")||
-    x.includes("people/km²")||x.includes("to the ocean coast")),
+    x.includes("people/km²")||x.includes("from the coast")),
     "Sparse island must never receive false coastal or city-population values");
   for(const entry of geo){
     if(entry.cap)assert.ok(entry.cap[0]>0&&entry.cap[1]);
@@ -816,7 +834,13 @@ test("five city-specific evidence types are sourced, dated, and conditional",()=
   for(const [lang,p] of Object.entries(w.CartigmaCityClueI18n)){
     assert.equal(Object.keys(p.templates).length,5);
     for(const key of Object.keys(p.templates)){
-      assert.ok(p.templates[key].includes("{year}"),lang+" "+key);
+      if(["cityCapitalDistance","cityCoastDistance"].includes(key)){
+        assert.ok(p.templates[key].includes("{value}"),lang+" "+key);
+        assert.ok(!p.templates[key].includes("{year}"),lang+" "+key);
+        assert.ok(!p.templates[key].includes("{capital}"),lang+" "+key);
+      }else{
+        assert.ok(p.templates[key].includes("{year}"),lang+" "+key);
+      }
       assert.ok(p.categories[key],lang+" "+key);
     }
   }
@@ -831,14 +855,14 @@ test("city-specific clues remain 10 and translated on Normal and Hard",()=>{
     g.language("pt");
     const clues=revealAll(g);
     assert.equal(clues.length,10);
-    assert.ok(clues.some(x=>x.includes("até Brasília (2026)")));
+    assert.ok(clues.some(x=>x==="≈ 875 km da capital"));
     assert.ok(clues.some(x=>x.includes("18.950.000")&&x.includes("2025")));
     assert.ok(clues.some(x=>x.includes("UTC-3 (2026)")));
     assert.equal(new Set(clues).size,10);
     assert.equal(g.get("attemptCount").textContent,
       difficulty==="normal"?"6 / 6":"4 / 4");
     g.language("en");
-    assert.ok(clueTexts(g).some(x=>x.includes("to Brasília (2026)")));
+    assert.ok(clueTexts(g).some(x=>x==="≈ 875 km from the capital"));
   }
 });
 
@@ -875,7 +899,7 @@ test("old eight-hint daily games keep original evidence without new source subst
   assert.equal($("hintCount").textContent,"8 / 10");
   assert.equal(JSON.parse(storage.get(key)).evidenceVersion,1);
   assert.ok(!clueTexts(g).slice(7).some(x=>
-    /Urban population:|Urban density:|to the ocean coast|to .* \(2026\)|UTC.*2026/.test(x)));
+    /Urban population:|Urban density:|from the coast|from the capital|UTC.*2026/.test(x)));
   const prior=clueTexts(g).slice(0,8);
   g.get("revealBtn").handlers.click();
   assert.deepEqual(clueTexts(g).slice(0,8),prior);

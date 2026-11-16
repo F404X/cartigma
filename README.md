@@ -164,10 +164,13 @@ statistics.
   current `Intl.DateTimeFormat` daylight-saving rules. Where the country
   contains several zones and no verified city zone exists, omit the clue.
 
-The year on each *distance* clue means **2026 calculation vintage**,
-not a survey date for the coastline or coordinates. New facts have no
-additional map overlays, and are available to buy using the existing
-points-based reveal system.
+The two distance clues now intentionally show **only an approximate value
+in km**, without naming the capital or displaying the calculation year:
+`≈ 875 km da capital` and `≈ 900 km do litoral` are examples in Portuguese.
+The calculations remain documented as 2026-vintage estimates, not official
+surveys. Population, density and time-zone clues retain their reference
+years. No additional map overlays are attached to these clues; they are
+available through the existing points-based reveal system.
 
 Sources: [Natural Earth capitals](https://www.naturalearthdata.com/downloads/110m-cultural-vectors/110m-populated-places/),
 [Natural Earth coastline](https://www.naturalearthdata.com/downloads/110m-physical-vectors/110m-coastline/),
