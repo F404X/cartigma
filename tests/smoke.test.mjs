@@ -380,7 +380,10 @@ test("landmarks that name their city are replaced by different latitude evidence
     const g=boot({randomValue:(index+.25)/places.length});
     g.get("freeBtn").handlers.click();
     for(let j=0;j<4;j++)g.get("revealBtn").handlers.click();
-    assert.match(clueTexts(g)[5],/^Latitude sector: -?\\d+° to -?\\d+°$/,city);
+    const sector=clueTexts(g)[5];
+    assert.ok(sector.startsWith("Latitude sector: "),city);
+    const bounds=sector.slice("Latitude sector: ".length).replaceAll("°","").split(" to ");
+    assert.ok(bounds.length===2&&bounds.every(value=>Number.isInteger(Number(value))),city);
     assert.doesNotMatch(clueTexts(g)[5],/Associated landmark:/,city);
   }
   const paris=places.findIndex(p=>p[0]==="Paris");
@@ -402,7 +405,7 @@ test("Hard mode uses expert-only UTM reference zones and bands, without landmark
     assert.equal(clueTexts(g)[5],"UTM latitude band: "+band,city);
     assert.equal(clueTexts(g).length,6);
   }
-  assert.match(files["app.js"],/regionalHintRadius\\(index,level\\)/);
+  assert.ok(files["app.js"].includes("regionalHintRadius(index,level)"));
 });
 
 test("exact guesses omit distance and direction in history and final dossier",()=>{
