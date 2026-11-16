@@ -423,10 +423,22 @@
   }
   function savedDaily(){
     const s=store.get(dailyStorageKey());
-    return s&&s.mode==="daily"&&s.date===today()&&s.difficulty===difficulty&&s.index===dailyIndex()
-      &&Array.isArray(s.guesses)&&s.guesses.length<=maximum()&&Number.isFinite(s.revealed)
-      &&s.guesses.every(g=>Number.isFinite(g.lat)&&Number.isFinite(g.lng)&&Number.isFinite(g.distance))
-      ?s:null;
+    const valid=s&&s.mode==="daily"&&s.date===today()&&s.difficulty===difficulty
+      &&s.index===dailyIndex()&&Array.isArray(s.guesses)&&s.guesses.length<=maximum()
+      &&Number.isFinite(s.revealed)
+      &&s.guesses.every(g=>Number.isFinite(g.lat)&&Number.isFinite(g.lng)&&Number.isFinite(g.distance));
+    if(!valid)return null;
+    // Before this release, northern-only regions could receive a hemisphere
+    // map purchase. Refund its previous 600-point cost on open cases now that
+    // the evidence no longer appears in those continents.
+    if(!s.finished&&Array.isArray(s.sectorReveals)
+      &&s.sectorReveals.includes("hemisphere")
+      &&!EQUATOR_CROSSING_CONTINENTS.has(continentKey(s.index))){
+      s.sectorReveals=s.sectorReveals.filter(key=>key!=="hemisphere");
+      s.sectorMapPenalty=Math.max(0,(s.sectorMapPenalty||0)-600);
+      store.set(dailyStorageKey(),s);
+    }
+    return s;
   }
   function save(){if(game?.mode==="daily")store.set(dailyStorageKey(),game)}
   function chooseFree(){

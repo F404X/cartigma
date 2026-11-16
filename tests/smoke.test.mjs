@@ -344,6 +344,30 @@ test("landlocked evidence and case profiles use affirmative sentences in all lan
     assert.equal(cell.children[0]?.className,"visually-hidden");
   }
 });
+test("obsolete hemisphere map purchases in northern-only daily cases are refunded",()=>{
+  const world=boot().window,places=world.GEODETECTIVE_PLACES;
+  const day=Array.from({length:200},(_,j)=>
+    new Date(Date.UTC(2027,0,1+j)).toISOString().slice(0,10)).find(d=>{
+    const idx=normalIndexForDay(d,world);
+    return !equatorRegions.has(continentForTest(idx,world));
+  });
+  assert.ok(day,"Need a daily case in Europe or North America");
+  class FakeDate extends Date{
+    constructor(...args){super(...(args.length?args:[day+"T12:00:00Z"]));}
+  }
+  const index=normalIndexForDay(day,world);
+  const key="geodetective-daily-v3-"+day+"-normal";
+  const storage=new Map([[key,JSON.stringify({
+    mode:"daily",index,difficulty:"normal",date:day,serial:1,guesses:[],
+    revealed:2,penalty:0,sectorMapPenalty:600,sectorReveals:["hemisphere"],
+    finished:false,won:false,score:0
+  })]]);
+  const g=boot({storage,clock:FakeDate});
+  const saved=JSON.parse(storage.get(key));
+  assert.equal(saved.sectorMapPenalty,0);
+  assert.deepEqual(saved.sectorReveals,[]);
+  assert.ok(!clueTexts(g).some(text=>text.startsWith("Hemisphere:")));
+});
 test("hint costs follow the NEXT clue, are deducted once, and saved hint count remains exact",()=>{
   const world=boot().window,places=world.GEODETECTIVE_PLACES;
   const priceTypes=new Set();
@@ -1302,7 +1326,8 @@ test("repeatable country evidence is cached per language without distance comput
   g.language("en");
   assert.equal(g.perf.distanceCalls,before);
   assert.ok(files["app.js"].includes('const cacheKey=index+":"+level+":"+lang'));
-  assert.ok(files["app.js"].includes('const mixed=['));
+  assert.ok(files["app.js"].includes('const countryPositions=[['));
+  assert.ok(files["app.js"].includes('const geographic=['));
   assert.ok(files["app.js"].includes('extraCountryClues(index,level)'));
 });
 
