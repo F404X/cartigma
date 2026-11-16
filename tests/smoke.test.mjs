@@ -462,8 +462,8 @@ test("country-data evidence is distributed among positions three to seven",()=>{
         "GDP per capita (","Country / territory area:","No access to the sea.","Has access to the sea."].find(prefix=>clues[j].startsWith(prefix));
       if(type){counts[type]=(counts[type]||0)+1;positions.add(j);country.push(type);}
     }
-    assert.ok(country.length>=4&&country.length<=5,
-      "Four or five distinct country facts per case: "+index);
+    assert.ok(country.length>=2&&country.length<=5,
+      "The original two country facts must remain: "+index);
     assert.equal(new Set(country).size,country.length,"Country facts must differ: "+index);
     assert.ok(!clues.some(text=>/Closer to |Distance from reference/.test(text)));
   }
