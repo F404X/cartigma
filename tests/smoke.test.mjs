@@ -314,7 +314,8 @@ test("map labels react to all language changes and fall back to native names",()
   const field=g.mapState.styles.filter(x=>x.id==="label_city").at(-1).expr;
   assert.ok(JSON.stringify(field).includes("name:ja"));
   assert.ok(JSON.stringify(field).includes('"name"'));
-  assert.ok(g.mapState.styles.every(x=>x.id!=="road_shield"));
+  assert.ok(g.mapState.styles.every(x=>!(x.id==="road_shield"&&x.key==="text-field")),
+    "Road shields must not be translated; their layer visibility may be filtered");
   g.language("pt");
   assert.equal(g.get("languageFlag").textContent,"🇧🇷");
   g.language("en");
