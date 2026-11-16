@@ -13,6 +13,7 @@ A browser-based geographic detective game. Read the evidence, place pins on a wo
 - Win when a guess falls within **100 km straight-line distance** of the city's approximate coordinates.
 - Six evidence cards: landscape or latitude zone, continent, regional profile, **longitude sector (30° wide) in Normal or UTM zone in Hard**, proximity comparison between two regional reference locations, and a local landmark. If a landmark's name contains the target city's name (including English aliases), Normal replaces it with a **15° latitude sector** rather than giving away the answer. Hard replaces all obvious landmarks with a **UTM latitude band**: the combined UTM references require advanced map-reading knowledge. The distance evidence card was removed as redundant with guess feedback. Hemisphere evidence still appears before the continent when selected. Regional proximity comparisons prefer nearby places in the same geographic region; the reference radius adapts to regional geographic spread (about 2,000–6,000 km).
 - **Vector map filters:** a gear beside **Vector** opens a compact, scrollable panel above the map selector. Toggle overview contours of all continents, national borders, state/region boundaries, country/city labels, roads, natural areas, rivers/lakes, and points of interest. Preferences persist locally across basemap and theme changes. These filters only change presentation: the paid clue that identifies the target continent still costs points. OpenStreetMap raster tiles cannot hide individual map layers, so the gear is disabled in that mode.
+- **Seven evidence slots** per investigation: six geographic clues plus one deterministic country-data clue. The last slot varies among local currency code, language family, one verified flag color, population estimate, GDP per capita, national area, and whether the country is landlocked. Figures are rounded (more coarsely on Hard) and include their reference years; unknown values are omitted, not fabricated.
 - Extra hints cost **300 points** each. Latitude/longitude sector evidence offers a **Map −1,200** button that highlights the entire sector in **yellow at 10% opacity**, persists across map styles and daily-game reloads, and only charges once per sector. This charge reduces final score separately from the extra hint count. When a hemisphere clue is given, the **Map −600** option draws a dashed yellow Equator with small repeated arrows pointing north or south into the correct hemisphere. The arrows stay the same pixel size, remain close to the Equator, and redistribute at consistent screen-pixel spacing whenever the map zooms or pans. This aid is also charged only once, stays visible through map switches, and persists across daily-case reloads. **Continent evidence** also includes a one-time **Map −600** option that follows the contour of that continent and its islands with a subtle yellow 28%-opacity stroke and **no fill**, based on simplified Natural Earth continent polygons; the guide persists across map styles and daily reloads. A successful investigation earns up to **5,000 points**, depending on guess count, accuracy and penalties.
 
 ### Case numbering
@@ -21,7 +22,7 @@ Case identifiers follow **`#N-YYYYMMDD-01`** or **`#H-YYYYMMDD-01`**. The first 
 
 ## Completed case file
 
-When an investigation ends, an interactive detective dossier is displayed with:
+When an investigation ends, an interactive detective dossier displays a country flag, a country-specific historical milestone (for all 165 represented countries and territories), and:
 
 - Case ID, outcome, city, country or territory, and continent.
 - Approximate target coordinates, mode, difficulty, guesses used, extra hints and score.
@@ -92,3 +93,15 @@ The city center coordinates are approximate. Distances use the haversine formula
 ### Map outline data
 
 Continent borders are based on [Natural Earth](https://www.naturalearthdata.com/) geographic outlines via the MIT-licensed [power-bi-shape-maps world-continents topology](https://github.com/giobuzala/power-bi-shape-maps/blob/master/world-continents.json), simplified and converted to standalone GeoJSON for offline use. These are approximate geographic contours, not political border determinations.
+
+### Data provenance (country evidence and history)
+
+The optional seventh clue and the country section of the final case file are generated from a **static 165-country snapshot** (no runtime API key):
+
+- ISO flags, currencies, area, access to sea and official languages: [mledoze/countries](https://github.com/mledoze/countries).
+- GDP per capita: calculated from matched-year current-US-dollar GDP and population in [World Bank WDI GDP](https://github.com/datasets/gdp) and [WDI population](https://github.com/datasets/population). Mostly 2023, with older observations labeled by year. Population estimates also carry a year, usually 2025. These are **approximate** country-level clues, not city statistics.
+- Language family: classification of an identified official language; countries may have multiple languages/families.
+- Flag-color clue: one color attested in the historic [UCI Flags dataset](https://archive.ics.uci.edu/dataset/40/flags) and retained only where the flag record was suitable. A missing or uncertain color is never used.
+- Brief country-specific political history: milestones from the public-domain [CIA World Factbook almanac](https://github.com/factbook/factbook.json), with authored contextual notes for selected countries and special cases such as Taiwan and French Polynesia. Dates describe historical events, not current government status. Short Portuguese and English notes are available for all 165 entries.
+
+The country flag in the case file loads by ISO alpha-2 code from flagcdn.com, with an emoji fallback. Other report languages use English history text when a dedicated translation is unavailable.

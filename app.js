@@ -7,6 +7,11 @@
   const PT_EXTRA_NAMES=window.GeoExtendedCityPortugueseNames || {};
   const TRANSLATIONS = window.GeoI18n?.PACKS || {};
   const CLUE_I18N = window.GeoCluesI18n || {};
+  const COUNTRY_INSIGHTS = window.GeoCountryInsights || {};
+  const COUNTRY_CLUE_I18N = window.GeoCountryClueI18n || {};
+  const COUNTRY_FAMILIES_PT = window.GeoCountryLanguageFamiliesPT || {};
+  const EXTRA_CLUE_KEYS = new Set(["countryCurrency","countryLanguageFamily","countryFlagColor",
+    "countryPopulation","countryGDP","countryArea","countryLandlocked"]);
   const FILTER_TRANSLATIONS = window.GeoMapFilterLabels || {};
   const LANGS = window.GeoI18n?.langNames || {};
   const REPORT_I18N = window.GeoReportI18n || {};
@@ -16,6 +21,7 @@
   const CONTINENT_BORDERS = window.GeoContinentBorders || {};
   const DIFFICULTIES = {normal:{attempts:6,initial:2},hard:{attempts:4,initial:1}};
   const SERIAL_PREFIX = "geodetective-case-counter-";
+  const EVIDENCE_COUNT = 7;
   const WIN_RADIUS = 100, HINT_COST = 300, MAP_OVERLAY_COSTS = Object.freeze({longitude:1200,latitude:1200,hemisphere:600,continent:600}), DAILY_KEY = "geodetective-daily-v3-";
   const COUNTRY_CODES = "IS NO NO NO FI SE DK GB FR PT IT GR TR MA EG SN NG KE ET ZA MG AE JO IL IN IN IN NP BD TH SG ID ID JP JP KR CN CN CN TW MN KZ AU AU AU AU NZ NZ FJ PF CA US US US US MX MX CU GT CO EC PE PE BO BR BR BR BR BR BR AR CL AR CL".split(" ").concat(EXTENDED.map(item=>item.countryCode));
   const FEATURES = "volcanic fjord polar fjord coast islands coast river river estuary river mountains strait desert desert peninsula delta plateau plateau peninsula plateau desert plateau mountains coast plain delta mountains delta delta islands delta islands coast mountains river plain delta bay mountains plateau mountains harbor coast coast islands volcanic harbor islands volcanic coast estuary bay mountains islands plateau plateau coast volcanic plateau mountains desert mountains plateau plateau plateau forest bay plateau bay estuary mountains islands strait".split(" ").concat(EXTENDED.map(()=>"urban"));
@@ -95,7 +101,10 @@
     return template.replace(/\{(\w+)\}/g,(_,name)=>String(variables[name]??""));
   }
   function tc(key,variables={}) {
-    const template = CLUE_I18N[lang]?.templates?.[key] ?? CLUE_I18N.en?.templates?.[key] ?? key;
+    const template = CLUE_I18N[lang]?.templates?.[key] ??
+      COUNTRY_CLUE_I18N[lang]?.[key] ??
+      CLUE_I18N.en?.templates?.[key] ??
+      COUNTRY_CLUE_I18N.en?.[key] ?? key;
     return template.replace(/\{(\w+)\}/g,(_,name)=>String(variables[name]??""));
   }
   function locale() {return LANGS[lang] || "en";}
@@ -260,6 +269,49 @@
   function referenceName(item){
     return item.name+", "+displayRegion(item.country);
   }
+  function extraCountryClue(index,level){
+    const code=COUNTRY_CODES[index],data=COUNTRY_INSIGHTS[code];
+    if(!data)throw Error("Missing country insights for "+code);
+    const candidates=[];
+    const add=(key,props)=>candidates.push({key,...props});
+    if(data.currency)add("countryCurrency",{code:data.currency});
+    if(data.languageFamily){
+      const family=lang==="pt"?(COUNTRY_FAMILIES_PT[data.languageFamily]||data.languageFamily):data.languageFamily;
+      add("countryLanguageFamily",{family});
+    }
+    if(data.flagColor){
+      const color=COUNTRY_CLUE_I18N[lang]?.colors?.[data.flagColor]||
+        COUNTRY_CLUE_I18N.en?.colors?.[data.flagColor]||data.flagColor;
+      add("countryFlagColor",{color});
+    }
+    const roundingStep=(amount,level)=>{
+      if(amount>=1e9)return level==="hard"?250e6:100e6;
+      if(amount>=100e6)return level==="hard"?50e6:20e6;
+      if(amount>=10e6)return level==="hard"?10e6:5e6;
+      if(amount>=1e6)return level==="hard"?2e6:500e3;
+      return level==="hard"?200e3:50e3;
+    };
+    if(data.population&&data.populationYear){
+      const step=roundingStep(data.population,level);
+      add("countryPopulation",{value:number(Math.max(step,Math.round(data.population/step)*step)),
+        year:data.populationYear});
+    }
+    if(data.gdpPerCapita&&data.gdpYear){
+      const step=level==="hard"?10000:(data.gdpPerCapita>=20000?5000:1000);
+      add("countryGDP",{value:number(Math.max(step,Math.round(data.gdpPerCapita/step)*step)),
+        year:data.gdpYear});
+    }
+    if(data.area){
+      const step=level==="hard"?100000:10000;
+      add("countryArea",{value:number(Math.max(step,Math.round(data.area/step)*step))});
+    }
+    if(typeof data.landlocked==="boolean")
+      add("countryLandlocked",{value:tc(data.landlocked?"yes":"no")});
+    // The seventh clue changes between cases, but is fixed for a given city,
+    // difficulty and language. Never select a field without verified data.
+    if(!candidates.length)throw Error("No seventh evidence for "+code);
+    return candidates[hash("country-evidence:"+code+":"+index+":"+level)%candidates.length];
+  }
   function cluesFor(index,level){
     const cacheKey=index+":"+level+":"+lang;
     if(clueCache.has(cacheKey))return clueCache.get(cacheKey);
@@ -298,7 +350,8 @@
       third,
       coordinateClue(index,level),
       relationship,
-      landmarkClue(index,level)
+      landmarkClue(index,level),
+      extraCountryClue(index,level)
     ];
     clueCache.set(cacheKey,clues);
     return clues;
@@ -392,6 +445,10 @@
   // Reuse the clue-category lookup instead of rebuilding it for every row.
   const CLUE_CATEGORY_KEYS=Object.freeze({
     terrain:"clueTerrain",continent:"clueRegion",zone:"clueClimate",adminRegion:"clueRegion",
+    countryCurrency:"clueCivic",countryLanguageFamily:"clueCivic",
+    countryFlagColor:"clueCivic",countryPopulation:"clueCivic",
+    countryGDP:"clueCivic",countryArea:"clueRegion",
+    countryLandlocked:"clueRegion",
     hemisphere:"clueRegion",capital:"clueCivic",longitude:"clueRegion",
     latitude:"clueRegion",utmZone:"clueRegion",utmBand:"clueRegion",
     closer:"clueDistance",nearest:"clueDistance",landmark:"clueLandmark"
@@ -458,7 +515,7 @@
       }
       row.append(idx,body);list.append(row);
     });
-    $("revealBtn").disabled=game.finished||revealed>=6;
+    $("revealBtn").disabled=game.finished||revealed>=EVIDENCE_COUNT;
     $("revealBtn").classList.toggle("hidden",game.finished);
   }
   function guessMetricText(g){
@@ -513,6 +570,24 @@
     $("reportVerdict").textContent=t(game.won?"caseSolved":"caseClosed");
     $("reportHeading").textContent=cityName(place);
     $("reportCountry").textContent=countryName(game.index);
+    const iso=COUNTRY_CODES[game.index],details=COUNTRY_INSIGHTS[iso];
+    const flagImage=$("reportFlag"),flagFallback=$("reportFlagFallback");
+    flagFallback.textContent=details?.flag||"";
+    flagFallback.classList.add("hidden");
+    flagImage.classList.remove("hidden");
+    flagImage.src=/^[A-Z]{2}$/.test(iso)
+      ?"https://flagcdn.com/w160/"+iso.toLowerCase()+".png":"";
+    flagImage.alt=countryName(game.index);
+    flagImage.onerror=()=>{
+      flagImage.classList.add("hidden");
+      flagFallback.classList.remove("hidden");
+    };
+    $("reportHistoryTitle").textContent=COUNTRY_CLUE_I18N[lang]?.countryHistory||
+      COUNTRY_CLUE_I18N.en?.countryHistory||"Country history";
+    $("reportHistory").textContent=details?.history?.[lang==="pt"?"pt":"en"]||
+      details?.history?.en||"";
+    $("reportHistorySource").textContent=COUNTRY_CLUE_I18N[lang]?.countryHistorySource||
+      COUNTRY_CLUE_I18N.en?.countryHistorySource||"CIA World Factbook";
     $("reportStamp").textContent=t(game.won?"reportSuccess":"reportFailure");
     $("reportMode").textContent=t(game.mode==="daily"?"daily":"free");
     $("reportDifficulty").textContent=t(difficulty);
@@ -838,7 +913,7 @@
     renderMap();
   }
   function reveal(){
-    if(game.finished||game.revealed>=6)return;
+    if(game.finished||game.revealed>=EVIDENCE_COUNT)return;
     game.revealed++;game.penalty+=HINT_COST;save();renderClues();toast(t("hintUsed"));
   }
   function guess(){
@@ -848,11 +923,12 @@
       at:new Date().toISOString(),distance:Math.round(distance),bearing:Math.round(heading(pos,to))});
     game.won=distance<=WIN_RADIUS;
     if(game.won||game.guesses.length>=maximum()){
-      game.finished=true;game.revealed=6;
+      game.finished=true;game.revealed=EVIDENCE_COUNT;
       game.score=game.won
         ?Math.max(0,Math.max(250,Math.round(5000*Math.pow(.78,game.guesses.length-1)*Math.max(.76,1-distance/425)-game.penalty))-(game.sectorMapPenalty||0))
         :0;
-    }else game.revealed=Math.min(6,Math.max(game.revealed,DIFFICULTIES[difficulty].initial+game.guesses.length));
+    }else game.revealed=Math.min(EVIDENCE_COUNT,
+      Math.max(game.revealed,DIFFICULTIES[difficulty].initial+game.guesses.length));
     save();selected=null;render();
     if(game.finished){showReport();}
     // Keep the investigator’s chosen zoom after a wrong guess.
@@ -1208,7 +1284,9 @@
     });
   }
   function init(){
-    if(PLACES.length!==500||EXTENDED.length!==426||PLACES.length!==FEATURES.length||
+    if(PLACES.length!==500||EXTENDED.length!==426||
+       new Set(COUNTRY_CODES).size!==Object.keys(COUNTRY_INSIGHTS).length||
+       PLACES.length!==FEATURES.length||
        PLACES.length!==COUNTRY_CODES.length||PLACES.length!==LANDMARKS.length||
        PLACES.length!==FACTS.length||Object.keys(NEARBY_REFERENCES).length<45)
       throw new Error("Location catalogue and metadata are out of sync");

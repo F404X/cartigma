@@ -19,24 +19,26 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.18.0/dist/maplibre-gl.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=20261116-global-500">
+  <link rel="stylesheet" href="styles.css?v=20261116-country-dossier">
   <link rel="stylesheet" href="themes.css">
   <link rel="stylesheet" href="mobile.css">
   
   <script defer src="places.js"></script>
-  <script defer src="continent-borders.js?v=20261116-global-500"></script>
+  <script defer src="continent-borders.js?v=20261116-country-dossier"></script>
   <script defer src="i18n.js"></script>
-  <script defer src="clues-i18n.js?v=20261116-global-500"></script>
-  <script defer src="map-filters-i18n.js?v=20261116-global-500"></script>
+  <script defer src="clues-i18n.js?v=20261116-country-dossier"></script>
+  <script defer src="map-filters-i18n.js?v=20261116-country-dossier"></script>
   <script defer src="report-i18n.js"></script>
   <script defer src="facts.js"></script>
-  <script defer src="cities-extended.js?v=20261116-global-500"></script>
+  <script defer src="cities-extended.js?v=20261116-country-dossier"></script>
+  <script defer src="country-insights.js?v=20261116-country-dossier"></script>
+  <script defer src="country-clues-i18n.js?v=20261116-country-dossier"></script>
   <script defer src="references.js"></script>
   <script defer src="compass-i18n.js"></script>
   <script defer src="theme.js"></script>
-  <script defer src="map-fallback.js?v=20261116-global-500"></script>
+  <script defer src="map-fallback.js?v=20261116-country-dossier"></script>
   <script defer src="language-picker.js"></script>
-  <script type="module" src="map-bootstrap.js?v=20261116-global-500"></script>
+  <script type="module" src="map-bootstrap.js?v=20261116-country-dossier"></script>
 </head>
 <body>
 <div class="app">
@@ -244,6 +246,10 @@
       <h2 id="reportHeading">Unknown location</h2>
       <p id="reportCountry"></p>
     </div>
+    <div class="report-flag" role="group" aria-label="Country flag">
+      <img id="reportFlag" alt="" loading="lazy" referrerpolicy="no-referrer">
+      <span id="reportFlagFallback" class="hidden" aria-hidden="true"></span>
+    </div>
     <div class="report-stamp" id="reportStamp" aria-hidden="true">CLOSED</div>
   </div>
   <div class="report-body">
@@ -263,6 +269,11 @@
     <section class="report-section report-fact">
       <h3 data-i18n="reportTrivia">Did you know?</h3>
       <p id="reportFact"></p>
+    </section>
+    <section class="report-section report-country-history">
+      <h3 id="reportHistoryTitle">A little history</h3>
+      <p id="reportHistory"></p>
+      <small id="reportHistorySource"></small>
     </section>
     <section class="report-section">
       <h3 data-i18n="reportTimeline">Guess log</h3>

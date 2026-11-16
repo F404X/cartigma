@@ -645,3 +645,22 @@ dialog.case-report .report-heading h2{font-size:24px}
 }
 @media(max-width:390px){.map-filter-gear{width:25px;flex-basis:25px}}
 @media(prefers-reduced-motion:reduce){.map-filter-row input,.map-filter-row input::before{transition:none}}
+
+/* Country flags and readable historical context on final case dossiers. */
+.report-flag{flex:0 0 52px;width:52px;min-height:34px;display:grid;place-items:center;
+ border:1px solid var(--border-strong);border-radius:2px;overflow:hidden;background:var(--surface3)}
+.report-flag img{display:block;width:100%;height:34px;object-fit:contain}
+.report-flag span{font:30px/1 var(--font);height:34px;display:grid;place-items:center}
+.report-flag .hidden{display:none!important}
+.report-country-history{padding:11px 14px;border-left:2px solid var(--accent);
+ background:var(--surface2);overflow-wrap:anywhere}
+.report-country-history h3{margin:0 0 9px}
+.report-country-history p{margin:0;color:var(--text);font:500 13px/1.55 var(--font)}
+.report-country-history small{display:block;margin-top:8px;color:var(--muted);font:10px/1.35 var(--font)}
+@media(max-width:760px){
+ .report-flag{flex-basis:40px;width:40px;min-height:28px}
+ .report-flag img{height:28px}
+ .report-flag span{height:28px;font-size:24px}
+ .report-country-history{padding:9px 11px}
+ .report-country-history p{font-size:12px}
+}

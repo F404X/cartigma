@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {runInNewContext} from "node:vm";
 
-const names=["places.js","continent-borders.js","references.js","i18n.js","map-filters-i18n.js","clues-i18n.js","report-i18n.js","facts.js","cities-extended.js","compass-i18n.js","app.js","index.html","styles.css","map-bootstrap.js"];
+const names=["places.js","continent-borders.js","references.js","i18n.js","map-filters-i18n.js","clues-i18n.js","report-i18n.js","facts.js","cities-extended.js","country-insights.js","country-clues-i18n.js","compass-i18n.js","app.js","index.html","styles.css","map-bootstrap.js"];
 const files=Object.fromEntries(names.map(n=>[n,readFileSync(new URL("../"+n,import.meta.url),"utf8")]));
 
 class Element {
@@ -266,6 +266,115 @@ test("new locations have playable region clues and never invent landmark names",
   }
 });
 
+
+test("every playable country has sourced metadata, a flag, and its own historical note",()=>{
+  const g=boot(),countries=g.window.GeoCountryInsights;
+  const codes=files["app.js"].match(/const COUNTRY_CODES = "([^"]+)"/)[1].split(" ");
+  const extra=g.window.GeoExtendedPlaceMetadata.map(m=>m.countryCode);
+  const needed=new Set([...codes,...extra]);
+  assert.equal(needed.size,165);
+  assert.equal(Object.keys(countries).length,165);
+  for(const code of needed){
+    const data=countries[code];
+    assert.ok(data,code+" missing country metadata");
+    assert.ok(data.currency,code+" missing currency");
+    assert.ok(typeof data.landlocked==="boolean",code+" missing landlocked status");
+    assert.ok(Number.isFinite(data.area)&&data.area>0,code+" missing area");
+    assert.ok(data.flag,code+" missing flag");
+    assert.ok(data.history.en?.length>35&&data.history.pt?.length>35,
+      code+" needs source-grounded historical context");
+    if(data.gdpPerCapita!==null){
+      assert.ok(Number.isInteger(data.gdpYear)&&data.gdpYear<=2025);
+      assert.ok(data.gdpPerCapita>0);
+    }
+  }
+  assert.equal(Object.keys(g.window.GeoCountryClueI18n).length,19);
+  assert.equal(g.window.GeoCountryClueI18n.pt.countryHistory,"Um pouco de história");
+});
+
+test("the seventh evidence varies among seven verified country-data types",()=>{
+  const g=boot(),p=g.window.GEODETECTIVE_PLACES;
+  const country=g.window.GeoCountryInsights,extras=g.window.GeoExtendedPlaceMetadata;
+  const codes=[...files["app.js"].match(/const COUNTRY_CODES = "([^"]+)"/)[1].split(" "),
+    ...extras.map(m=>m.countryCode)];
+  const counted={};
+  const available=(data)=>{
+    const a=[];
+    if(data.currency)a.push("countryCurrency");
+    if(data.languageFamily)a.push("countryLanguageFamily");
+    if(data.flagColor)a.push("countryFlagColor");
+    if(data.population)a.push("countryPopulation");
+    if(data.gdpPerCapita)a.push("countryGDP");
+    if(data.area)a.push("countryArea");
+    if(typeof data.landlocked==="boolean")a.push("countryLandlocked");
+    return a;
+  };
+  for(let i=0;i<p.length;i++){
+    const choices=available(country[codes[i]]);
+    assert.ok(choices.length>0);
+    const key=choices[hash("country-evidence:"+codes[i]+":"+i+":normal")%choices.length];
+    counted[key]=(counted[key]||0)+1;
+  }
+  assert.deepEqual(Object.keys(counted).sort(),[
+    "countryArea","countryCurrency","countryFlagColor","countryGDP",
+    "countryLandlocked","countryLanguageFamily","countryPopulation"
+  ].sort());
+  for(const [index,place] of p.entries()){
+    if(index%37!==0)continue;
+    const instance=boot({randomValue:(index+.25)/p.length});
+    instance.get("freeBtn").handlers.click();
+    for(let j=0;j<6;j++)instance.get("revealBtn").handlers.click();
+    const visible=clueTexts(instance);
+    assert.equal(visible.length,7);
+    assert.ok(visible[6].length>4&&visible[6]!=="Locked",place[0]);
+    instance.language("pt");
+    assert.ok(clueTexts(instance)[6].length>4,place[0]);
+  }
+});
+
+test("a solved dossier shows the flag and a historical paragraph for every country tested",()=>{
+  const places=boot().window.GEODETECTIVE_PLACES;
+  for(const city of ["Reykjavík","Taipé","Papeete","Istambul","Ankara","São Paulo"]){
+    const index=places.findIndex(x=>x[0]===city);
+    assert.ok(index>=0);
+    const g=boot({randomValue:(index+.25)/places.length}),$=g.get;
+    $("freeBtn").handlers.click();
+    g.select(city);$("guessBtn").handlers.click();
+    assert.equal($("reportDialog").open,true);
+    assert.ok($("reportHistory").textContent.length>35,city);
+    assert.ok($("reportHistorySource").textContent.includes("World Factbook"));
+    const iso=city==="Taipé"?"tw":city==="Papeete"?"pf":city==="Ankara"||city==="Istambul"?"tr":city==="São Paulo"?"br":"is";
+    assert.equal($("reportFlag").src,"https://flagcdn.com/w160/"+iso+".png",city);
+    assert.ok($("reportFlag").alt.length>2);
+    assert.equal($("reportEvidenceList").children.length,7);
+    if(city==="Taipé"){
+      g.language("pt");
+      assert.match($("reportHistory").textContent,/Taiwan esteve sob administração japonesa/);
+      assert.equal($("reportHistoryTitle").textContent,"Um pouco de história");
+      $("reportFlag").onerror();
+      assert.equal($("reportFlag").classList.contains("hidden"),true);
+      assert.equal($("reportFlagFallback").classList.contains("hidden"),false);
+    }
+  }
+});
+
+test("all 19 country clue templates keep required values and annual provenance",()=>{
+  const g=boot(),packs=g.window.GeoCountryClueI18n;
+  const keys=["countryCurrency","countryLanguageFamily","countryFlagColor","countryPopulation",
+    "countryGDP","countryArea","countryLandlocked","countryHistory","countryHistorySource"];
+  for(const [lang,t] of Object.entries(packs)){
+    for(const key of keys)assert.ok(t[key],lang+" missing "+key);
+    for(const key of ["countryPopulation","countryGDP"])
+      assert.match(t[key],/{year}/,lang+" must disclose the economic data year");
+    assert.match(t.countryCurrency,/{code}/);
+    assert.match(t.countryGDP,/{value}/);
+    assert.match(t.countryArea,/{value}/);
+    assert.equal(Object.keys(t.colors).length,7);
+  }
+  assert.ok(files["index.html"].includes('id="reportFlag"'));
+  assert.ok(files["index.html"].includes('id="reportHistory"'));
+  assert.ok(files["index.html"].includes('src="country-insights.js?v=20261116-country-dossier"'));
+});
 test("national-capital evidence marks Taipei correctly and keeps non-capitals distinct",()=>{
   const all=boot().window.GEODETECTIVE_PLACES;
   for(const [name,isCapital] of [["Taipé",true],["Brasília",true],["Goiânia",false]]){
@@ -283,18 +392,18 @@ test("national-capital evidence marks Taipei correctly and keeps non-capitals di
   assert.ok(capitalLine.includes("|Cidade do Cabo|"),"Cape Town is South Africa\'s legislative capital");
 });
 
-test("Normal and Hard are the only modes and both have six translated clues",()=>{
+test("Normal and Hard have seven translated clues with unchanged guess limits",()=>{
   const g=boot(),$=g.get;
   assert.doesNotMatch(files["index.html"],/value="easy"/);
   assert.equal($("attemptCount").textContent,"6 / 6");
-  assert.equal($("hintCount").textContent,"2 / 6");
-  assert.equal(clueTexts(g).length,6);
+  assert.equal($("hintCount").textContent,"2 / 7");
+  assert.equal(clueTexts(g).length,7);
   assert.equal(g.document.documentElement.lang,"en");
   g.difficulty("hard");
   assert.equal($("attemptCount").textContent,"4 / 4");
-  assert.equal($("hintCount").textContent,"1 / 6");
-  for(let i=0;i<5;i++)$("revealBtn").handlers.click();
-  assert.equal($("hintCount").textContent,"6 / 6");
+  assert.equal($("hintCount").textContent,"1 / 7");
+  for(let i=0;i<6;i++)$("revealBtn").handlers.click();
+  assert.equal($("hintCount").textContent,"7 / 7");
   assert.ok(clueTexts(g).every(x=>x.length));
   assert.doesNotMatch(clueTexts(g).join(" "),/Country \/ territory:/);
   g.difficulty("normal");
@@ -365,7 +474,7 @@ test("final dossier records all guesses, fact, continent, score and coordinate",
   assert.equal($("reportScore").textContent,"5,000 / 5,000");
   assert.ok($("reportFact").textContent.length>30);
   assert.match($("reportCoordinates").textContent,/64\.1466/);
-  assert.equal($("reportEvidenceList").children.length,6);
+  assert.equal($("reportEvidenceList").children.length,7);
   assert.equal($("reportTimeline").children.length,1);
   assert.equal($("reportBest").textContent,"0 km");
   assert.ok(g.mapState.fits.at(-1).options.maxZoom>=6);
@@ -605,7 +714,7 @@ test("Hard mode uses expert-only UTM reference zones and bands, without landmark
     for(let j=0;j<5;j++)g.get("revealBtn").handlers.click();
     assert.equal(clueTexts(g)[3],"UTM zone: "+zone,city);
     assert.equal(clueTexts(g)[5],"UTM latitude band: "+band,city);
-    assert.equal(clueTexts(g).length,6);
+    assert.equal(clueTexts(g).length,7);
   }
   assert.ok(files["app.js"].includes("regionalHintRadius(index,level)"));
 });
@@ -639,8 +748,8 @@ test("a correct fifth guess in Cape Town has no distance or bearing in history o
 });
 
 test("fresh deployments fingerprint both game engine and translated clues",()=>{
-  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-global-500"'));
-  assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-global-500"'));
+  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-country-dossier"'));
+  assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-country-dossier"'));
   assert.ok(files["map-bootstrap.js"].includes('new URL(import.meta.url).searchParams.get("v")'));
   assert.ok(files["app.js"].includes("function guessMetricText(g)"));
   const deploy=readFileSync(new URL("../.github/workflows/pages.yml",import.meta.url),"utf8");
@@ -880,7 +989,7 @@ test("Equator arrows pop in and out without fade animations",()=>{
   assert.match(files["app.js"],/"text-opacity-transition":\{duration:0,delay:0\}/);
   assert.ok(!g.mapState.layers.has("case-continent-outline"),
     "No unpaid continent guide should appear");
-  assert.ok(files["index.html"].includes('src="continent-borders.js?v=20261116-global-500"'));
+  assert.ok(files["index.html"].includes('src="continent-borders.js?v=20261116-country-dossier"'));
 });
 
 test("hemisphere evidence never follows the continent and no generic river-valley clue remains",()=>{
