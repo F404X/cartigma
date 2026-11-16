@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {runInNewContext} from "node:vm";
 
-const names=["places.js","continent-borders.js","references.js","i18n.js","map-filters-i18n.js","clues-i18n.js","report-i18n.js","facts.js","cities-extended.js","country-insights.js","country-clues-i18n.js","country-profile-i18n.js","compass-i18n.js","app.js","index.html","styles.css","map-bootstrap.js"];
+const names=["places.js","continent-borders.js","references.js","i18n.js","map-filters-i18n.js","clues-i18n.js","report-i18n.js","facts.js","cities-extended.js","country-insights.js","country-clues-i18n.js","country-profile-i18n.js","compass-i18n.js","app.js","index.html","styles.css","map-bootstrap.js","map-fallback.js"];
 const files=Object.fromEntries(names.map(n=>[n,readFileSync(new URL("../"+n,import.meta.url),"utf8")]));
 
 class Element {
@@ -1117,24 +1117,23 @@ test("mobile completed-case dossier moves into lower scroller without covering m
 });
 
 
-test("repeated clue renders reuse geographic calculations and switch cache by language",()=>{
+test("repeatable country evidence is cached per language without distance computations",()=>{
   const g=boot(),$=g.get;
   const before=g.perf.distanceCalls;
-  assert.ok(before>20,"Initial investigation needs geographic distances");
+  assert.equal(before,0,"Generating evidence no longer needs reference distances");
   $("revealBtn").handlers.click();
-  assert.equal(g.perf.distanceCalls,before,"Revealing a clue should not recalculate all regional distances");
+  assert.equal(g.perf.distanceCalls,before);
   $("dailyBtn").handlers.click();
-  assert.equal(g.perf.distanceCalls,before,"Reopening the same case should reuse immutable clues");
-  const english=clueTexts(g);
+  assert.equal(g.perf.distanceCalls,before);
+  const english=revealAll(g);
   g.language("pt");
-  const translated=g.perf.distanceCalls;
-  assert.ok(translated>before,"A different language needs its own translated clue cache");
-  assert.notDeepEqual(clueTexts(g),english,"Localized text must still update");
+  assert.equal(g.perf.distanceCalls,before,"Translations do not need geodesic searches");
+  assert.notDeepEqual(revealAll(g),english,"Clue text must react to language switches");
   g.language("en");
-  assert.equal(g.perf.distanceCalls,translated,"Returning to a cached language should not repeat calculations");
-  assert.match(files["app.js"],/const cacheKey=index\+":"\+level\+":"\+lang/);
-  assert.match(files["app.js"],/anchorDistances\(index,level,radius\)/);
-  assert.match(files["app.js"],/regionFormatters\.get\(language\)/);
+  assert.equal(g.perf.distanceCalls,before);
+  assert.ok(files["app.js"].includes('const cacheKey=index+":"+level+":"+lang'));
+  assert.ok(files["app.js"].includes('const mixed=['));
+  assert.ok(files["app.js"].includes('extraCountryClues(index,level)'));
 });
 
 test("indexed city search handles accents and English aliases without changing result limits",()=>{
