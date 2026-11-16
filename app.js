@@ -297,13 +297,23 @@
         year:data.populationYear});
     }
     if(data.gdpPerCapita&&data.gdpYear){
-      const step=level==="hard"?10000:(data.gdpPerCapita>=20000?5000:1000);
-      add("countryGDP",{value:number(Math.max(step,Math.round(data.gdpPerCapita/step)*step)),
-        year:data.gdpYear});
+      // Preserve meaningful scale for low-income economies; avoid a 10,000
+      // USD rounding step when GDP/capita is only a few hundred dollars.
+      const value=data.gdpPerCapita;
+      const step=value>=50000?5000:value>=10000?1000:
+        value>=1000?100:10;
+      const roundedStep=step*(level==="hard"?2:1);
+      add("countryGDP",{value:number(Math.max(roundedStep,
+        Math.round(value/roundedStep)*roundedStep)),year:data.gdpYear});
     }
     if(data.area){
-      const step=level==="hard"?100000:10000;
-      add("countryArea",{value:number(Math.max(step,Math.round(data.area/step)*step))});
+      // Singapore and island territories are not remotely 10,000 km².
+      const area=data.area;
+      const step=area>=1000000?100000:area>=100000?10000:
+        area>=10000?1000:area>=1000?100:area>=100?10:1;
+      const roundedStep=step*(level==="hard"?2:1);
+      add("countryArea",{value:number(Math.max(roundedStep,
+        Math.round(area/roundedStep)*roundedStep))});
     }
     if(typeof data.landlocked==="boolean")
       add("countryLandlocked",{value:tc(data.landlocked?"yes":"no")});
