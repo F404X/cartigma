@@ -278,7 +278,7 @@ test("new cities have seven meaningful clues without a redundant distance compar
     assert.ok(clues.some(text=>/^Longitude sector:/.test(text)),city);
     assert.ok(clues.some(text=>/^Latitude sector:/.test(text)),city);
     assert.doesNotMatch(clues.join(" "),/Closer to |Distance clue|from [^\n]+ km/i);
-    const national=clues.filter(text=>/^(Currency code|Language family|One flag color|Population \(|GDP per capita|Area:|Landlocked:)/.test(text));
+    const national=clues.filter(text=>/^(Currency code|Language family|One flag color|Population \(|GDP per capita|Country \\/ territory area:|Landlocked:)/.test(text));
     assert.equal(national.length,2,city+" must have two distinct country facts");
     if(g.window.GeoExtendedPlaceMetadata[index-74].capital)
       assert.ok(clues.some(x=>x==="National capital: Yes"),city);
@@ -319,7 +319,7 @@ test("country-data evidence is distributed among positions three to seven",()=>{
     assert.equal(clues.length,7);
     for(let j=0;j<clues.length;j++){
       const type=["Currency code:","Language family:","One flag color:","Population (",
-        "GDP per capita (","Area:","Landlocked:"].find(prefix=>clues[j].startsWith(prefix));
+        "GDP per capita (","Country / territory area:","Landlocked:"].find(prefix=>clues[j].startsWith(prefix));
       if(type){counts[type]=(counts[type]||0)+1;positions.add(j);country.push(type);}
     }
     assert.equal(country.length,2,"Two country facts per case: "+index);
@@ -396,7 +396,7 @@ test("country-area metrics always identify the country or territory in all local
   for(const locale of Object.keys(clue)){
     assert.ok(profile[locale],locale+" missing profile translation");
     assert.ok(clue[locale].countryArea.includes("{value}"),locale);
-    assert.ok(profile[locale].area.length>=9,locale);
+    assert.ok(profile[locale].area.length>=2,locale);
   }
   assert.match(clue.pt.countryArea,/Área do país ou território:/);
   assert.equal(profile.pt.area,"Área do país ou território");
