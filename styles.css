@@ -683,3 +683,10 @@ dialog.case-report .report-heading h2{font-size:24px}
 .report-footer #reportAlternateBtn:not(.hidden){grid-column:1/-1}
 .report-footer #reportNextBtn{grid-column:1/-1}
 .report-footer #reportAlternateBtn.hidden{display:none!important}
+
+/* Display sea access as one standalone sentence, with an accessible hidden label. */
+.report-country-access .visually-hidden{position:absolute!important;width:1px!important;
+ height:1px!important;margin:-1px!important;padding:0!important;border:0!important;
+ clip:rect(0,0,0,0)!important;clip-path:inset(50%)!important;overflow:hidden!important;
+ white-space:nowrap!important}
+.report-country-access dd{font-weight:600}

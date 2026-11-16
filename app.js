@@ -22,7 +22,22 @@
   const DIFFICULTIES = {normal:{attempts:6,initial:2},hard:{attempts:4,initial:1}};
   const SERIAL_PREFIX = "geodetective-case-counter-";
   const EVIDENCE_COUNT = 7;
-  const WIN_RADIUS = 100, HINT_COST = 300, MAP_OVERLAY_COSTS = Object.freeze({longitude:1200,latitude:1200,hemisphere:600,continent:600}), DAILY_KEY = "geodetective-daily-v3-";
+  const WIN_RADIUS = 100, HINT_COST = 300, DAILY_KEY = "geodetective-daily-v3-";
+  // 300 is preserved only for loading older saved games. New charges reflect
+  // information gain; the price for the NEXT clue is always shown before purchase.
+  const HINT_PRICES=Object.freeze({
+    hemisphere:150,terrain:200,zone:200,continent:300,capital:250,
+    adminRegion:350,landmark:500,
+    longitude:400,latitude:450,utmZone:450,utmBand:450,
+    countryCurrency:250,countryLanguageFamily:250,countryFlagColor:200,
+    countryPopulation:300,countryGDP:350,countryArea:300,countryLandlocked:200
+  });
+  // Overlay costs differ by how tightly each display constrains the target.
+  const MAP_OVERLAY_COSTS=Object.freeze({hemisphere:250,continent:500,
+    longitude:1000,latitude:1100});
+  // Europe and North America are fully/almost entirely in the Northern
+  // Hemisphere. The others have meaningful populations on BOTH sides of 0°.
+  const EQUATOR_CROSSING_CONTINENTS=new Set(["asia","africa","southAmerica","oceania"]);
   const COUNTRY_CODES = "IS NO NO NO FI SE DK GB FR PT IT GR TR MA EG SN NG KE ET ZA MG AE JO IL IN IN IN NP BD TH SG ID ID JP JP KR CN CN CN TW MN KZ AU AU AU AU NZ NZ FJ PF CA US US US US MX MX CU GT CO EC PE PE BO BR BR BR BR BR BR AR CL AR CL".split(" ").concat(EXTENDED.map(item=>item.countryCode));
   const FEATURES = "volcanic fjord polar fjord coast islands coast river river estuary river mountains strait desert desert peninsula delta plateau plateau peninsula plateau desert plateau mountains coast plain delta mountains delta delta islands delta islands coast mountains river plain delta bay mountains plateau mountains harbor coast coast islands volcanic harbor islands volcanic coast estuary bay mountains islands plateau plateau coast volcanic plateau mountains desert mountains plateau plateau plateau forest bay plateau bay estuary mountains islands strait".split(" ").concat(EXTENDED.map(()=>"urban"));
   const LANDMARKS = [
@@ -316,13 +331,18 @@
         Math.round(area/roundedStep)*roundedStep))});
     }
     if(typeof data.landlocked==="boolean")
-      add("countryLandlocked",{value:tc(data.landlocked?"yes":"no")});
-    // Choose two distinct verified country facts. They vary by case and
-    // difficulty, but their types remain stable when the language changes.
-    if(candidates.length<2)throw Error("Not enough country evidence for "+code);
-    const first=hash("country-evidence:"+code+":"+index+":"+level)%candidates.length;
-    const other=1+hash("country-evidence-alt:"+code+":"+index+":"+level)%(candidates.length-1);
-    return [candidates[first],candidates[(first+other)%candidates.length]];
+      add("countryLandlocked",{value:tc(data.landlocked?"countryLandlockedYes":"countryLandlockedNo")});
+    // Pair one cultural/civic fact with one numeric fact. This prevents two
+    // nearly identical population/GDP/area clues in a single investigation.
+    // Both buckets are available for every country in the current catalogue.
+    const cultural=candidates.filter(item=>["countryCurrency","countryLanguageFamily",
+      "countryFlagColor","countryLandlocked"].includes(item.key));
+    const numeric=candidates.filter(item=>["countryPopulation","countryGDP","countryArea"].includes(item.key));
+    if(!cultural.length||!numeric.length)throw Error("Insufficient distinct country evidence for "+code);
+    const id="country-evidence:"+code+":"+index+":"+level;
+    const first=cultural[hash(id+":cultural")%cultural.length];
+    const second=numeric[hash(id+":numeric")%numeric.length];
+    return hash(id+":order")%2?[second,first]:[first,second];
   }
   function cluesFor(index,level){
     const cacheKey=index+":"+level+":"+lang;
@@ -332,29 +352,35 @@
     const zone={key:"zone",value:latitudeZone(p[3])};
     const capital={key:"capital",value:tc(CAPITALS.has(p[0])?"yes":"no")};
     const hemisphere={key:"hemisphere",value:tc(p[3]>=0?"north":"south")};
+    const hemisphereUseful=EQUATOR_CROSSING_CONTINENTS.has(continentKey(index));
     const reliableCapital=!["Jerusalém","La Paz","Jacarta"].includes(p[0]);
     // Hemisphere, when used at all, comes BEFORE the continent clue.
     // It must never appear in a later evidence slot after the continent.
     const choice=hash("opening:"+p[0])%3;
-    const opening=[7,8,10,35].includes(index)?terrain:(choice===2?hemisphere:(choice===0?terrain:zone));
+    const opening=[7,8,10,35].includes(index)?terrain:
+      (choice===2&&hemisphereUseful?hemisphere:(choice===0?terrain:zone));
     const extra=index>=BASE_CITIES?EXTENDED[index-BASE_CITIES]:null;
     const safeRegion=extra&&p[2]&&!norm(p[2]).includes(norm(p[0]));
     const third=extra
       ?(extra.capital?capital:(safeRegion?{key:"adminRegion",value:p[2]}:capital))
       :(reliableCapital&&hash("profile:"+p[0])%3===0?capital:
         (opening===terrain?zone:terrain));
-    // Retire the distance-reference evidence entirely. Keep five geographic
-    // and civic clues plus TWO different country facts in every case.
-    const mixed=[
-      third,coordinateClue(index,level),landmarkClue(index,level),
-      ...extraCountryClues(index,level)
-    ];
-    // Reproducible Fisher-Yates shuffle: country facts can appear in any
-    // position 3–7 instead of being reserved for the final evidence.
-    for(let i=mixed.length-1;i>0;i--){
-      const j=hash("mixed-evidence:"+index+":"+level+":"+i)%(i+1);
-      [mixed[i],mixed[j]]=[mixed[j],mixed[i]];
+    // Spread cultural, numeric and geographic clues across positions 3–7.
+    // Country fact cards never sit next to each other. The six stable layouts
+    // balance which positions carry the most useful evidence.
+    const countryFacts=extraCountryClues(index,level);
+    const countryPositions=[[0,2],[0,3],[0,4],[1,3],[1,4],[2,4]];
+    const positions=countryPositions[hash("fact-positions:"+index+":"+level)%countryPositions.length];
+    const mixed=Array(5);
+    mixed[positions[0]]=countryFacts[0];
+    mixed[positions[1]]=countryFacts[1];
+    const geographic=[third,coordinateClue(index,level),landmarkClue(index,level)];
+    for(let i=geographic.length-1;i>0;i--){
+      const j=hash("geographic-order:"+index+":"+level+":"+i)%(i+1);
+      [geographic[i],geographic[j]]=[geographic[j],geographic[i]];
     }
+    let next=0;
+    for(let i=0;i<mixed.length;i++)if(!mixed[i])mixed[i]=geographic[next++];
     const clues=[opening,{key:"continent",value:continentName(index)},...mixed];
     clueCache.set(cacheKey,clues);
     return clues;
@@ -389,7 +415,8 @@
   }
   function newGame(mode,index) {
     return {mode,index,difficulty,date:today(),serial:nextCaseNumber(),guesses:[],
-      revealed:DIFFICULTIES[difficulty].initial,penalty:0,sectorMapPenalty:0,sectorReveals:[],finished:false,won:false,score:0};
+      revealed:DIFFICULTIES[difficulty].initial,penalty:0,paidHints:0,
+      sectorMapPenalty:0,sectorReveals:[],finished:false,won:false,score:0};
   }
   function caseCode(){
     return "#"+difficulty[0].toUpperCase()+"-"+game.date.replaceAll("-","")+"-"+String(game.serial).padStart(2,"0");
@@ -491,6 +518,11 @@
       clue.key==="continent"?"continentMapPurchased":"sectorMapPurchased";
     toast(tc(message,{cost:number(cost)}));
   }
+  function nextHintCost(){
+    if(!game||game.finished||game.revealed>=EVIDENCE_COUNT)return 0;
+    const clue=cluesFor(game.index,difficulty)[game.revealed];
+    return HINT_PRICES[clue?.key]??HINT_COST;
+  }
   function renderClues(){
     const clues=cluesFor(game.index,difficulty);
     const revealed=game.revealed;
@@ -526,6 +558,8 @@
       row.append(idx,body);list.append(row);
     });
     $("revealBtn").disabled=game.finished||revealed>=EVIDENCE_COUNT;
+    $("revealCost").textContent=game.finished||revealed>=EVIDENCE_COUNT
+      ?"":"−"+number(nextHintCost());
     $("revealBtn").classList.toggle("hidden",game.finished);
   }
   function guessMetricText(g){
@@ -608,7 +642,18 @@
     if(info?.gdpPerCapita)add("gdp","US$ "+fmt(info.gdpPerCapita)+
       (info.gdpYear?" ("+info.gdpYear+")":""));
     if(info?.area)add("area",fmt(info.area)+" km²");
-    add("landlocked",countryWord(info?.landlocked));
+    if(typeof info?.landlocked==="boolean"){
+      // One natural sentence, not a confusing "landlocked: Yes/No" pair.
+      const sentence=tc(info.landlocked?"countryLandlockedYes":"countryLandlockedNo");
+      const cell=document.createElement("div");
+      cell.className="report-country-access";
+      const label=document.createElement("dt");
+      label.className="visually-hidden";
+      label.textContent=locale.landlocked||"Sea access";
+      const value=document.createElement("dd");
+      value.textContent=sentence;
+      cell.append(label,value);list.append(cell);
+    }
   }
   function renderCaseNavigation(){
     const daily=game?.mode==="daily";
@@ -653,7 +698,8 @@
     $("reportDifficulty").textContent=t(difficulty);
     $("reportAttempts").textContent=game.guesses.length+" / "+maximum();
     $("reportBest").textContent=best?number(best.distance)+" km":"—";
-    $("reportHints").textContent=number(Math.round(game.penalty/HINT_COST));
+    $("reportHints").textContent=number(Number.isInteger(game.paidHints)
+      ?game.paidHints:Math.round(game.penalty/HINT_COST));
     $("reportScore").textContent=number(game.score)+" / 5,000";
     $("reportCoordinates").textContent=place[3].toFixed(4)+"°, "+place[4].toFixed(4)+"°";
     $("reportContinent").textContent=continentName(game.index);
@@ -976,7 +1022,14 @@
   }
   function reveal(){
     if(game.finished||game.revealed>=EVIDENCE_COUNT)return;
-    game.revealed++;game.penalty+=HINT_COST;save();renderClues();toast(t("hintUsed"));
+    const cost=nextHintCost();
+    if(!cost)return;
+    if(!Number.isInteger(game.paidHints))
+      game.paidHints=Math.round(game.penalty/HINT_COST); // Legacy daily cases.
+    game.revealed++;
+    game.penalty+=cost;
+    game.paidHints++;
+    save();renderClues();toast(t("hintUsed",{cost:number(cost)}));
   }
   function guess(){
     if(!selected||game.finished)return;

@@ -183,7 +183,7 @@
               <span id="hintCount">2 / 7</span>
             </div>
             <ol class="clue-list" id="clueList" aria-live="polite"></ol>
-            <button type="button" id="revealBtn" class="reveal-btn"><span data-i18n="reveal">Reveal a hint</span><small>−300</small></button>
+            <button type="button" id="revealBtn" class="reveal-btn"><span data-i18n="reveal">Reveal a hint</span><small id="revealCost">−300</small></button>
           </section>
 
           <section class="guess-panel" aria-labelledby="guessHeading">
@@ -228,7 +228,7 @@
   <ol>
     <li data-i18n="rule1">Read the evidence and place a pin on the map or search for a city.</li>
     <li data-i18n="rule2">Each incorrect guess gives you distance and a new clue. Direction is hidden on Hard.</li>
-    <li data-i18n="rule3">Win by getting within 100 km of the target. Extra hints cost 300 points.</li>
+    <li data-i18n="rule3">Win by getting within 100 km of the target. Hint prices vary from 150 to 500 points.</li>
     <li data-i18n="rule4">Normal: 6 guesses with direction. Hard: 4 guesses without direction.</li>
     <li data-i18n="rule5">Daily cases are shared worldwide per difficulty and reset at 00:00 UTC.</li>
   </ol>
