@@ -241,7 +241,7 @@ test("Normal selection favors capitals and major cities; Hard retains the full c
   forced.difficulty("hard");
   forced.get("freeBtn").handlers.click();
   for(let n=0;n<6;n++)forced.get("revealBtn").handlers.click();
-  assert.equal(clueTexts(forced).length,6);
+  assert.equal(clueTexts(forced).length,7);
   assert.match(clueTexts(forced)[3],/^UTM zone: \d+$/);
   assert.match(clueTexts(forced)[5],/^UTM latitude band: [A-Z]$/);
 });
@@ -256,7 +256,7 @@ test("new locations have playable region clues and never invent landmark names",
     $("freeBtn").handlers.click();
     for(let k=0;k<6;k++)$("revealBtn").handlers.click();
     const clues=clueTexts(g);
-    assert.equal(clues.length,6);
+    assert.equal(clues.length,7);
     assert.ok(clues[1].includes("Continent"),city);
     assert.match(clues[3],/Longitude sector:/);
     assert.match(clues[4],/Closer to /);
