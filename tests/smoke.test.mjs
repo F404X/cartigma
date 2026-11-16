@@ -437,10 +437,10 @@ test("a correct fifth guess in Cape Town has no distance or bearing in history o
 });
 
 test("fresh deployments fingerprint both game engine and translated clues",()=>{
-  assert.match(files["index.html"],/src="map-bootstrap\\.js\\?v=20261116-exact-fix"/);
-  assert.match(files["index.html"],/src="clues-i18n\\.js\\?v=20261116-exact-fix"/);
-  assert.match(files["map-bootstrap.js"],/new URL\\(import\\.meta\\.url\\)\\.searchParams\\.get\\("v"\\)/);
-  assert.match(files["app.js"],/function guessMetricText\\(g\\)/);
+  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-exact-fix"'));
+  assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-exact-fix"'));
+  assert.ok(files["map-bootstrap.js"].includes('new URL(import.meta.url).searchParams.get("v")'));
+  assert.ok(files["app.js"].includes("function guessMetricText(g)"));
   const deploy=readFileSync(new URL("../.github/workflows/pages.yml",import.meta.url),"utf8");
   assert.ok(deploy.includes("GITHUB_SHA"));
 });
