@@ -278,7 +278,7 @@ test("new cities have seven meaningful clues without a redundant distance compar
     assert.ok(clues.some(text=>/^Longitude sector:/.test(text)),city);
     assert.ok(clues.some(text=>/^Latitude sector:/.test(text)),city);
     assert.doesNotMatch(clues.join(" "),/Closer to |Distance clue|from [^\n]+ km/i);
-    const national=clues.filter(text=>/^(Currency code|Language family|One flag color|Population \(|GDP per capita|Country \\/ territory area:|Landlocked:)/.test(text));
+    const national=clues.filter(text=>["Currency code","Language family","One flag color", "Population (","GDP per capita","Country / territory area:","Landlocked:"].some(x=>text.startsWith(x)));
     assert.equal(national.length,2,city+" must have two distinct country facts");
     if(g.window.GeoExtendedPlaceMetadata[index-74].capital)
       assert.ok(clues.some(x=>x==="National capital: Yes"),city);
