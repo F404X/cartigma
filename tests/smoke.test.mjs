@@ -388,6 +388,62 @@ test("national-capital metadata remains correct even with shuffled evidence",()=
   }
 });
 
+test("country-area metrics always identify the country or territory in all locales",()=>{
+  const g=boot();
+  const clue=g.window.GeoCountryClueI18n;
+  const profile=g.window.GeoCountryProfileI18n;
+  assert.equal(Object.keys(clue).length,19);
+  for(const locale of Object.keys(clue)){
+    assert.ok(profile[locale],locale+" missing profile translation");
+    assert.ok(clue[locale].countryArea.includes("{value}"),locale);
+    assert.ok(profile[locale].area.length>=9,locale);
+  }
+  assert.match(clue.pt.countryArea,/Área do país ou território:/);
+  assert.equal(profile.pt.area,"Área do país ou território");
+  assert.ok(clue.en.countryArea.includes("Country / territory area:"));
+  assert.equal(profile.en.area,"Country / territory area");
+  assert.ok(files["index.html"].includes('src="country-clues-i18n.js?v=20261116-area-scope"'));
+  assert.ok(files["index.html"].includes('src="country-profile-i18n.js?v=20261116-area-scope"'));
+});
+test("daily case file offers the other unfinished difficulty and a clear Free Play action",()=>{
+  const g=boot(),$=g.get,day=new Date().toISOString().slice(0,10);
+  const index=normalIndexForDay(day,g.window);
+  g.select(g.window.GEODETECTIVE_PLACES[index][0]);
+  $("guessBtn").handlers.click();
+  assert.equal($("reportDialog").open,true);
+  assert.equal($("reportAlternateBtn").classList.contains("hidden"),false);
+  assert.equal($("reportAlternateBtn").textContent,"Play daily: Hard");
+  assert.equal($("reportNextBtn").textContent,"New Free Play case");
+  assert.equal($("newCaseBtn").textContent,"New Free Play case");
+  g.language("pt");
+  assert.equal($("reportAlternateBtn").textContent,"Jogar diário: Difícil");
+  assert.equal($("reportNextBtn").textContent,"Novo caso no jogo livre");
+  $("reportAlternateBtn").handlers.click();
+  assert.equal($("difficultySelect").value,"hard");
+  assert.equal($("dailyBtn").classList.contains("active"),true);
+  assert.equal($("reportDialog").open,false);
+  assert.equal($("resultCard").classList.contains("hidden"),true);
+  assert.equal($("reportAlternateBtn").classList.contains("hidden"),true);
+});
+test("finished daily alternate is not offered again, even after a lost case",()=>{
+  const day=new Date().toISOString().slice(0,10);
+  const hardIndex=hash("GEODETECTIVE-v3|"+day+"|hard")%500;
+  for(const won of [true,false]){
+    const storage=new Map([["geodetective-daily-v3-"+day+"-hard",
+      JSON.stringify({mode:"daily",date:day,difficulty:"hard",index:hardIndex,
+        serial:1,guesses:[],revealed:1,finished:true,won,score:won?5000:0})]]);
+    const g=boot({storage}),$=g.get,normal=normalIndexForDay(day,g.window);
+    g.select(g.window.GEODETECTIVE_PLACES[normal][0]);
+    $("guessBtn").handlers.click();
+    assert.equal($("reportAlternateBtn").classList.contains("hidden"),true);
+    assert.equal($("reportAlternateBtn").disabled,true);
+    assert.equal($("reportNextBtn").textContent,"New Free Play case");
+    $("reportNextBtn").handlers.click();
+    assert.equal($("freeBtn").classList.contains("active"),true);
+    assert.equal($("reportAlternateBtn").classList.contains("hidden"),true);
+    assert.equal($("reportNextBtn").textContent,"New case");
+  }
+});
 test("the case file displays all country facts including GDP per capita and source year",()=>{
   const places=boot().window.GEODETECTIVE_PLACES;
   for(const name of ["Reykjavík","Taipé","São Paulo","Istambul","Ankara"]){
@@ -401,7 +457,7 @@ test("the case file displays all country facts including GDP per capita and sour
     const byLabel=label=>fields.find(row=>row.children[0].textContent===label)?.children[1].textContent;
     assert.ok(byLabel("Código ISO"),name);
     assert.ok(byLabel("Moeda"),name);
-    assert.ok(byLabel("Área territorial")?.includes("km²"),name);
+    assert.ok(byLabel("Área do país ou território")?.includes("km²"),name);
     if(data.gdpPerCapita){
       assert.ok(byLabel("PIB per capita")?.includes("US$"),name);
       assert.ok(byLabel("PIB per capita")?.includes(String(data.gdpYear)),name);

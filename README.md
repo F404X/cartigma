@@ -107,3 +107,6 @@ The optional seventh clue and the country section of the final case file are gen
 The country flag in the case file loads by ISO alpha-2 code from flagcdn.com, with an emoji fallback. Other report languages use English history text when a dedicated translation is unavailable.
 
 The dossier displays all available country data (GDP per capita and population with reference years, area, ISO code, administrative region, currency, language family, a flag color and landlocked status). Its flag is larger and frameless. Map rotation is disabled on both touch and mouse input.
+
+- **Area-scope clarity:** every `km²` country-area clue and dossier statistic explicitly says it represents the whole **country or territory**, not the city, municipality, state or province. The source dataset does not provide subnational/city area values; all 19 supported languages use scoped labels.
+- **Case-file daily navigation:** once a daily case finishes, the dossier offers the other daily difficulty only if its same-day case has not already finished (win or loss). This respects both levels' separate saved state and immediately switches to the still-playable daily challenge. The main action in a daily result or dossier explicitly starts a new **Free Play** case; ordinary Free Play continues to use “New case.” All 19 locales are translated.

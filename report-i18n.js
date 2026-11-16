@@ -51,5 +51,12 @@
     PACKS[language].rule2=rules[language][0];
     PACKS[language].rule4=rules[language][1];
   }
+  const actionLabels={"en":["New Free Play case","Play daily: {difficulty}"],"pt":["Novo caso no jogo livre","Jogar diário: {difficulty}"],"es":["Nuevo caso en juego libre","Jugar diario: {difficulty}"],"zh":["开始新的自由模式案例","每日挑战：{difficulty}"],"ja":["フリープレイで新しい事件","デイリーに挑戦：{difficulty}"],"ru":["Новый случай в свободной игре","Ежедневное задание: {difficulty}"],"fr":["Nouvelle partie libre","Défi quotidien : {difficulty}"],"de":["Neuer Fall im freien Spiel","Tagesfall spielen: {difficulty}"],"it":["Nuovo caso in modalità libera","Gioca il giornaliero: {difficulty}"],"nl":["Nieuwe vrije zaak","Dagelijkse zaak: {difficulty}"],"pl":["Nowa sprawa w trybie wolnym","Dzienny przypadek: {difficulty}"],"sv":["Nytt fritt fall","Spela dagligt: {difficulty}"],"tr":["Serbest oyunda yeni vaka","Günlük vaka: {difficulty}"],"ar":["قضية جديدة في اللعب الحر","التحدي اليومي: {difficulty}"],"he":["מקרה חדש במשחק חופשי","אתגר יומי: {difficulty}"],"ko":["자유 플레이 새 사건","일일 도전: {difficulty}"],"th":["คดีใหม่ในโหมดอิสระ","เล่นรายวัน: {difficulty}"],"vi":["Ván mới ở chế độ tự do","Thử thách hằng ngày: {difficulty}"],"id":["Kasus baru mode bebas","Main harian: {difficulty}"]};
+  for(const language of Object.keys(PACKS)){
+    const pair=actionLabels[language];
+    if(!pair||pair.length!==2)throw Error("Missing case navigation labels for "+language);
+    PACKS[language].newFreeCase=pair[0];
+    PACKS[language].otherDaily=pair[1];
+  }
   window.GeoReportI18n=PACKS;
 })();

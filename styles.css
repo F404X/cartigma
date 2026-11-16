@@ -674,3 +674,9 @@ dialog.case-report .report-heading h2{font-size:24px}
 @media(max-width:760px){.report-country-stats{gap:6px}.report-country-stats>div{padding:8px 9px}
  .report-country-stats dd{font-size:11px}}
 @media(max-width:370px){.report-country-stats{grid-template-columns:minmax(0,1fr)}}
+
+/* Case navigation: supplementary daily difficulty stays secondary and full-width.
+   The main action explicitly opens Free Play from a completed daily case. */
+.report-footer #reportAlternateBtn:not(.hidden){grid-column:1/-1}
+.report-footer #reportNextBtn{grid-column:1/-1}
+.report-footer #reportAlternateBtn.hidden{display:none!important}

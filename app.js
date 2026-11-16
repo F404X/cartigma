@@ -366,13 +366,20 @@
   const NORMAL_FOCUS=PLACES.map((_,index)=>index).filter(index=>
     index<BASE_CITIES||Boolean(EXTENDED[index-BASE_CITIES]?.capital)||
     Number(EXTENDED[index-BASE_CITIES]?.populationRank)<=2);
-  function dailyIndex(){
-    const seed=hash("GEODETECTIVE-v3|"+today()+"|"+difficulty);
-    if(difficulty==="normal"&&seed%10!==0&&NORMAL_FOCUS.length)
+  function dailyIndex(level=difficulty){
+    const seed=hash("GEODETECTIVE-v3|"+today()+"|"+level);
+    if(level==="normal"&&seed%10!==0&&NORMAL_FOCUS.length)
       return NORMAL_FOCUS[seed%NORMAL_FOCUS.length];
     return seed%PLACES.length;
   }
-  function dailyStorageKey(){return DAILY_KEY+today()+"-"+difficulty}
+  function dailyStorageKey(level=difficulty){return DAILY_KEY+today()+"-"+level}
+  // Finished daily cases cannot be replayed, whether solved or closed after
+  // exhausting guesses. Suggest only the alternate difficulty still playable.
+  function otherDailyAvailable(level){
+    const saved=store.get(dailyStorageKey(level));
+    return !(saved?.mode==="daily"&&saved.date===today()&&
+      saved.difficulty===level&&saved.index===dailyIndex(level)&&saved.finished===true);
+  }
   function nextCaseNumber(date=today()){
     const key=SERIAL_PREFIX+date;
     const previous=Number(store.get(key))||0;
@@ -603,6 +610,18 @@
     if(info?.area)add("area",fmt(info.area)+" km²");
     add("landlocked",countryWord(info?.landlocked));
   }
+  function renderCaseNavigation(){
+    const daily=game?.mode==="daily";
+    const newLabel=t(daily?"newFreeCase":"newCase");
+    $("newCaseBtn").textContent=newLabel;
+    $("reportNextBtn").textContent=newLabel;
+    const other=difficulty==="normal"?"hard":"normal";
+    const showOther=daily&&Boolean(game?.finished)&&otherDailyAvailable(other);
+    const button=$("reportAlternateBtn");
+    button.classList.toggle("hidden",!showOther);
+    button.disabled=!showOther;
+    if(showOther)button.textContent=t("otherDaily",{difficulty:t(other)});
+  }
   function renderDossier(){
     if(!game.finished)return;
     const best=bestGuess();
@@ -688,6 +707,7 @@
     }
   }
   function renderResult(){
+    renderCaseNavigation();
     $("resultCard").classList.toggle("hidden",!game.finished);
     if(!game.finished)return;
     const name=cityName(cityAt(game.index))+", "+countryName(game.index);
@@ -1342,6 +1362,13 @@
     $("reportCloseBtn").addEventListener("click",closeReport);
     $("reportMapBtn").addEventListener("click",closeReport);
     $("reportNextBtn").addEventListener("click",()=>{closeReport();startFree()});
+    $("reportAlternateBtn").addEventListener("click",()=>{
+      if(game?.mode!=="daily"||!game.finished)return;
+      const other=difficulty==="normal"?"hard":"normal";
+      if(!otherDailyAvailable(other))return;
+      closeReport();
+      setDifficulty(other);
+    });
     $("reportShareBtn").addEventListener("click",share);
     $("helpBtn").addEventListener("click",()=>$("helpDialog").showModal());
     $("closeHelpBtn").addEventListener("click",()=>$("helpDialog").close());
