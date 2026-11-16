@@ -54,7 +54,7 @@ test("both keyless vector and fallback raster scripts are included in Pages",()=
   assert.match(app,/switchToFallback/);
   assert.match(app,/mapStyleTimeout/);
   assert.match(app,/typeof libre\.supported==="function"/);
-  assert.ok(html.includes('src="map-fallback.js?v=20261116-sector-map"'));
+  assert.ok(html.includes('src="map-fallback.js?v=20261116-hemisphere-guide"'));
   assert.match(html,/leaflet@1\.9\.4\/dist\/leaflet\.css/);
   assert.match(workflow,/map-fallback\.js/);
 });
@@ -87,12 +87,24 @@ test("Leaflet fallback restores map, markers, line and click coordinates",async(
   map.addLayer({id:"case-distance-line",source:"case-distance-line"});
   assert.equal(state.lines.length,1);
   assert.equal(state.lines[0].coords[0][0],31.63);
+  const equator={type:"LineString",coordinates:[[-179.9,0],[179.9,0]]};
+  map.addSource("case-hemisphere-line",{data:{geometry:equator}});
+  map.addLayer({id:"case-hemisphere-line",source:"case-hemisphere-line",type:"line"});
+  assert.equal(state.lines[1].options.dashArray,"6 9");
   const strip={type:"Polygon",coordinates:[[[-30,-85],[0,-85],[0,85],[-30,85],[-30,-85]]]};
   map.addSource("case-sector-longitude",{data:{geometry:strip}});
   map.addLayer({id:"case-sector-longitude",source:"case-sector-longitude",type:"fill"});
   assert.equal(state.polygons.length,1);
   assert.equal(state.polygons[0].options.style.fillColor,"#ffd449");
   assert.equal(state.polygons[0].options.style.fillOpacity,0.10);
+  const arrows={type:"MultiPoint",coordinates:[[-30,1.8],[0,1.8],[30,1.8]]};
+  map.addSource("case-hemisphere-arrows",{data:{geometry:arrows}});
+  map.addLayer({id:"case-hemisphere-arrows",source:"case-hemisphere-arrows",
+    type:"symbol",layout:{"text-field":"↑"}});
+  assert.equal(state.polygons.length,2);
+  const arrowMarker=state.polygons[1].options.pointToLayer({},[1.8,0]);
+  assert.equal(arrowMarker.options.icon.html,"↑");
+  assert.equal(arrowMarker.options.interactive,false);
   map.fitBounds([[-8,31],[-7,34]],{maxZoom:5,padding:{top:20,bottom:20,left:30,right:30}});
   assert.equal(state.fit.options.maxZoom,5);
   marker.remove();

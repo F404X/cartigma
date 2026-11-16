@@ -77,9 +77,20 @@
         const geo=this._sources.get(layer.source)?.data?.geometry;
         if(geo?.type==="LineString"){
           const line=L.polyline(geo.coordinates.map(point=>[point[1],point[0]]),{
-            color:"#ffd449",weight:2,opacity:.85,dashArray:"5 7"
+            color:"#ffd449",weight:2,opacity:.85,
+            dashArray:layer.id==="case-hemisphere-line"?"6 9":"5 7"
           }).addTo(this.root);
           this._layers.set(layer.id,line);
+        }else if(geo?.type==="MultiPoint"&&layer.id==="case-hemisphere-arrows"){
+          const glyph=layer.layout?.["text-field"]==="↓"?"↓":"↑";
+          const icons=L.geoJSON({type:"Feature",properties:{},geometry:geo},{
+            pointToLayer:(_,latlng)=>L.marker(latlng,{
+              icon:L.divIcon({className:"hemisphere-direction-arrow",html:glyph,
+                iconSize:[18,18],iconAnchor:[9,9]}),
+              interactive:false,keyboard:false
+            })
+          }).addTo(this.root);
+          this._layers.set(layer.id,icons);
         }else if(geo?.type==="Polygon"||geo?.type==="MultiPolygon"){
           const polygon=L.geoJSON({type:"Feature",properties:{},geometry:geo},{
             style:{color:"#ffd449",weight:1,opacity:.45,fillColor:"#ffd449",

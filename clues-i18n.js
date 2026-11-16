@@ -167,5 +167,10 @@
     if(!parts||parts.length!==sectorButtonKeys.length)throw Error("Missing sector-map translations: "+language);
     for(const [i,key] of sectorButtonKeys.entries())localeData[language].templates[key]=parts[i];
   }
+  const hemispherePurchaseText={"en":"Hemisphere marked · −{cost} points","pt":"Hemisfério indicado · −{cost} pontos","es":"Hemisferio señalado · −{cost} puntos","zh":"已标示半球 · −{cost} 分","ja":"半球を表示 · −{cost} 点","ru":"Полушарие отмечено · −{cost} очков","fr":"Hémisphère indiqué · −{cost} points","de":"Halbkugel markiert · −{cost} Punkte","it":"Emisfero indicato · −{cost} punti","nl":"Halfrond gemarkeerd · −{cost} punten","pl":"Zaznaczono półkulę · −{cost} pkt","sv":"Halvklot markerat · −{cost} poäng","tr":"Yarımküre işaretlendi · −{cost} puan","ar":"تم تحديد نصف الكرة · −{cost} نقطة","he":"חצי הכדור סומן · −{cost} נקודות","ko":"반구 표시됨 · −{cost}점","th":"แสดงซีกโลกแล้ว · −{cost} คะแนน","vi":"Đã đánh dấu bán cầu · −{cost} điểm","id":"Belahan bumi ditandai · −{cost} poin"};
+  for(const language of Object.keys(localeData)){
+    if(!hemispherePurchaseText[language])throw Error("Missing hemisphere map translation: "+language);
+    localeData[language].templates.hemisphereMapPurchased=hemispherePurchaseText[language];
+  }
   window.GeoCluesI18n = localeData;
 })();

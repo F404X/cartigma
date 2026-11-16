@@ -11,7 +11,7 @@
   const NEARBY_REFERENCES = window.GEODETECTIVE_NEARBY_REFERENCES || {};
   const DIFFICULTIES = {normal:{attempts:6,initial:2},hard:{attempts:4,initial:1}};
   const SERIAL_PREFIX = "geodetective-case-counter-";
-  const WIN_RADIUS = 100, HINT_COST = 300, SECTOR_MAP_COST = 1200, DAILY_KEY = "geodetective-daily-v3-";
+  const WIN_RADIUS = 100, HINT_COST = 300, MAP_OVERLAY_COSTS = Object.freeze({longitude:1200,latitude:1200,hemisphere:600}), DAILY_KEY = "geodetective-daily-v3-";
   const COUNTRY_CODES = "IS NO NO NO FI SE DK GB FR PT IT GR TR MA EG SN NG KE ET ZA MG AE JO IL IN IN IN NP BD TH SG ID ID JP JP KR CN CN CN TW MN KZ AU AU AU AU NZ NZ FJ PF CA US US US US MX MX CU GT CO EC PE PE BO BR BR BR BR BR BR AR CL AR CL".split(" ");
   const FEATURES = "volcanic fjord polar fjord coast islands coast river river estuary river mountains strait desert desert peninsula delta plateau plateau peninsula plateau desert plateau mountains coast plain delta mountains delta delta islands delta islands coast mountains river plain delta bay mountains plateau mountains harbor coast coast islands volcanic harbor islands volcanic coast estuary bay mountains islands plateau plateau coast volcanic plateau mountains desert mountains plateau plateau plateau forest bay plateau bay estuary mountains islands strait".split(" ");
   const LANDMARKS = [
@@ -344,19 +344,25 @@
     latitude:"clueRegion",utmZone:"clueRegion",utmBand:"clueRegion",
     closer:"clueDistance",nearest:"clueDistance",landmark:"clueLandmark"
   });
-  function revealSectorOnMap(clue){
-    if(game.finished||!map||!mapStyleReady||!["longitude","latitude"].includes(clue.key))return;
-    if(!cluesFor(game.index,difficulty).slice(0,game.revealed)
-      .some(item=>item.key===clue.key&&item.from===clue.from&&item.to===clue.to))return;
+  function revealGeographyOnMap(clue){
+    const cost=MAP_OVERLAY_COSTS[clue.key];
+    if(game.finished||!map||!mapStyleReady||!cost)return;
+    if(!cluesFor(game.index,difficulty).slice(0,game.revealed).some(item=>
+      item.key===clue.key&&(clue.key==="hemisphere"
+        ?item.value===clue.value:item.from===clue.from&&item.to===clue.to)))return;
     if(!Array.isArray(game.sectorReveals))game.sectorReveals=[];
     if(game.sectorReveals.includes(clue.key))return;
     game.sectorReveals.push(clue.key);
-    game.sectorMapPenalty=(game.sectorMapPenalty||0)+SECTOR_MAP_COST;
+    game.sectorMapPenalty=(game.sectorMapPenalty||0)+cost;
     save();renderClues();renderMap();
-    const bounds=clue.key==="longitude"?
-      [[clue.from,-75],[clue.to,75]]:[[-179.5,clue.from],[179.5,clue.to]];
-    map.fitBounds(bounds,{padding:{top:20,bottom:20,left:20,right:20},maxZoom:3,duration:450});
-    toast(tc("sectorMapPurchased",{cost:number(SECTOR_MAP_COST)}));
+    if(clue.key==="hemisphere"){
+      map.easeTo({center:[0,0],zoom:1.7,duration:450});
+    }else{
+      const bounds=clue.key==="longitude"?
+        [[clue.from,-75],[clue.to,75]]:[[-179.5,clue.from],[179.5,clue.to]];
+      map.fitBounds(bounds,{padding:{top:20,bottom:20,left:20,right:20},maxZoom:3,duration:450});
+    }
+    toast(tc(clue.key==="hemisphere"?"hemisphereMapPurchased":"sectorMapPurchased",{cost:number(cost)}));
   }
   function renderClues(){
     const clues=cluesFor(game.index,difficulty);
@@ -376,16 +382,16 @@
       value.textContent=clueValue;
       value.title=clueValue;
       body.append(category,value);
-      if(i<revealed&&(clue.key==="longitude"||clue.key==="latitude")){
+      if(i<revealed&&MAP_OVERLAY_COSTS[clue.key]){
         const purchased=Array.isArray(game.sectorReveals)&&game.sectorReveals.includes(clue.key);
         const button=document.createElement("button");
         button.type="button";
         button.className="sector-map-btn"+(purchased?" purchased":"");
-        button.textContent=purchased?tc("sectorMapped"):tc("sectorMapButton",{cost:number(SECTOR_MAP_COST)});
+        button.textContent=purchased?tc("sectorMapped"):tc("sectorMapButton",{cost:number(MAP_OVERLAY_COSTS[clue.key])});
         button.title=button.textContent;
         button.setAttribute("aria-label",button.textContent);
         button.disabled=game.finished||purchased||!map||!mapStyleReady;
-        button.addEventListener("click",()=>revealSectorOnMap(clue));
+        button.addEventListener("click",()=>revealGeographyOnMap(clue));
         body.classList.add("with-sector-map");
         body.append(button);
       }
@@ -572,8 +578,8 @@
     if(!map||!mapStyleReady)return;
     if(map.getLayer("case-distance-line"))map.removeLayer("case-distance-line");
     if(map.getSource("case-distance-line"))map.removeSource("case-distance-line");
-    for(const key of ["longitude","latitude"]){
-      const id="case-sector-"+key;
+    for(const id of ["case-sector-longitude","case-sector-latitude",
+      "case-hemisphere-line","case-hemisphere-arrows"]){
       if(map.getLayer(id))map.removeLayer(id);
       if(map.getSource(id))map.removeSource(id);
     }
@@ -596,6 +602,25 @@
       map.addLayer({id,type:"fill",source:id,
         paint:{"fill-color":"#ffd449","fill-opacity":0.10,"fill-outline-color":"#ffd449"}});
     }
+  }
+  function drawHemisphereOverlay(){
+    if(!map||!mapStyleReady||!Array.isArray(game.sectorReveals)
+      ||!game.sectorReveals.includes("hemisphere")
+      ||!cluesFor(game.index,difficulty).some(clue=>clue.key==="hemisphere"))return;
+    const north=cityAt(game.index)[3]>=0;
+    const lineId="case-hemisphere-line",arrowsId="case-hemisphere-arrows";
+    map.addSource(lineId,{type:"geojson",data:{type:"Feature",properties:{},
+      geometry:{type:"LineString",coordinates:[[-179.9,0],[179.9,0]]}}});
+    map.addLayer({id:lineId,type:"line",source:lineId,
+      layout:{"line-cap":"butt","line-join":"round"},
+      paint:{"line-color":"#ffd449","line-width":2,"line-opacity":0.9,"line-dasharray":[2,3]}});
+    const glyph=north?"↑":"↓";
+    const points=Array.from({length:13},(_,i)=>[-162+i*27,north?1.8:-1.8]);
+    map.addSource(arrowsId,{type:"geojson",data:{type:"Feature",properties:{},
+      geometry:{type:"MultiPoint",coordinates:points}}});
+    map.addLayer({id:arrowsId,type:"symbol",source:arrowsId,
+      layout:{"text-field":glyph,"text-size":16,"text-allow-overlap":true,"text-ignore-placement":true},
+      paint:{"text-color":"#ffd449","text-halo-color":"#172015","text-halo-width":1}});
   }
   function addMarker(lat,lng,label,style,popupText=""){
     const pin=makeMarker(label,style).setLngLat([lng,lat]).addTo(map);
@@ -691,6 +716,7 @@
     if(!map)return;
     clearMapOverlays();
     drawSectorOverlays();
+    drawHemisphereOverlay();
     const target=cityCoords(game.index);
     const best=game.finished?bestGuess():null;
     game.guesses.forEach((g,i)=>addMarker(g.lat,g.lng,i+1,g===best?"best":"past"));

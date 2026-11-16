@@ -582,3 +582,9 @@ dialog.case-report .report-heading h2{font-size:24px}
 .sector-map-btn.purchased{opacity:.72;border-style:dashed;cursor:default}
 .sector-map-btn:disabled:not(.purchased){opacity:.45;cursor:not-allowed}
 @media(max-width:760px){.sector-map-btn{font-size:10px;padding:7px 6px}}
+
+/* Small arrows beside the paid Equator guidance in both map renderers. */
+.hemisphere-direction-arrow{background:transparent;border:0;color:#ffd449;
+  font:700 18px/18px "IBM Plex Mono",monospace;text-align:center;
+  text-shadow:0 1px 2px #111c16,0 -1px 2px #111c16;
+  pointer-events:none!important;user-select:none}

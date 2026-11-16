@@ -33,7 +33,7 @@ class Element {
   closest(){return null}
 }
 const hash=input=>{let h=2166136261;for(const c of input){h ^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0};
-function boot({storage=new Map(),map=false,randomValue=0,mobile=false}={}){
+function boot({storage=new Map(),map=false,randomValue=0,mobile=false,clock=Date}={}){
   const nodes=new Map(),window={},mobileCase=new Element("mobile-case"),mapState={fits:[],eases:[],styles:[],zoomRanges:[],markers:[],layers:new Map(),sources:new Map(),events:{},canvas:new Element("canvas")};
   const document={
     readyState:"complete",documentElement:{lang:"en",dir:"ltr"},hidden:false,
@@ -93,7 +93,7 @@ function boot({storage=new Map(),map=false,randomValue=0,mobile=false}={}){
   const perf={distanceCalls:0};
   math.atan2=(...args)=>{perf.distanceCalls++;return Math.atan2(...args)};
   const context={
-    window,document,localStorage,navigator:{},Math:math,Number,String,Array,Set,Map,JSON,Date,Intl,
+    window,document,localStorage,navigator:{},Math:math,Number,String,Array,Set,Map,JSON,Date:clock,Intl,
     AbortController,console,setTimeout(){return 0},clearTimeout(){},
     fetch:async()=>({ok:true,json:async()=>({results:[]})})
   };
@@ -437,8 +437,8 @@ test("a correct fifth guess in Cape Town has no distance or bearing in history o
 });
 
 test("fresh deployments fingerprint both game engine and translated clues",()=>{
-  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-sector-map"'));
-  assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-sector-map"'));
+  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-hemisphere-guide"'));
+  assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-hemisphere-guide"'));
   assert.ok(files["map-bootstrap.js"].includes('new URL(import.meta.url).searchParams.get("v")'));
   assert.ok(files["app.js"].includes("function guessMetricText(g)"));
   const deploy=readFileSync(new URL("../.github/workflows/pages.yml",import.meta.url),"utf8");
@@ -511,7 +511,94 @@ test("daily purchased map sectors reload without double deduction and Hard has n
   assert.equal(again.get("clueList").children[3].children[1].children[2].disabled,true);
   assert.equal(JSON.parse(storage.get("geodetective-daily-v3-"+day+"-normal")).sectorMapPenalty,1200);
   again.difficulty("hard");
-  assert.equal(again.get("clueList").children.some(row=>row.children[1].children.length===3),false);
+  for(const row of again.get("clueList").children){
+    if(row.children[1].children.length===3){
+      assert.match(row.children[1].children[1].textContent,/hemisphere/i,
+        "Hard can offer the hemisphere guide, not longitude/latitude guides");
+    }
+  }
+});
+
+test("paid hemisphere guidance draws the Equator dashed with arrows pointing to north or south",()=>{
+  const places=boot().window.GEODETECTIVE_PLACES;
+  for(const north of [true,false]){
+    const index=places.findIndex((p,i)=>![7,8,10,35].includes(i)
+      &&hash("opening:"+p[0])%3===2&&(p[3]>=0)===north);
+    assert.ok(index>=0,"Missing northern/southern hemisphere example");
+    const g=boot({map:true,randomValue:(index+.25)/places.length}),$=g.get;
+    $("freeBtn").handlers.click();
+    assert.match(clueTexts(g)[0],/hemisphere/i);
+    const button=$("clueList").children[0].children[1].children[2];
+    assert.equal(button.textContent,"Map −600");
+    assert.equal(button.disabled,false);
+    button.handlers.click();
+    const line=g.mapState.sources.get("case-hemisphere-line").data.geometry;
+    assert.equal(line.type,"LineString");
+    assert.equal(line.coordinates[0][1],0);
+    assert.equal(line.coordinates[1][1],0);
+    const layer=g.mapState.layers.get("case-hemisphere-line");
+    assert.equal(layer.paint["line-color"],"#ffd449");
+    assert.equal(layer.paint["line-dasharray"].join(","),"2,3");
+    const arrowLayer=g.mapState.layers.get("case-hemisphere-arrows");
+    assert.equal(arrowLayer.layout["text-field"],north?"↑":"↓");
+    const points=g.mapState.sources.get("case-hemisphere-arrows").data.geometry;
+    assert.equal(points.type,"MultiPoint");
+    assert.ok(points.coordinates.length>=10);
+    assert.ok(points.coordinates.every(p=>north?p[1]>0:p[1]<0));
+    assert.equal($("clueList").children[0].children[1].children[2].disabled,true);
+    button.handlers.click(); // Clicking the original button again cannot charge twice.
+    assert.equal(g.mapState.eases.at(-1).center[1],0);
+    g.language("pt");
+    assert.match($("clueList").children[0].children[1].children[2].textContent,/No mapa/);
+    g.select(places[index][0]);$("guessBtn").handlers.click();
+    assert.equal($("reportScore").textContent,"4.400 / 5,000");
+    assert.equal($("reportHints").textContent,"0");
+  }
+});
+
+test("hemisphere purchase survives daily reloading and map engine switching",async()=>{
+  const places=boot().window.GEODETECTIVE_PLACES;
+  const day=Array.from({length:120},(_,i)=>new Date(Date.UTC(2027,0,i+1)).toISOString().slice(0,10))
+    .find(d=>{
+      const index=hash("GEODETECTIVE-v3|"+d+"|normal")%places.length;
+      return ![7,8,10,35].includes(index)&&hash("opening:"+places[index][0])%3===2;
+    });
+  assert.ok(day);
+  class FakeDate extends Date{
+    constructor(...args){super(...(args.length?args:[day+"T12:00:00Z"]));}
+  }
+  const storage=new Map(),g=boot({map:true,storage,clock:FakeDate}),$=g.get;
+  assert.match(clueTexts(g)[0],/hemisphere/i);
+  $("clueList").children[0].children[1].children[2].handlers.click();
+  const saved=JSON.parse(storage.get("geodetective-daily-v3-"+day+"-normal"));
+  assert.equal(saved.sectorMapPenalty,600);
+  assert.deepEqual(saved.sectorReveals,["hemisphere"]);
+  await $("mapOsmBtn").handlers.click();
+  assert.ok(g.mapState.layers.has("case-hemisphere-line"));
+  assert.ok(g.mapState.layers.has("case-hemisphere-arrows"));
+  await $("mapVectorBtn").handlers.click();
+  assert.equal(g.mapState.layers.get("case-hemisphere-arrows").type,"symbol");
+  const reopened=boot({map:true,storage,clock:FakeDate});
+  assert.ok(reopened.mapState.sources.has("case-hemisphere-line"));
+  assert.equal(reopened.get("clueList").children[0].children[1].children[2].disabled,true);
+  assert.equal(JSON.parse(storage.get("geodetective-daily-v3-"+day+"-normal")).sectorMapPenalty,600);
+});
+
+test("hemisphere guide requires a revealed hemisphere clue and working map, including Hard",()=>{
+  const places=boot().window.GEODETECTIVE_PLACES;
+  const index=places.findIndex((p,i)=>![7,8,10,35].includes(i)&&hash("opening:"+p[0])%3===2);
+  assert.ok(index>=0);
+  const g=boot({map:false,randomValue:(index+.25)/places.length});
+  g.get("freeBtn").handlers.click();
+  const button=g.get("clueList").children[0].children[1].children[2];
+  assert.equal(button.disabled,true);
+  assert.match(button.textContent,/600/);
+  const hard=boot({map:true,randomValue:(index+.25)/places.length});
+  hard.difficulty("hard");
+  hard.get("freeBtn").handlers.click();
+  assert.equal(hard.get("clueList").children[0].children[1].children[2].disabled,false);
+  for(let i=1;i<6;i++)
+    assert.equal(hard.get("clueList").children[i].children[1].children[2],undefined);
 });
 
 test("hemisphere evidence never follows the continent and no generic river-valley clue remains",()=>{
