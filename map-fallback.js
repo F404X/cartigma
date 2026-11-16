@@ -75,7 +75,8 @@
       addSource(id,source){this._sources.set(id,source);}
       removeSource(id){this._sources.delete(id);}
       addLayer(layer){
-        const geo=this._sources.get(layer.source)?.data?.geometry;
+        const data=this._sources.get(layer.source)?.data;
+        const geo=data?.geometry;
         if(layer.id==="case-hemisphere-arrows"&&layer.type==="symbol"
           &&geo?.type==="LineString"){
           const group=L.layerGroup().addTo(this.root);
@@ -109,6 +110,33 @@
           this.root.on("zoomend",update);
           this.root.on("moveend",update);
           update();
+        }else if(layer.id==="case-utm-annotations"&&layer.type==="symbol"
+          &&data?.type==="FeatureCollection"){
+          const group=L.layerGroup().addTo(this.root);
+          const update=()=>{
+            group.clearLayers();
+            if(this.root.getZoom()<3)return;
+            for(const point of data.features){
+              if(point.geometry?.type!=="Point")continue;
+              const label=String(point.properties?.label||"");
+              if(!/^(?:[1-9]|[1-5][0-9]|60|[C-HJ-NP-X])$/.test(label))continue;
+              const [lng,lat]=point.geometry.coordinates;
+              const icon=L.divIcon({className:"utm-grid-label",html:label,
+                iconSize:[26,16],iconAnchor:[13,8]});
+              L.marker([lat,lng],{icon,interactive:false,keyboard:false})
+                .addTo(group);
+            }
+          };
+          this._layers.set(layer.id,group);
+          this._layerCleanups.set(layer.id,()=>this.root.off("zoomend",update));
+          this.root.on("zoomend",update);
+          update();
+        }else if(geo?.type==="MultiLineString"&&layer.type==="line"){
+          const grid=L.geoJSON({type:"Feature",properties:{},geometry:geo},{
+            style:{color:"#ffd449",weight:0.8,opacity:.36,
+              dashArray:"3 4",interactive:false}
+          }).addTo(this.root);
+          this._layers.set(layer.id,grid);
         }else if(geo?.type==="LineString"){
           const line=L.polyline(geo.coordinates.map(point=>[point[1],point[0]]),{
             color:"#ffd449",weight:2,opacity:.85,

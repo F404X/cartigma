@@ -690,3 +690,8 @@ dialog.case-report .report-heading h2{font-size:24px}
  clip:rect(0,0,0,0)!important;clip-path:inset(50%)!important;overflow:hidden!important;
  white-space:nowrap!important}
 .report-country-access dd{font-weight:600}
+
+/* UTM ruler annotations shown only after the corresponding paid map aid. */
+.utm-grid-label{background:#23291dd9;color:#ffe28a;border:1px solid #ba9e4b99;
+  border-radius:2px;display:grid;place-items:center;width:26px;height:16px;
+  font:600 10px/1 var(--mono);pointer-events:none;box-shadow:0 1px 3px #0008}

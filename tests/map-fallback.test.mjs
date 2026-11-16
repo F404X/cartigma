@@ -69,9 +69,35 @@ test("both keyless vector and fallback raster scripts are included in Pages",()=
   assert.match(app,/switchToFallback/);
   assert.match(app,/mapStyleTimeout/);
   assert.match(app,/typeof libre\.supported==="function"/);
-  assert.ok(html.includes('src="map-fallback.js?v=20261116-profile-diversity"'));
+  assert.ok(html.includes('src="map-fallback.js?v=20261116-utm-ruler"'));
   assert.match(html,/leaflet@1\.9\.4\/dist\/leaflet\.css/);
   assert.match(workflow,/map-fallback\.js/);
+});
+
+test("raster fallback renders UTM grids and labels with cleanup",async()=>{
+  const {leaflet,state}=mockLeaflet();
+  const window={L:leaflet};
+  runInNewContext(source,{window,document:{},Promise,Map,queueMicrotask,console});
+  const lib=await window.GeoMapFallback.ensure();
+  const map=new lib.Map({container:"map",center:[8,15],zoom:3});
+  map.addSource("case-utm-grid",{data:{geometry:{type:"MultiLineString",
+    coordinates:[[[3,56],[3,64]],[[9,72],[9,84]]]}}});
+  map.addLayer({id:"case-utm-grid",source:"case-utm-grid",type:"line"});
+  assert.equal(state.polygons.length,1);
+  assert.equal(state.polygons[0].options.style.fill,undefined);
+  assert.equal(state.polygons[0].options.style.opacity,.36);
+  map.addSource("case-utm-annotations",{data:{type:"FeatureCollection",features:[
+    {type:"Feature",properties:{label:"32"},geometry:{type:"Point",coordinates:[9,0]}},
+    {type:"Feature",properties:{label:"S"},geometry:{type:"Point",coordinates:[9,36]}}
+  ]}});
+  map.addLayer({id:"case-utm-annotations",source:"case-utm-annotations",type:"symbol"});
+  assert.equal(state.groups.length,1);
+  assert.equal(state.groups[0].markers.length,2);
+  assert.deepEqual(state.groups[0].markers.map(m=>m.options.icon.html),["32","S"]);
+  assert.equal(state.events.zoomend instanceof Function,true);
+  map.removeLayer("case-utm-annotations");
+  assert.equal(state.events.zoomend,undefined);
+  assert.equal(state.groups[0].markers.length,2);
 });
 
 test("Leaflet fallback restores map, markers, line and click coordinates",async()=>{

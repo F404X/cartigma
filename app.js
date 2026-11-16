@@ -34,7 +34,13 @@
   });
   // Overlay costs differ by how tightly each display constrains the target.
   const MAP_OVERLAY_COSTS=Object.freeze({hemisphere:250,continent:500,
-    longitude:1000,latitude:1100});
+    longitude:1000,latitude:1100,utmZone:1200,utmBand:1300});
+  // Hard charges 50% more for clues AND every map aid, rounding to 50 points.
+  // Stored purchases retain their original cost when a daily case is reopened.
+  const HARD_COST_FACTOR=1.5;
+  const pricedCost=(base)=>difficulty==="hard"
+    ?Math.ceil(base*HARD_COST_FACTOR/50)*50:base;
+  const overlayCost=(key)=>pricedCost(MAP_OVERLAY_COSTS[key]||0);
   // Europe and North America are fully/almost entirely in the Northern
   // Hemisphere. The others have meaningful populations on BOTH sides of 0°.
   const EQUATOR_CROSSING_CONTINENTS=new Set(["asia","africa","southAmerica","oceania"]);
@@ -560,12 +566,15 @@
     landmark:"clueLandmark"
   });
   function revealGeographyOnMap(clue){
-    const cost=MAP_OVERLAY_COSTS[clue.key];
+    const cost=overlayCost(clue.key);
     if(game.finished||!map||!mapStyleReady||!cost)return;
     if(clue.key==="continent"&&!CONTINENT_BORDERS[continentKey(game.index)])return;
     if(!cluesFor(game.index,difficulty).slice(0,game.revealed).some(item=>
-      item.key===clue.key&&(["hemisphere","continent"].includes(clue.key)
-        ?item.value===clue.value:item.from===clue.from&&item.to===clue.to)))return;
+      item.key===clue.key&&(
+        item.key==="utmZone"?item.zone===clue.zone:
+        item.key==="utmBand"?item.band===clue.band:
+        ["hemisphere","continent"].includes(clue.key)
+          ?item.value===clue.value:item.from===clue.from&&item.to===clue.to)))return;
     if(!Array.isArray(game.sectorReveals))game.sectorReveals=[];
     if(game.sectorReveals.includes(clue.key))return;
     game.sectorReveals.push(clue.key);
@@ -579,7 +588,16 @@
         padding:{top:20,bottom:20,left:20,right:20},maxZoom:4,duration:400
       });
     }else{
-      const bounds=clue.key==="longitude"?
+      let bounds;
+      if(clue.key==="utmZone"){
+        const polygons=utmZonePolygons(clue.zone);
+        const coords=polygons.flatMap(poly=>poly[0]);
+        bounds=[[Math.min(...coords.map(p=>p[0])),Math.min(...coords.map(p=>p[1]))],
+          [Math.max(...coords.map(p=>p[0])),Math.max(...coords.map(p=>p[1]))]];
+      }else if(clue.key==="utmBand"){
+        const [south,north]=utmBandBounds(clue.band);
+        bounds=[[-179.5,south],[179.5,north]];
+      }else bounds=clue.key==="longitude"?
         [[clue.from,-75],[clue.to,75]]:[[-179.5,clue.from],[179.5,clue.to]];
       map.fitBounds(bounds,{padding:{top:20,bottom:20,left:20,right:20},maxZoom:3,duration:450});
     }
@@ -590,7 +608,7 @@
   function nextHintCost(){
     if(!game||game.finished||game.revealed>=EVIDENCE_COUNT)return 0;
     const clue=cluesFor(game.index,difficulty)[game.revealed];
-    return HINT_PRICES[clue?.key]??HINT_COST;
+    return pricedCost(HINT_PRICES[clue?.key]??HINT_COST);
   }
   function renderClues(){
     const clues=cluesFor(game.index,difficulty);
@@ -618,7 +636,7 @@
         const button=document.createElement("button");
         button.type="button";
         button.className="sector-map-btn"+(purchased?" purchased":"");
-        button.textContent=purchased?tc("sectorMapped"):tc("sectorMapButton",{cost:number(MAP_OVERLAY_COSTS[clue.key])});
+        button.textContent=purchased?tc("sectorMapped"):tc("sectorMapButton",{cost:number(overlayCost(clue.key))});
         button.title=button.textContent;
         button.setAttribute("aria-label",button.textContent);
         button.disabled=game.finished||purchased||!map||!mapStyleReady||
@@ -896,6 +914,7 @@
     if(map.getSource("case-distance-line"))map.removeSource("case-distance-line");
     // The symbol layer depends on the Equator line source: remove it first.
     for(const id of ["case-sector-longitude","case-sector-latitude",
+      "case-utm-annotations","case-utm-grid","case-utm-zone","case-utm-band",
       "case-hemisphere-arrows","case-hemisphere-line","case-continent-outline"]){
       if(map.getLayer(id))map.removeLayer(id);
       if(map.getSource(id))map.removeSource(id);
@@ -919,6 +938,103 @@
       map.addLayer({id,type:"fill",source:id,
         paint:{"fill-color":"#ffd449","fill-opacity":0.10,"fill-outline-color":"#ffd449"}});
     }
+  }
+  // UTM grid spans 80°S–84°N. Bands C–W are 8° high; X is 12°.
+  // Norway's 32V and Svalbard's 31X/33X/35X/37X boundaries are irregular.
+  const UTM_BANDS="CDEFGHJKLMNPQRSTUVWX";
+  const UTM_LONGITUDE_CUTS=Object.freeze(
+    [...new Set([...Array.from({length:61},(_,i)=>-180+i*6),
+      3,9,12,21,33,42])].sort((a,b)=>a-b));
+  function utmBandBounds(letter){
+    const index=UTM_BANDS.indexOf(letter);
+    if(index<0)throw Error("Unknown UTM latitude band "+letter);
+    const south=-80+index*8;
+    return [south,index===UTM_BANDS.length-1?84:south+8];
+  }
+  function utmBandRows(){
+    return [...UTM_BANDS].map(band=>{
+      const [south,north]=utmBandBounds(band);
+      return {band,south,north,latitude:(south+north)/2};
+    });
+  }
+  function utmIntervals(zone,latitude){
+    const ranges=[];
+    for(let i=0;i<UTM_LONGITUDE_CUTS.length-1;i++){
+      const left=UTM_LONGITUDE_CUTS[i],right=UTM_LONGITUDE_CUTS[i+1];
+      if(utmZone(latitude,(left+right)/2)!==zone)continue;
+      if(ranges.length&&ranges.at(-1)[1]===left)ranges.at(-1)[1]=right;
+      else ranges.push([left,right]);
+    }
+    return ranges;
+  }
+  function utmZonePolygons(zone){
+    return utmBandRows().flatMap(row=>utmIntervals(zone,row.latitude)
+      .map(([west,east])=>sectorRectangle(west,row.south,east,row.north)));
+  }
+  function drawUtmOverlays(){
+    const purchased=game?.sectorReveals||[];
+    if(!map||!mapStyleReady||
+      !["utmZone","utmBand"].some(key=>purchased.includes(key)))return;
+    const clues=cluesFor(game.index,difficulty);
+    const zoneClue=clues.find(clue=>clue.key==="utmZone");
+    const bandClue=clues.find(clue=>clue.key==="utmBand");
+    const addShape=(id,geometry,opacity)=>{
+      map.addSource(id,{type:"geojson",data:{type:"Feature",properties:{},geometry}});
+      map.addLayer({id,type:"fill",source:id,
+        paint:{"fill-color":"#ffd449","fill-opacity":opacity,
+          "fill-outline-color":"#ffd449"}});
+    };
+    if(purchased.includes("utmZone")&&zoneClue)
+      addShape("case-utm-zone",{type:"MultiPolygon",coordinates:
+        utmZonePolygons(zoneClue.zone)},.10);
+    if(purchased.includes("utmBand")&&bandClue){
+      const [south,north]=utmBandBounds(bandClue.band);
+      addShape("case-utm-band",{type:"MultiPolygon",coordinates:
+        Array.from({length:6},(_,i)=>
+          sectorRectangle(-180+i*60,south,-120+i*60,north))},.085);
+    }
+    // Draw only actual UTM boundaries, including the Norway and Svalbard
+    // exceptions. Splitting the vertical lines by band avoids false 6° zones.
+    const lines=[];
+    for(const row of utmBandRows()){
+      for(const lon of UTM_LONGITUDE_CUTS.slice(1,-1)){
+        if(utmZone(row.latitude,lon-0.001)===utmZone(row.latitude,lon+0.001))
+          continue;
+        lines.push([[lon,row.south],[lon,row.north]]);
+      }
+      lines.push([[-179.8,row.south],[179.8,row.south]]);
+    }
+    lines.push([[-179.8,84],[179.8,84]]);
+    map.addSource("case-utm-grid",{type:"geojson",data:{type:"Feature",
+      properties:{},geometry:{type:"MultiLineString",coordinates:lines}}});
+    map.addLayer({id:"case-utm-grid",type:"line",source:"case-utm-grid",
+      paint:{"line-color":"#ffd449","line-width":0.8,
+        "line-opacity":0.36,"line-dasharray":[2,3]}});
+    // Numbered zones and lettered latitude bands make the overlay a readable
+    // geographic ruler, rather than an unlabeled highlighted rectangle.
+    const annotations=[];
+    if(purchased.includes("utmZone")){
+      for(let zone=1;zone<=60;zone++){
+        const longitude=-180+(zone-.5)*6;
+        annotations.push({type:"Feature",properties:{label:String(zone)},
+          geometry:{type:"Point",coordinates:[longitude,-4]}});
+      }
+    }
+    if(purchased.includes("utmBand")){
+      for(const row of utmBandRows())
+        for(const longitude of [-150,-90,-30,30,90,150])
+          annotations.push({type:"Feature",properties:{label:row.band},
+            geometry:{type:"Point",coordinates:[longitude,row.latitude]}});
+    }
+    map.addSource("case-utm-annotations",{type:"geojson",
+      data:{type:"FeatureCollection",features:annotations}});
+    map.addLayer({id:"case-utm-annotations",source:"case-utm-annotations",
+      type:"symbol",minzoom:2.5,
+      layout:{"text-field":["get","label"],"text-size":10,
+        "text-font":["Open Sans Regular","Arial Unicode MS Regular"],
+        "text-allow-overlap":false,"text-optional":true},
+      paint:{"text-color":"#ffe28a","text-halo-color":"#122017",
+        "text-halo-width":1.3}});
   }
   function drawContinentOutline(){
     if(!map||!mapStyleReady||!Array.isArray(game.sectorReveals)
@@ -1060,6 +1176,7 @@
     if(!map)return;
     clearMapOverlays();
     drawSectorOverlays();
+    drawUtmOverlays();
     drawHemisphereOverlay();
     drawContinentOutline();
     const target=cityCoords(game.index);

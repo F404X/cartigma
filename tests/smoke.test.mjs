@@ -1099,12 +1099,125 @@ test("a correct fifth guess in Cape Town has no distance or bearing in history o
 });
 
 test("fresh deployments fingerprint both game engine and translated clues",()=>{
-  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-ten-evidence"'));
+  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-utm-ruler"'));
   assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-profile-diversity"'));
   assert.ok(files["map-bootstrap.js"].includes('new URL(import.meta.url).searchParams.get("v")'));
   assert.ok(files["app.js"].includes("function guessMetricText(g)"));
   const deploy=readFileSync(new URL("../.github/workflows/pages.yml",import.meta.url),"utf8");
   assert.ok(deploy.includes("GITHUB_SHA"));
+});
+
+test("Hard mode charges 50 percent more for all clue reveals and map overlays",()=>{
+  const places=boot().window.GEODETECTIVE_PLACES;
+  const i=places.findIndex(p=>p[0]==="Reykjavík");
+  const normal=boot({map:true,randomValue:(i+.25)/places.length});
+  normal.get("freeBtn").handlers.click();
+  const initialNormal=Number(normal.get("revealCost").textContent.replace(/[^0-9]/g,""));
+  assert.equal(normal.get("clueList").children[1].children[1].children[2].textContent,"Map −500");
+  const hard=boot({map:true,randomValue:(i+.25)/places.length});
+  hard.difficulty("hard");hard.get("freeBtn").handlers.click();
+  const hardCost=Number(hard.get("revealCost").textContent.replace(/[^0-9]/g,""));
+  assert.equal(hardCost,Math.ceil(300*1.5/50)*50,"Second clue is the continent");
+  hard.get("revealBtn").handlers.click();
+  assert.equal(hard.get("clueList").children[1].children[1].children[2].textContent,"Map −750");
+  const before=Number(hard.get("revealCost").textContent.replace(/[^0-9]/g,""));
+  assert.ok(before>=Math.ceil(initialNormal*1.5/50)*50||before>=300);
+  hard.get("clueList").children[1].children[1].children[2].handlers.click();
+  hard.select("Reykjavík");hard.get("guessBtn").handlers.click();
+  const spent=hardCost;
+  assert.equal(hard.get("reportScore").textContent,
+    new Intl.NumberFormat("en-US").format(5000-spent-750)+" / 5,000");
+  assert.equal(hard.get("reportHints").textContent,"1");
+});
+
+test("paid UTM zone draws correct Norwegian and Svalbard exceptions with labeled ruler",()=>{
+  const cities=boot().window.GEODETECTIVE_PLACES;
+  for(const [city,expectedZone,west,east,south,north] of [
+    ["Oslo",32,3,12,56,64],["Longyearbyen",33,9,21,72,84]
+  ]){
+    const idx=cities.findIndex(x=>x[0]===city);
+    const g=boot({map:true,randomValue:(idx+.25)/cities.length}),$=g.get;
+    g.difficulty("hard");$("freeBtn").handlers.click();
+    const {button}=unlockClue(g,/^UTM zone:/);
+    assert.equal(button.textContent,"Map −1,800");
+    assert.equal(button.disabled,false);
+    button.handlers.click();
+    assert.equal($("clueList").children.find(row=>row.children[1].children[1].textContent==="UTM zone: "+expectedZone)
+      .children[1].children[2].disabled,true);
+    const shape=g.mapState.sources.get("case-utm-zone").data.geometry;
+    assert.equal(shape.type,"MultiPolygon");
+    assert.ok(shape.coordinates.some(poly=>poly[0].some(p=>p[0]===west&&p[1]===south)
+      &&poly[0].some(p=>p[0]===east&&p[1]===north)),
+      city+" must include correct special UTM borders");
+    assert.ok(g.mapState.sources.has("case-utm-grid"));
+    const grid=g.mapState.sources.get("case-utm-grid").data.geometry;
+    assert.equal(grid.type,"MultiLineString");
+    assert.ok(grid.coordinates.some(line=>line[0][0]===west
+      &&line[0][1]===south&&line[1][1]===north),
+      city+" should draw the corrected UTM zone ruler");
+    const labels=g.mapState.sources.get("case-utm-annotations").data.features;
+    assert.equal(labels.length,60);
+    assert.ok(labels.some(f=>f.properties.label===String(expectedZone)));
+    assert.equal(g.mapState.layers.get("case-utm-grid").paint["line-opacity"],.36);
+    assert.equal(g.mapState.layers.get("case-utm-zone").paint["fill-opacity"],.10);
+    assert.equal(g.mapState.fits.length>0,true);
+    button.handlers.click();
+  }
+});
+
+test("UTM latitude-band purchase shows the correct 8 and 12 degree ranges",async()=>{
+  const places=boot().window.GEODETECTIVE_PLACES;
+  for(const [city,band,south,north] of [
+    ["Tóquio","S",32,40],["Longyearbyen","X",72,84]
+  ]){
+    const index=places.findIndex(p=>p[0]===city);
+    const g=boot({map:true,randomValue:(index+.25)/places.length}),$=g.get;
+    g.difficulty("hard");$("freeBtn").handlers.click();
+    const {button}=unlockClue(g,/^UTM latitude band:/);
+    assert.equal(button.textContent,"Map −1,950");
+    button.handlers.click();
+    const geo=g.mapState.sources.get("case-utm-band").data.geometry;
+    assert.equal(geo.type,"MultiPolygon");
+    assert.equal(geo.coordinates.length,6);
+    assert.equal(geo.coordinates[0][0][0][1],south);
+    assert.equal(geo.coordinates[0][0][2][1],north);
+    assert.equal(g.mapState.sources.get("case-utm-annotations").data.features.length,120);
+    assert.ok(g.mapState.sources.get("case-utm-annotations").data.features.some(
+      f=>f.properties.label===band));
+    await $("mapOsmBtn").handlers.click();
+    assert.ok(g.mapState.sources.has("case-utm-grid"));
+    assert.ok(g.mapState.sources.has("case-utm-band"));
+    await $("mapVectorBtn").handlers.click();
+    assert.ok(g.mapState.sources.has("case-utm-band"));
+  }
+});
+
+test("both UTM overlays persist in daily Hard games without charging twice",()=>{
+  const storage=new Map(),cities=boot().window.GEODETECTIVE_PLACES;
+  const date=new Date().toISOString().slice(0,10);
+  const g=boot({map:true,storage}),$=g.get;
+  g.difficulty("hard");
+  const {button:zone}=unlockClue(g,/^UTM zone:/);
+  zone.handlers.click();
+  const {button:band}=unlockClue(g,/^UTM latitude band:/);
+  band.handlers.click();
+  const key="geodetective-daily-v3-"+date+"-hard";
+  const saved=JSON.parse(storage.get(key));
+  assert.deepEqual(saved.sectorReveals,["utmZone","utmBand"]);
+  assert.equal(saved.sectorMapPenalty,3750);
+  assert.equal(saved.guesses.length,0);
+  assert.ok(g.mapState.sources.has("case-utm-zone"));
+  assert.ok(g.mapState.sources.has("case-utm-band"));
+  assert.equal(g.mapState.sources.get("case-utm-annotations").data.features.length,180);
+  const loaded=boot({map:true,storage});
+  assert.equal(unlockClue(loaded,/^UTM zone:/).button.disabled,true);
+  assert.equal(unlockClue(loaded,/^UTM latitude band:/).button.disabled,true);
+  assert.ok(loaded.mapState.sources.has("case-utm-zone"));
+  assert.ok(loaded.mapState.sources.has("case-utm-band"));
+  assert.equal(JSON.parse(storage.get(key)).sectorMapPenalty,3750);
+  loaded.difficulty("normal");
+  assert.ok(!loaded.mapState.sources.has("case-utm-zone"));
+  assert.equal(loaded.get("clueList").children[1].children[1].children[2]?.textContent,"Map −500");
 });
 
 test("paid longitude sector remains available regardless of shuffled evidence order",()=>{

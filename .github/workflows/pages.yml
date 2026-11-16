@@ -40,6 +40,7 @@ jobs:
           sed -i "s|v=20261116-sea-access-fix|v=${GITHUB_SHA}|g" dist/index.html
           sed -i "s|v=20261116-currency-names|v=${GITHUB_SHA}|g" dist/index.html
           sed -i "s|v=20261116-ten-evidence|v=${GITHUB_SHA}|g" dist/index.html
+          sed -i "s|v=20261116-utm-ruler|v=${GITHUB_SHA}|g" dist/index.html
           touch dist/.nojekyll
 
       - name: Configurar GitHub Pages

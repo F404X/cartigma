@@ -122,3 +122,19 @@ Ten evidence slots retain the original first seven clues in their established or
 ### Ten clues, independent guesses
 
 Normal mode retains **6 guesses**, while Hard retains its original **4**; neither is increased by buying clues. The initial evidence remains 2 in Normal and 1 in Hard, with all remaining clues available for optional point purchases from the start. Incorrect guesses still reveal evidence at the existing pace. The first seven positions remain unchanged so that ongoing saved daily cases do not lose access to previously revealed clue and map-overlay purchases. The final report now lists all ten clues.
+
+### UTM map ruler and Hard-mode pricing
+
+Both UTM zone and UTM latitude-band evidence now offer a one-time paid **Map**
+button on Hard. Buying either displays a low-opacity geographic highlight of
+the respective UTM region and a UTM grid: real 6° zone boundaries, horizontal
+latitude-band boundaries C–X (including the 12° X band), numeric zone labels
+and band letters. The zone geometry includes the exceptions in western Norway
+and Svalbard. Purchases are stored separately, survive map-style changes and
+daily-case reloads, and do not use guesses.
+
+Hard charges **50% more** than Normal for every paid clue and existing overlay,
+with costs rounded up to the nearest 50 points. UTM zone and UTM latitude-band
+overlays have base costs 1,200/1,300 and therefore cost **1,800/1,950 points**
+on Hard. Normal-mode pricing remains unchanged. Existing charges from saved
+cases are not recalculated.
