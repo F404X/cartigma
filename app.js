@@ -319,6 +319,14 @@
     const from=Math.floor(p[4]/30)*30;
     return {key:"longitude",from,to:from+30};
   }
+  function latitudeGridClue(index,level){
+    const latitude=cityAt(index)[3];
+    if(level==="hard")return {key:"utmBand",band:utmLatitudeBand(latitude)};
+    const from=Math.floor(latitude/15)*15;
+    return {key:"latitude",from,to:from+15};
+  }
+  // For already-started saved investigations only. New cases never offer
+  // an associated landmark as evidence; the city archive still lists it.
   function landmarkClue(index,level){
     const place=cityAt(index),name=LANDMARKS[index];
     // Supplemental cities have reliable coordinates but no curated landmark:
@@ -439,9 +447,15 @@
     }
     return clues;
   }
-  function cluesFor(index,level){
-    const legacy=game?.index===index&&game.evidenceVersion===1;
-    const cacheKey=index+":"+level+":"+lang+":"+(legacy?"legacy":"city");
+  function cluesFor(index,level,revision=null){
+    // Version 3 retires landmark and administrative-region evidence.
+    // Preserve purchased hints in version 1/2 daily saves. The public city
+    // archive always requests version 3, regardless of the active save.
+    const evidenceVersion=revision??(game?.index===index
+      ?(game.evidenceVersion??2):3);
+    const legacy=evidenceVersion===1;
+    const archived=evidenceVersion<3;
+    const cacheKey=index+":"+level+":"+lang+":"+evidenceVersion;
     if(clueCache.has(cacheKey))return clueCache.get(cacheKey);
     const p=cityAt(index);
      const terrain={key:"terrain",value:locationFeature(index)};
@@ -458,7 +472,8 @@
     const extra=index>=BASE_CITIES?EXTENDED[index-BASE_CITIES]:null;
     const safeRegion=extra&&p[2]&&!norm(p[2]).includes(norm(p[0]));
     const third=extra
-      ?(extra.capital?capital:(safeRegion?{key:"adminRegion",value:p[2]}:capital))
+      ?(archived&&safeRegion&&!extra.capital
+        ?{key:"adminRegion",value:p[2]}:capital)
       :(reliableCapital&&hash("profile:"+p[0])%3===0?capital:
         (opening===terrain?zone:terrain));
     // Spread cultural, numeric and geographic clues across positions 3–7.
@@ -470,22 +485,23 @@
     const mixed=Array(5);
     mixed[positions[0]]=countryFacts[0];
     mixed[positions[1]]=countryFacts[1];
-    const geographic=[third,coordinateClue(index,level),landmarkClue(index,level)];
+    const geographic=[third,coordinateClue(index,level),
+      archived?landmarkClue(index,level):latitudeGridClue(index,level)];
     for(let i=geographic.length-1;i>0;i--){
       const j=hash("geographic-order:"+index+":"+level+":"+i)%(i+1);
       [geographic[i],geographic[j]]=[geographic[j],geographic[i]];
     }
     let next=0;
     for(let i=0;i<mixed.length;i++)if(!mixed[i])mixed[i]=geographic[next++];
-    // Preserve the first seven clues for already-started daily cases.
-    // Three more distinct clues are appended; they can be purchased at any
-    // time, independently of the remaining guesses.
+    // Versioned layouts preserve the first seven clues only for saved cases
+    // that already earned or purchased evidence. New games have no landmark
+    // or administrative-region clue, without altering their guess limits.
     const clues=[opening,{key:"continent",value:continentName(index)},...mixed];
     const usedKeys=new Set(clues.map(clue=>clue.key));
     const extraGeographic=[
       zone,terrain,
       ...(reliableCapital||index>=BASE_CITIES?[capital]:[]),
-      ...(safeRegion?[{key:"adminRegion",value:p[2]}]:[])
+      ...(archived&&safeRegion?[{key:"adminRegion",value:p[2]}]:[])
     ].find(clue=>!usedKeys.has(clue.key));
     let additional;
     if(legacy){
@@ -509,6 +525,8 @@
       new Set(additional.map(clue=>clue.key)).size!==3)
       throw Error("Repeated or missing evidence in case "+index);
     clues.push(...additional);
+    if(!archived&&clues.some(clue=>["landmark","adminRegion"].includes(clue.key)))
+      throw Error("Retired evidence in a new case "+index);
     if(clues.length!==EVIDENCE_COUNT)throw Error("Incomplete evidence set for "+index);
     clueCache.set(cacheKey,clues);
     return clues;
@@ -553,7 +571,7 @@
   function newGame(mode,index) {
     return {mode,index,difficulty,date:today(),serial:nextCaseNumber(),guesses:[],
       revealed:DIFFICULTIES[difficulty].initial,penalty:0,paidHints:0,
-      sectorMapPenalty:0,sectorReveals:[],evidenceVersion:2,
+      sectorMapPenalty:0,sectorReveals:[],evidenceVersion:3,
       finished:false,won:false,score:0};
   }
   function caseCode(){
@@ -570,6 +588,13 @@
       // Older saved cases with slots 8–10 already revealed retain the
       // original evidence, protecting points already spent.
       s.evidenceVersion=s.revealed>7?1:2;
+      store.set(dailyStorageKey(),s);
+    }
+    // A never-played saved daily case can safely receive the new clue set.
+    // Cases with previous attempts or paid evidence retain their prior clues.
+    if(s.evidenceVersion<3&&!s.finished&&s.guesses.length===0&&
+      s.revealed===DIFFICULTIES[difficulty].initial&&!s.paidHints){
+      s.evidenceVersion=3;
       store.set(dailyStorageKey(),s);
     }
     // Before this release, northern-only regions could receive a hemisphere
@@ -896,7 +921,7 @@
   }
   function atlasEvidence(index,level,target){
     const list=$(target);list.replaceChildren();
-    cluesFor(index,level).forEach((clue,i)=>{
+    cluesFor(index,level,3).forEach((clue,i)=>{
       const row=document.createElement("li");row.className="report-evidence-row";
       const count=document.createElement("span");count.textContent=String(i+1).padStart(2,"0");
       const value=document.createElement("span");value.textContent=clueText(clue,index);

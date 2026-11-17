@@ -226,3 +226,24 @@ for Web Mercator). Except Equatorial, **both northern and southern
 bands** are always highlighted, so buying the overlay does not reveal an
 otherwise unknown hemisphere. The new map source has independent cleanup
 and works with both MapLibre and Leaflet fallback.
+
+### Retired evidence: landmarks and administrative regions
+
+**New investigations (evidence revision 3)** no longer generate
+`landmark` ("Associated landmark" / "Referência conhecida") or
+`adminRegion` ("Administrative region" / "Região administrativa")
+as purchasable or automatically revealed evidence. Every city still has
+**10 distinct evidence cards**. In their place, geographic slots draw
+from the existing latitude sector or UTM latitude band, capital status,
+terrain, and the already sourced country/city information. Normal still
+offers six guesses and Hard four.
+
+The city archive continues to show curated landmarks and administrative
+regions as reference information. Its normal/hard evidence lists always
+use the new revision.
+
+Older **in-progress daily cases with guesses or previously purchased hints**
+keep their original evidence order and purchases to avoid silently swapping
+paid information. Previously saved cases that have not made a guess or bought
+a hint automatically upgrade to the new selection. No old scores are
+recalculated.

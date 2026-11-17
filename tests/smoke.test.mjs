@@ -944,8 +944,7 @@ test("ten clue types are unique and complete across representative cities and bo
         assert.ok(all.some(x=>x.startsWith("UTM latitude band:")),p[i][0]);
       }else{
         assert.ok(all.some(x=>x.startsWith("Longitude sector:")),p[i][0]);
-        assert.ok(all.some(x=>x.startsWith("Latitude sector:")||
-          x.startsWith("Associated landmark:")),p[i][0]);
+        assert.ok(all.some(x=>x.startsWith("Latitude sector:")),p[i][0]);
       }
     }
   }
@@ -1362,7 +1361,7 @@ test("longitude stays accurate but moves to different evidence positions",()=>{
   }
   assert.ok(seen.size>=2,"Longitude should not be a fixed fourth clue");
 });
-test("revealing landmarks never leaks the answer through the place name",()=>{
+test("normal evidence always has latitude sectors instead of known landmarks",()=>{
   const places=boot().window.GEODETECTIVE_PLACES;
   for(const name of ["Tóquio","Taipé","Antananarivo","Sydney","Papeete"]){
     const i=places.findIndex(x=>x[0]===name);
@@ -1373,8 +1372,83 @@ test("revealing landmarks never leaks the answer through the place name",()=>{
   }
   const i=places.findIndex(x=>x[0]==="Paris"),g=boot({randomValue:(i+.25)/places.length});
   g.get("freeBtn").handlers.click();
-  assert.ok(revealAll(g).includes("Associated landmark: Eiffel Tower"));
+  const clues=revealAll(g);
+  assert.ok(clues.some(text=>text.startsWith("Latitude sector:")));
+  assert.ok(!clues.some(text=>/^Associated landmark:|^Administrative region:/.test(text)));
 });
+test("all 500 cities have 10 Normal and Hard clues without the two retired clue types",()=>{
+  const g=boot(),$=g.get,original=JSON.stringify([...g.storage.entries()]);
+  $("atlasBtn").handlers.click();
+  const choices=$("atlasOptions").children;
+  assert.equal(choices.length,500);
+  for(let index=0;index<500;index++){
+    const button=choices.find(item=>item.dataset.index===String(index));
+    assert.ok(button);
+    button.handlers.click();
+    for(const level of ["Normal","Hard"]){
+      const clues=$("atlas"+level+"Evidence").children.map(row=>row.children[1].textContent);
+      assert.equal(clues.length,10,"City "+index+" "+level);
+      assert.equal(new Set(clues).size,10,"Duplicate clue for "+index+" "+level);
+      assert.ok(!clues.some(clue=>/^Associated landmark:|^Administrative region:/.test(clue)),
+        "Retired clue must not appear for city "+index+" "+level);
+      assert.ok(clues.some(clue=>clue.startsWith(level==="Normal"?
+        "Latitude sector:":"UTM latitude band:")),"Latitude clue absent for "+index+" "+level);
+    }
+  }
+  assert.equal(JSON.stringify([...g.storage.entries()]),original,
+    "Browsing archived clues must not affect a running game");
+});
+
+test("old paid clues stay intact, while never-played daily cases upgrade to the new clue selection",()=>{
+  const world=boot().window,places=world.GEODETECTIVE_PLACES,paris=8;
+  assert.equal(places[paris][0],"Paris");
+  const day=Array.from({length:3650},(_,i)=>
+    new Date(Date.UTC(2027,0,i+1)).toISOString().slice(0,10))
+    .find(date=>normalIndexForDay(date,world)===paris);
+  assert.ok(day,"Need a daily Paris case in the rotation");
+  class FixedDate extends Date{
+    constructor(...args){super(...(args.length?args:[day+"T12:00:00Z"]));}
+  }
+  const key="geodetective-daily-v3-"+day+"-normal";
+  const saved={mode:"daily",index:paris,difficulty:"normal",date:day,serial:1,
+    guesses:[],revealed:7,penalty:900,paidHints:5,sectorMapPenalty:0,sectorReveals:[],
+    evidenceVersion:2,finished:false,won:false,score:0};
+  const storage=new Map([[key,JSON.stringify(saved)]]);
+  const g=boot({storage,clock:FixedDate}),$=g.get,previous=clueTexts(g);
+  assert.ok(previous.includes("Associated landmark: Eiffel Tower"));
+  assert.equal(JSON.parse(storage.get(key)).evidenceVersion,2);
+  $("atlasBtn").handlers.click();
+  $("atlasSearch").value="Paris";$("atlasSearch").handlers.input();
+  const parisOption=$("atlasOptions").children.find(b=>b.dataset.index===String(paris));
+  assert.ok(parisOption);parisOption.handlers.click();
+  const newClues=$("atlasNormalEvidence").children.map(x=>x.children[1].textContent);
+  assert.equal(newClues.length,10);
+  assert.ok(newClues.some(x=>x.startsWith("Latitude sector:")));
+  assert.ok(!newClues.some(x=>/^Associated landmark:|^Administrative region:/.test(x)));
+  assert.deepEqual(clueTexts(g),previous);
+  $("atlasCloseBtn").handlers.click();
+  $("revealBtn").handlers.click();
+  assert.deepEqual(clueTexts(g).slice(0,7),previous.slice(0,7));
+  const loaded=boot({storage,clock:FixedDate});
+  assert.deepEqual(clueTexts(loaded).slice(0,7),previous.slice(0,7));
+  assert.equal(JSON.parse(storage.get(key)).evidenceVersion,2);
+
+  const unused=new Map([[key,JSON.stringify({...saved,revealed:2,paidHints:0,penalty:0})]]);
+  const newRun=boot({storage:unused,clock:FixedDate});
+  assert.equal(JSON.parse(unused.get(key)).evidenceVersion,3);
+  assert.ok(!revealAll(newRun).some(x=>/^Associated landmark:|^Administrative region:/.test(x)));
+});
+
+test("administrative regions and landmarks remain in the archive as reference data",()=>{
+  const g=boot(),$=g.get;$("atlasBtn").handlers.click();
+  $("atlasOptions").children.find(b=>b.dataset.index==="74").handlers.click();
+  assert.ok($("atlasCityFacts").children.some(x=>
+    x.children[0]?.textContent==="Administrative region"));
+  for(const level of ["Normal","Hard"])
+    assert.ok(!$("atlas"+level+"Evidence").children.some(x=>
+      /^Administrative region:|^Associated landmark:/.test(x.children[1].textContent)));
+});
+
 test("Hard mode still uses UTM zone and latitude bands without city giveaways",()=>{
   const places=boot().window.GEODETECTIVE_PLACES;
   for(const [name,zone,band] of [["Taipé",51,"R"],["Tóquio",54,"S"],["Longyearbyen",33,"X"]]){
@@ -1417,7 +1491,7 @@ test("a correct fifth guess in Cape Town has no distance or bearing in history o
 });
 
 test("fresh deployments fingerprint both game engine and translated clues",()=>{
-  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-short-currency"'));
+  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-retired-clues"'));
   assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-profile-diversity"'));
   assert.ok(files["map-bootstrap.js"].includes('new URL(import.meta.url).searchParams.get("v")'));
   assert.ok(files["app.js"].includes("function guessMetricText(g)"));
