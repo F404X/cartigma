@@ -777,7 +777,7 @@ test("mobile Rush evidence follows newest unlocked clue and is fully scrollable"
   const g=boot({mobile:true,clock:Clock,map:true}),$=g.get;
   const list=$("clueList");
   Object.defineProperty(list,"scrollHeight",{get(){
-    return this.children.filter(row=>!row.classList.contains("locked")).length*64;
+    return this.children.filter(row=>!row.className.split(" ").includes("locked")).length*64;
   }});
   list.scrollTop=0;
   g.difficulty("rush");
