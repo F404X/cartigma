@@ -31,4 +31,9 @@ limit = 30
 period = 60
 
 [vars]
-APP_ORIGIN = "https://cartigma.f404x.net"
+APP_ORIGIN = "https://cartigma-ranking-staging.foxythefox2017xd.workers.dev"
+
+# Serve an isolated preview build from this staging Worker.
+[assets]
+directory = "../preview-dist"
+binding = "ASSETS"
