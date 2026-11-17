@@ -294,6 +294,60 @@ test("Start card displays actual mode and finite attempts in Normal and Hard",()
     }
   }
 });
+test("Completed ranked free case permits another free case and changing to Daily",async()=>{
+  let starts=0;
+  const origin=Date.parse("2026-11-17T12:00:00Z");
+  const initial={
+    id:"b1592f31-fc31-4189-aebf-1d2ee615d877",mode:"free",difficulty:"normal",
+    day:"2026-11-17",startedAt:origin,
+    clues:[{key:"continent",label:"Continente",value:"América do Sul"}],
+    revealed:1,guesses:[],finished:false,won:false,score:null,
+    penalty:0,hints:0,saved:false
+  };
+  const ranked={
+    mayRank:()=>true,
+    resumeRanked:async(mode)=>{
+      // Simulate a stale response arriving after the player switched modes.
+      return mode==="daily"?{...initial,finished:true,target:"BR"}:null;
+    },
+    beginRanked:async({mode})=>{
+      starts++;
+      return starts===1?{...initial,mode}:null;
+    },
+    gameAction:async()=>({...initial,guesses:[{code:"BR",elapsedMs:1000}],
+      finished:true,won:true,score:5000,saved:true,target:"BR",revealed:10})
+  };
+  const g=boot({ranking:ranked,autoStart:false}),$=g.get;
+  $("freeBtn").click();
+  $("rushStartBtn").click();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal($("rushIntro").classList.contains("hidden"),true);
+  assert.match($("modeCaption").textContent,/Free/i);
+  g.select("Brazil");$("guessBtn").click();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal($("resultCard").classList.contains("hidden"),false);
+  $("reportNextBtn").click();
+  assert.equal($("reportDialog").open,false);
+  assert.equal($("rushIntro").classList.contains("hidden"),false);
+  assert.match($("modeCaption").textContent,/Free/i);
+  $("rushStartBtn").click();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(starts,2);
+  assert.equal($("rushIntro").classList.contains("hidden"),true,
+    "New Free game must start offline after ranked score is used");
+  assert.equal($("guessBtn").disabled,true);
+  g.select("Brazil");
+  assert.equal($("guessBtn").disabled,false);
+  $("dailyBtn").click();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.match($("modeCaption").textContent,/Daily/i);
+  assert.equal($("rushIntro").classList.contains("hidden"),false);
+  $("rushStartBtn").click();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(starts,3);
+  assert.equal($("rushIntro").classList.contains("hidden"),true);
+  assert.match($("modeCaption").textContent,/Daily/i);
+});
 test("Normal, Hard, and Rush all require explicit Start before revealing clues",()=>{
   for(const level of ["normal","hard","rush"]){
     const g=boot({autoStart:false}),$=g.get;
