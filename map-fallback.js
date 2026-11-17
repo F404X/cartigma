@@ -15,7 +15,7 @@
       el.src = url;
       el.async = true;
       el.onload = resolve;
-      el.onerror = () => reject(new Error("Leaflet CDN unavailable"));
+      el.onerror = () => { el.remove(); reject(new Error("Leaflet CDN unavailable: " + url)); };
       document.head.appendChild(el);
     });
   }
