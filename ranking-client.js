@@ -144,31 +144,64 @@
    renderAccount();
    return state.user;
  }
- function sessionKey(difficulty){
-   return RANK_SESSION_PREFIX+
+ // The ranking budget is one eligible attempt per account, day and
+ // difficulty. Replaying Free mode must never reopen yesterday's/earlier
+ // finished round or trap the user behind the API's 409 response.
+ function attemptKey(difficulty,userId=state.user?.id){
+   return "cartigma-ranked-claimed-v1:"+userId+":"+
      new Date().toISOString().slice(0,10)+":"+difficulty;
  }
- function storedSession(difficulty){
-   try{return JSON.parse(sessionStorage.getItem(sessionKey(difficulty))||"null");}
+ function sessionKey(mode,difficulty,userId=state.user?.id){
+   return RANK_SESSION_PREFIX+userId+":"+
+     new Date().toISOString().slice(0,10)+":"+mode+":"+difficulty;
+ }
+ function storedSession(mode,difficulty){
+   try{return JSON.parse(sessionStorage.getItem(sessionKey(mode,difficulty))||"null");}
    catch{return null;}
+ }
+ function recordAttempt(difficulty){
+   try{localStorage.setItem(attemptKey(difficulty),"1");}catch{}
+ }
+ function wasAttempted(difficulty){
+   try{return localStorage.getItem(attemptKey(difficulty))==="1";}catch{return false;}
  }
  async function beginRanked({mode,difficulty}){
    if(!await signedInUser())return null;
-   const key=sessionKey(difficulty);
-   const old=storedSession(difficulty);
+   const key=sessionKey(mode,difficulty);
+   const old=storedSession(mode,difficulty);
    if(old?.id&&old?.playToken){
      state.activeRank=old;
-     try{return await api("/games/state",{id:old.id,playToken:old.playToken});}
-     catch(e){
+     try {
+       const existing=await api("/games/state",{id:old.id,playToken:old.playToken});
+       if(existing.mode!==mode)throw Error("Modo da sessão inválido");
+       recordAttempt(difficulty);
+       // A completed free-play case must never be silently reused as the
+       // next free case. Continue unlimited free-play locally instead.
+       if(existing.finished&&mode==="free")return null;
+       return existing;
+     }catch(e){
        if(e.code!=="game_not_found"&&e.code!=="game_expired")throw e;
        sessionStorage.removeItem(key);
        state.activeRank=null;
      }
    }
-   const result=await api("/games/start",{mode,difficulty});
+   if(wasAttempted(difficulty))return null;
+   let result;
+   try{
+     result=await api("/games/start",{mode,difficulty});
+   }catch(e){
+     // Another tab/browser may already have consumed the daily score.
+     // The game stays playable rather than disabling Start or switching modes.
+     if(e.code==="ranked_attempt_already_started"){
+       recordAttempt(difficulty);
+       return null;
+     }
+     throw e;
+   }
    const playToken=result.playToken;delete result.playToken;
-   state.activeRank={id:result.id,playToken,difficulty};
+   state.activeRank={id:result.id,playToken,difficulty,mode};
    sessionStorage.setItem(key,JSON.stringify(state.activeRank));
+   recordAttempt(difficulty);
    return result;
  }
  async function gameAction(action,payload={}){
@@ -185,15 +218,20 @@
    }
    return result;
  }
- async function resumeRanked(difficulty){
+ async function resumeRanked(mode,difficulty){
    if(!await signedInUser())return null;
-   const stored=storedSession(difficulty);
-   if(!stored)return null;
+   const stored=storedSession(mode,difficulty);
+   if(!stored?.id||!stored?.playToken)return null;
    state.activeRank=stored;
-   try{return await api("/games/state",{id:stored.id,playToken:stored.playToken});}
-   catch(e){
+   try{
+     const result=await api("/games/state",{id:stored.id,playToken:stored.playToken});
+     if(result.mode!==mode)return null;
+     recordAttempt(difficulty);
+     // Free mode always opens a fresh case once its previous case finished.
+     return mode==="free"&&result.finished?null:result;
+   }catch(e){
      if(e.code==="game_expired"||e.code==="game_not_found"){
-       sessionStorage.removeItem(sessionKey(difficulty));
+       sessionStorage.removeItem(sessionKey(mode,difficulty));
        state.activeRank=null;
        return null;
      }
@@ -246,10 +284,16 @@
    finally{state.loading=false;$("rank-auth-submit").disabled=false;}
  }
  async function logout(){
-   try{await api("/auth/logout",{});state.user=null;state.activeRank=null;
+   try{
+     const userId=state.user?.id;
+     await api("/auth/logout",{});
+     for(const d of ["normal","hard","rush"]){
+       for(const mode of ["daily","free"])sessionStorage.removeItem(sessionKey(mode,d,userId));
+     }
+     state.user=null;state.activeRank=null;
      localStorage.removeItem(ACCOUNT_MARKER);
-     for(const d of ["normal","hard","rush"])sessionStorage.removeItem(sessionKey(d));
-     renderAccount();message("Sessão encerrada.");}
+     renderAccount();message("Sessão encerrada.");
+   }
    catch(e){message(e.message,true);}
  }
  async function requestReset(){
