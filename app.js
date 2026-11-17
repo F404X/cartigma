@@ -24,7 +24,7 @@
   const COMPASS_I18N = window.GeoCompassI18n || {};
   const NEARBY_REFERENCES = window.GEODETECTIVE_NEARBY_REFERENCES || {};
   const CONTINENT_BORDERS = window.GeoContinentBorders || {};
-  const DIFFICULTIES = {normal:{attempts:6,initial:2},hard:{attempts:4,initial:1}};
+  const DIFFICULTIES = {normal:{attempts:6,initial:2},hard:{attempts:4,initial:1},rush:{attempts:Infinity,initial:1}};
   const SERIAL_PREFIX = "geodetective-case-counter-";
   const EVIDENCE_COUNT = 10;
   const WIN_RADIUS = 100, HINT_COST = 300, DAILY_KEY = "geodetective-daily-v3-";
@@ -564,12 +564,56 @@
   }
   function newGame(mode,index) {
     return {mode,index,difficulty,date:today(),serial:nextCaseNumber(),guesses:[],
+      startedAt:Date.now(),endedAt:null,durationMs:null,
       revealed:DIFFICULTIES[difficulty].initial,penalty:0,paidHints:0,
       sectorMapPenalty:0,sectorReveals:[],evidenceVersion:3,
       finished:false,won:false,score:0};
   }
+  function isRush(){return difficulty==="rush"}
   function caseCode(){
     return "#"+difficulty[0].toUpperCase()+"-"+game.date.replaceAll("-","")+"-"+String(game.serial).padStart(2,"0");
+  }
+  const RUSH_DURATION_MS=60000, RUSH_CLUE_INTERVAL_MS=6000;
+  function elapsedMs(){
+    if(!game)return 0;
+    if(game.finished&&Number.isFinite(game.durationMs))return game.durationMs;
+    return Math.max(0,Date.now()-(Number.isFinite(game.startedAt)?game.startedAt:Date.now()));
+  }
+  function formatElapsed(ms){
+    const seconds=Math.floor(Math.max(0,ms)/1000);
+    const minutes=Math.floor(seconds/60),hours=Math.floor(minutes/60);
+    return (hours?String(hours).padStart(2,"0")+":":"")+
+      String(minutes%60).padStart(2,"0")+":"+String(seconds%60).padStart(2,"0");
+  }
+  function guessTimestamp(g){
+    const stamp=Date.parse(g.at);
+    const clock=Number.isFinite(stamp)?new Date(stamp).toLocaleTimeString(locale(),{
+      hour:"2-digit",minute:"2-digit",second:"2-digit"}):"";
+    return clock+(Number.isFinite(g.elapsedMs)?" · +"+formatElapsed(g.elapsedMs):"");
+  }
+  function rushRemaining(){return Math.max(0,RUSH_DURATION_MS-elapsedMs())}
+  function updateClock(){
+    if(!game)return;
+    const rush=isRush(),remaining=rush?rushRemaining():0;
+    $("timerLabel").textContent=t(rush?"rushRemaining":"elapsedTime");
+    $("gameTimer").textContent=formatElapsed(rush?Math.ceil(remaining/1000)*1000:elapsedMs());
+    $("gameTimer").setAttribute("aria-label",$("timerLabel").textContent+" "+$("gameTimer").textContent);
+    $("timerTrack").classList.toggle("hidden",!rush);
+    $("timerProgress").style.setProperty("width",(rush?100*remaining/RUSH_DURATION_MS:0)+"%");
+  }
+  function clockTick(){
+    if(!game)return;
+    updateClock();
+    if(!isRush()||game.finished)return;
+    if(rushRemaining()===0){
+      game.finished=true;game.won=false;game.revealed=EVIDENCE_COUNT;
+      game.endedAt=new Date(game.startedAt+RUSH_DURATION_MS).toISOString();
+      game.durationMs=RUSH_DURATION_MS;game.score=0;
+      selected=null;save();render();showReport();return;
+    }
+    const count=Math.min(EVIDENCE_COUNT,DIFFICULTIES.rush.initial+
+      Math.floor(elapsedMs()/RUSH_CLUE_INTERVAL_MS));
+    if(count>game.revealed){game.revealed=count;save();renderClues();}
   }
   function savedDaily(){
     const s=store.get(dailyStorageKey());
@@ -582,6 +626,10 @@
       // Older saved cases with slots 8–10 already revealed retain the
       // original evidence, protecting points already spent.
       s.evidenceVersion=s.revealed>7?1:2;
+      store.set(dailyStorageKey(),s);
+    }
+    if(!Number.isFinite(s.startedAt)){
+      s.startedAt=s.finished?(Date.parse(s.guesses[0]?.at)||Date.now()):Date.now();
       store.set(dailyStorageKey(),s);
     }
     // A never-played saved daily case can safely receive the new clue set.
@@ -622,9 +670,9 @@
       save();
     }
     save();
-    selected=null;closeReport();render();resetMapView();
+    selected=null;closeReport();render();resetMapView();clockTick();
   }
-  function startFree(){game=newGame("free",chooseFree());selected=null;closeReport();render();resetMapView()}
+  function startFree(){game=newGame("free",chooseFree());selected=null;closeReport();render();resetMapView();clockTick()}
   function setDifficulty(level){
     if(!DIFFICULTIES[level]||level===difficulty)return;
     difficulty=level;store.set("geodetective-difficulty",level);
@@ -1973,6 +2021,7 @@
     document.addEventListener("click",e=>{if(!e.target.closest(".search-wrap"))$("suggestions").classList.add("hidden")});
     startDaily();
     setLanguage(lang);
+    if(typeof setInterval==="function")setInterval(clockTick,250);
     document.addEventListener("visibilitychange",()=>{
       if(!document.hidden&&game?.mode==="daily"&&game.date!==today())startDaily();
     });
