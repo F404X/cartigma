@@ -1,43 +1,33 @@
 /* Cartigma — game engine · no framework, no account, no API key. */
 (() => {
   "use strict";
-  const PLACES = window.GEODETECTIVE_PLACES || [];
-  // Indices 0–73 retain their curated coordinates, facts and saved-case identity.
-  const BASE_CITIES=74, EXTENDED=window.GeoExtendedPlaceMetadata || [];
-  const PT_EXTRA_NAMES=window.GeoExtendedCityPortugueseNames || {};
+  // One entry per country. Reference coordinates are geographic centroids,
+  // never hidden city answers or additional city database records.
+  const COUNTRIES=window.CartigmaCountries||[];
+  const COUNTRY_REFS=COUNTRIES.map(c=>[c.name,c.name,c.continent,c.lat,c.lng]);
   const TRANSLATIONS = window.GeoI18n?.PACKS || {};
   const CLUE_I18N = window.GeoCluesI18n || {};
   const COUNTRY_INSIGHTS = window.GeoCountryInsights || {};
   const COUNTRY_CLUE_I18N = window.GeoCountryClueI18n || {};
   const CURRENCY_DENOMINATIONS = window.GeoCurrencyDenominations || {};
-  const CITY_INDICATORS = window.CartigmaCityIndicators || [];
-  const CITY_URBAN_2025 = window.CartigmaUrban2025 || {};
-  const CITY_CLUES_I18N = window.CartigmaCityClueI18n || {};
   const ATLAS_I18N = window.CartigmaAtlasI18n || {};
   const COUNTRY_FAMILIES_PT = window.GeoCountryLanguageFamiliesPT || {};
-  const EXTRA_CLUE_KEYS = new Set(["countryCurrency","countryLanguageFamily","countryFlagColor",
-    "countryPopulation","countryGDP","countryArea","countryLandlocked"]);
   const FILTER_TRANSLATIONS = window.GeoMapFilterLabels || {};
   const LANGS = window.GeoI18n?.langNames || {};
   const REPORT_I18N = window.GeoReportI18n || {};
-  const FACTS = window.GEODETECTIVE_FACTS || [];
   const COMPASS_I18N = window.GeoCompassI18n || {};
-  const NEARBY_REFERENCES = window.GEODETECTIVE_NEARBY_REFERENCES || {};
   const CONTINENT_BORDERS = window.GeoContinentBorders || {};
   const DIFFICULTIES = {normal:{attempts:6,initial:2},hard:{attempts:4,initial:1},rush:{attempts:Infinity,initial:1}};
   const SERIAL_PREFIX = "geodetective-case-counter-";
   const EVIDENCE_COUNT = 10;
-  const WIN_RADIUS = 100, HINT_COST = 300, DAILY_KEY = "geodetective-daily-v3-";
+  const WIN_RADIUS = 100, HINT_COST = 300, DAILY_KEY = "cartigma-country-daily-v5-";
   // 300 is preserved only for loading older saved games. New charges reflect
   // information gain; the price for the NEXT clue is always shown before purchase.
   const HINT_PRICES=Object.freeze({
-    hemisphere:150,terrain:200,zone:200,continent:300,capital:250,
-    adminRegion:350,landmark:500,
-    longitude:400,latitude:450,utmZone:450,utmBand:450,
+    hemisphere:150,zone:200,continent:300,longitude:400,latitude:450,
+    utmZone:450,utmBand:450,
     countryCurrency:250,countryLanguageFamily:250,countryFlagColor:200,
-    countryPopulation:300,countryGDP:350,countryArea:300,countryLandlocked:200,
-    cityCapitalDistance:500,cityCoastDistance:350,cityPopulation:300,
-    cityDensity:400,cityTimezone:200
+    countryPopulation:300,countryGDP:350,countryArea:300,countryLandlocked:200
   });
   // Overlay costs differ by how tightly each display constrains the target.
   const MAP_OVERLAY_COSTS=Object.freeze({hemisphere:250,continent:500,zone:600,
@@ -50,46 +40,10 @@
   const overlayCost=(key)=>pricedCost(MAP_OVERLAY_COSTS[key]||0);
   // Europe and North America are fully/almost entirely in the Northern
   // Hemisphere. The others have meaningful populations on BOTH sides of 0°.
-  const EQUATOR_CROSSING_CONTINENTS=new Set(["asia","africa","southAmerica","oceania"]);
-  const COUNTRY_CODES = "IS NO NO NO FI SE DK GB FR PT IT GR TR MA EG SN NG KE ET ZA MG AE JO IL IN IN IN NP BD TH SG ID ID JP JP KR CN CN CN TW MN KZ AU AU AU AU NZ NZ FJ PF CA US US US US MX MX CU GT CO EC PE PE BO BR BR BR BR BR BR AR CL AR CL".split(" ").concat(EXTENDED.map(item=>item.countryCode));
-  const FEATURES = "volcanic fjord polar fjord coast islands coast river river estuary river mountains strait desert desert peninsula delta plateau plateau peninsula plateau desert plateau mountains coast plain delta mountains delta delta islands delta islands coast mountains river plain delta bay mountains plateau mountains harbor coast coast islands volcanic harbor islands volcanic coast estuary bay mountains islands plateau plateau coast volcanic plateau mountains desert mountains plateau plateau plateau forest bay plateau bay estuary mountains islands strait".split(" ").concat(EXTENDED.map(()=>"urban"));
-  const LANDMARKS = [
-    "Hallgrímskirkja","Arctic Cathedral","Svalbard Global Seed Vault","Vigeland Sculpture Park","Suomenlinna","Gamla Stan","Nyhavn","Tower Bridge",
-    "Eiffel Tower","Belém Tower","Colosseum","Acropolis","Hagia Sophia","Jemaa el-Fnaa","Pyramids of Giza","Gorée Island",
-    "Lekki Conservation Centre","Nairobi National Park","African Union headquarters","Table Mountain","Rova of Antananarivo",
-    "Burj Khalifa","Amman Citadel","Old City of Jerusalem","Gateway of India","India Gate","Victoria Memorial","Swayambhunath",
-    "Lalbagh Fort","Grand Palace","Marina Bay Sands","Monas National Monument","Bajra Sandhi Monument","Tokyo Skytree",
-    "Fushimi Inari Shrine","Gyeongbokgung Palace","Forbidden City","The Bund","Victoria Harbour","Taipei 101",
-    "Sükhbaatar Square","Medeu","Sydney Opera House","Federation Square","Kings Park","kunanyi / Mount Wellington",
-    "Sky Tower","The Beehive","Fiji Museum","Papeete Market","Stanley Park","Statue of Liberty","Golden Gate Bridge",
-    "Flattop Mountain","Waikiki Beach","Palacio de Bellas Artes","Teatro Degollado","Malecón","National Palace of Culture",
-    "Monserrate","Mitad del Mundo","Plaza Mayor","Sacsayhuamán","Mi Teleférico","National Congress","Art Deco architecture",
-    "Meeting of the Waters","Sugarloaf Mountain","Paulista Avenue","Pelourinho","Casa Rosada","Cerro San Cristóbal",
-    "Beagle Channel","Strait of Magellan"
-  ].concat(EXTENDED.map(item=>item.landmark));
-  const CAPITALS = new Set("Reykjavík|Oslo|Helsinque|Estocolmo|Copenhague|Londres|Paris|Lisboa|Roma|Atenas|Cairo|Dacar|Nairóbi|Adis Abeba|Cidade do Cabo|Antananarivo|Amã|Nova Délhi|Catmandu|Daca|Bangcoc|Singapura|Tóquio|Seul|Pequim|Taipé|Ulan Bator|Wellington|Suva|Cidade do México|Havana|Cidade da Guatemala|Bogotá|Quito|Lima|Brasília|Buenos Aires|Santiago".split("|"));
-  for(let i=0;i<EXTENDED.length;i++)
-    if(EXTENDED[i].capital)CAPITALS.add(PLACES[BASE_CITIES+i][0]);
-  const EN_CITY = {
-    "Estocolmo":"Stockholm","Copenhague":"Copenhagen","Londres":"London","Lisboa":"Lisbon",
-    "Roma":"Rome","Atenas":"Athens","Istambul":"Istanbul","Cidade do Cabo":"Cape Town",
-    "Nairóbi":"Nairobi","Adis Abeba":"Addis Ababa","Amã":"Amman",
-    "Nova Délhi":"New Delhi","Calcutá":"Kolkata","Catmandu":"Kathmandu","Daca":"Dhaka",
-    "Bangcoc":"Bangkok","Singapura":"Singapore","Jacarta":"Jakarta","Tóquio":"Tokyo",
-    "Quioto":"Kyoto","Seul":"Seoul","Pequim":"Beijing","Xangai":"Shanghai",
-    "Taipé":"Taipei","Ulan Bator":"Ulaanbaatar","Nova York":"New York",
-    "São Francisco":"San Francisco","Cidade do México":"Mexico City",
-    "Cidade da Guatemala":"Guatemala City"
-  };
+  const COUNTRY_CODES=COUNTRIES.map(c=>c.code);
   const $ = id => document.getElementById(id);
   const hash = input => {let h=2166136261;for(const char of input){h ^=char.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0;};
   const norm = s => String(s).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
-  // Index immutable search terms once instead of normalizing 74 cities per keystroke.
-  const LOCAL_SEARCH_INDEX = PLACES.map((place,index)=>({
-    place,index,terms:norm(place[0]+" "+(EN_CITY[place[0]]||"")+" "+
-      (PT_EXTRA_NAMES[place[0]]||"")+" "+place[1])
-  }));
-  const GEOCODER_LANGUAGES=new Set(["en","pt","es","fr","de","it","ru","zh","ja","nl","pl","tr"]);
   const rad = n => n*Math.PI/180;
   const dist = (a,b) => {
     const la=rad(b[0]-a[0]),lo=rad(b[1]-a[1]);
@@ -133,9 +87,7 @@
   function tc(key,variables={}) {
     const template = CLUE_I18N[lang]?.templates?.[key] ??
       COUNTRY_CLUE_I18N[lang]?.[key] ??
-      CITY_CLUES_I18N[lang]?.templates?.[key] ??
       CLUE_I18N.en?.templates?.[key] ??
-      CITY_CLUES_I18N.en?.templates?.[key] ??
       COUNTRY_CLUE_I18N.en?.[key] ?? key;
     return template.replace(/\{(\w+)\}/g,(_,name)=>String(variables[name]??""));
   }
@@ -194,24 +146,15 @@
       CURRENCY_DENOMINATIONS.labels?.en?.[family]))||
       currencyName(code,fallbackName);
   }
-  function cityName(p) {
-    return lang==="pt"?(PT_EXTRA_NAMES[p[0]]||p[0]):(EN_CITY[p[0]]||p[0]);
-  }
+
   function countryName(index){return displayRegion(COUNTRY_CODES[index])}
-  function continentKey(index){
-    if(index>=BASE_CITIES)return EXTENDED[index-BASE_CITIES]?.continent||"asia";
-    if(index<=12)return "europe";
-    if(index<=20)return "africa";
-    if(index<=41)return "asia";
-    if(index<=49)return "oceania";
-    if(index<=58)return "northAmerica";
-    return "southAmerica";
-  }
+  function continentKey(index){return COUNTRIES[index]?.continent||"asia"}
   function continentName(index){
-    const names=CLUE_I18N[lang]?.continents||CLUE_I18N.en?.continents||{};
-    if(index===12)return [names.europe||"Europe",names.asia||"Asia"].join(" / ");
+    const labels=CLUE_I18N[lang]?.continents||CLUE_I18N.en?.continents||{};
+    if(COUNTRY_CODES[index]==="TR")
+      return [labels.europe||"Europe",labels.asia||"Asia"].join(" / ");
     const key=continentKey(index);
-    return names[key]||CLUE_I18N.en?.continents?.[key]||key;
+    return labels[key]||CLUE_I18N.en?.continents?.[key]||key;
   }
   function updateCompassRose(){
     const pack=COMPASS_I18N[lang]||COMPASS_I18N.en;
@@ -227,16 +170,6 @@
     const buttons=$("mapStylePicker");
     if(buttons)buttons.setAttribute("aria-label",pack.mapStyle);
   }
-  const RIVER_NAMES=Object.freeze({7:"Thames",8:"Seine",10:"Tiber",35:"Han"});
-  function locationFeature(index) {
-    // Naming the river is more useful than the generic clue "river valleys".
-    if(RIVER_NAMES[index]){
-      const template=COMPASS_I18N[lang]?.river||COMPASS_I18N.en?.river||"Along the {name} River";
-      return template.replace("{name}",RIVER_NAMES[index]);
-    }
-    const key = FEATURES[index] || "urban";
-    return CLUE_I18N[lang]?.features?.[key] || CLUE_I18N.en?.features?.[key] || key;
-  }
   function latitudeZoneKey(latitude){
     const a=Math.abs(latitude);
     return a<10?"equatorial":a<23.5?"tropical":a<35?"subtropical":
@@ -251,16 +184,12 @@
   // from their island extents. Each entry is primary-band index:6-bit mask.
   const COUNTRY_BELT_NAMES=Object.freeze(
     ["equatorial","tropical","subtropical","temperate","subpolar","polar"]);
-  const COUNTRY_BELT_DATA=Object.freeze(Object.fromEntries(
-    "AE=2:6 AF=2:12 AL=3:8 AM=3:8 AO=1:3 AR=3:30 AT=3:8 AU=2:14 AZ=3:8 BA=3:8 BD=2:6 BE=3:8 BF=1:3 BG=3:8 BI=0:1 BJ=0:3 BN=0:1 BO=1:3 BR=1:7 BT=2:4 BW=1:6 BY=3:24 BZ=1:2 CA=4:56 CD=0:3 CF=0:3 CG=0:1 CH=3:8 CI=0:3 CL=3:30 CM=0:3 CN=3:14 CO=0:3 CR=0:3 CU=1:2 CZ=3:8 DE=3:8 DJ=1:2 DK=4:24 DO=1:2 DZ=2:14 EC=0:1 EE=4:16 EG=2:6 ER=1:2 ES=3:8 ET=0:3 FI=4:48 FJ=1:2 FR=3:9 GA=0:1 GB=3:24 GE=3:8 GH=0:3 GM=1:2 GN=1:3 GQ=0:1 GR=3:12 GT=1:2 GW=1:2 GY=0:1 HN=1:2 HR=3:8 HT=1:2 HU=3:8 ID=0:3 IE=3:24 IL=2:4 IN=1:15 IQ=2:12 IR=2:12 IS=4:48 IT=3:8 JM=1:2 JO=2:4 JP=3:12 KE=0:1 KG=3:8 KH=1:2 KP=3:8 KR=3:12 KW=2:4 KZ=3:24 LA=1:2 LB=2:4 LK=0:1 LR=0:1 LS=2:4 LT=4:24 LU=3:8 LV=4:16 LY=2:6 MA=2:14 MD=3:8 ME=3:8 MG=1:6 MK=3:8 ML=1:6 MM=1:6 MN=3:8 MR=1:6 MW=1:3 MX=2:6 MY=0:1 MZ=1:6 NA=1:6 NE=1:2 NG=0:3 NI=1:2 NL=3:8 NO=5:48 NP=2:4 NZ=3:12 OM=1:6 PA=0:1 PE=0:3 PF=1:7 PG=0:3 PH=1:3 PK=2:12 PL=3:8 PT=3:8 PY=1:6 QA=2:4 RO=3:8 RS=3:8 RU=4:56 RW=0:1 SA=2:6 SB=0:3 SD=1:3 SE=4:48 SG=0:1 SI=3:8 SK=3:8 SL=0:3 SN=1:2 SO=0:3 SR=0:1 SV=1:2 SY=3:12 SZ=2:4 TD=1:3 TG=0:3 TH=1:3 TJ=3:8 TL=0:1 TM=3:8 TN=2:12 TR=3:8 TT=1:2 TW=2:6 TZ=0:3 UA=3:8 UG=0:1 US=3:62 UY=2:4 UZ=3:8 VE=0:3 VN=1:3 VU=1:2 YE=1:2 ZA=2:6 ZM=1:3 ZW=1:2".split(" ").map(item=>{
-      const [code,record]=item.split("="),[primary,mask]=record.split(":").map(Number);
-      return [code,Object.freeze({primary,mask})];
-    })));
   function countryBelts(index){
-    const code=COUNTRY_CODES[index],record=COUNTRY_BELT_DATA[code];
-    if(!record)throw Error("Missing country latitude coverage: "+code);
-    return {code,primary:COUNTRY_BELT_NAMES[record.primary],
-      zones:COUNTRY_BELT_NAMES.filter((_,n)=>record.mask&(1<<n))};
+    const country=COUNTRIES[index];
+    if(!country)throw Error("Unknown country latitude coverage: "+index);
+    return {code:country.code,
+      primary:COUNTRY_BELT_NAMES[country.primary],
+      zones:COUNTRY_BELT_NAMES.filter((_,n)=>country.mask&(1<<n))};
   }
   function countryLatitudeZone(index){
     const {primary,zones}=countryBelts(index);
@@ -279,69 +208,8 @@
     subpolar:[[-66.5,-55],[55,66.5]],
     polar:[[-85.05,-66.5],[66.5,85.05]]
   });
-  function cityAt(index){return PLACES[index]}
-  function cityCoords(index){return [PLACES[index][3],PLACES[index][4]]}
-  function nearestOther(index) {
-    let best=-1,minimum=Infinity;
-    for(let i=0;i<PLACES.length;i++){
-      if(i===index)continue;
-      const d=dist(cityCoords(index),cityCoords(i));
-      if(d<minimum){best=i;minimum=d}
-    }
-    return {index:best,km:minimum};
-  }
-  const REGIONAL_BASE_RADIUS=Object.freeze({europe:2000,africa:2600,asia:2700,oceania:2500,northAmerica:2500,southAmerica:2300});
-  function regionalHintRadius(index, level){
-    // Use the geographic spread of the target's region, not a universal 1,000 km cap.
-    // Sparse/large regions need longer references; dense regions get a smaller radius.
-    const base=REGIONAL_BASE_RADIUS;
-    const region=continentKey(index);
-    const center=cityCoords(index);
-    const neighbors=PLACES.map((_,i)=>({
-      i,km:dist(center,cityCoords(i))
-    })).filter(item=>item.i!==index&&continentKey(item.i)===region)
-      .sort((a,b)=>a.km-b.km);
-    const localScale=neighbors[Math.min(2,neighbors.length-1)]?.km||base[region];
-    const normalRadius=Math.max(base[region],base[region]*0.55+localScale*0.65);
-    const modifier=level==="hard"?1.2:1;
-    return Math.round(Math.min(6000,Math.min(5200,normalRadius)*modifier)/100)*100;
-  }
-  function anchorDistances(index,level,radius=regionalHintRadius(index,level)) {
-    const origin=cityCoords(index),region=continentKey(index);
-    const items=[];
-    for(let i=0;i<PLACES.length;i++){
-      if(i===index)continue;
-      const km=dist(origin,cityCoords(i));
-      if(km<=radius&&km>=10)
-        items.push({name:cityName(cityAt(i)),country:COUNTRY_CODES[i],
-          km,regional:continentKey(i)===region});
-    }
-    for(const [name,country,lat,lng] of NEARBY_REFERENCES[index]||[]){
-      const km=dist(origin,[lat,lng]);
-      if(km<=radius&&km>=10)
-        items.push({name,country,km,regional:true});
-    }
-    const unique=new Map();
-    for(const item of items) {
-      const key=norm(item.name);
-      if(!unique.has(key)||unique.get(key).km>item.km)unique.set(key,item);
-    }
-    // Very isolated additions may have no second catalog city nearby.
-    // Expand only in that case: the comparison stays geographically true.
-    if(unique.size<2){
-      const extra=PLACES.map((place,i)=>({
-        name:cityName(place),country:COUNTRY_CODES[i],
-        km:i===index?0:dist(origin,[place[3],place[4]]),
-        regional:continentKey(i)===region
-      })).filter(item=>item.km>=10).sort((a,b)=>a.km-b.km);
-      for(const candidate of extra){
-        if(unique.size>=2)break;
-        if(!unique.has(norm(candidate.name)))unique.set(norm(candidate.name),candidate);
-      }
-    }
-    return [...unique.values()].sort((a,b)=>a.km-b.km);
-  }
-  // Normal mode gives a broad geographic sector; Hard mode uses surveyor-style UTM notation.
+  function countryAt(index){return COUNTRY_REFS[index]}
+  function countryCoords(index){return [COUNTRY_REFS[index][3],COUNTRY_REFS[index][4]]}
   function utmZone(latitude,longitude){
     if(latitude>=56&&latitude<64&&longitude>=3&&longitude<12)return 32;
     if(latitude>=72&&latitude<84&&longitude>=0&&longitude<42){
@@ -353,207 +221,79 @@
     return "CDEFGHJKLMNPQRSTUVWX"[Math.min(19,Math.max(0,Math.floor((latitude+80)/8)))];
   }
   function coordinateClue(index,level){
-    const p=cityAt(index);
+    const p=countryAt(index);
     if(level==="hard")return {key:"utmZone",zone:utmZone(p[3],p[4])};
     const from=Math.floor(p[4]/30)*30;
     return {key:"longitude",from,to:from+30};
   }
   function latitudeGridClue(index,level){
-    const latitude=cityAt(index)[3];
+    const latitude=countryAt(index)[3];
     if(level==="hard")return {key:"utmBand",band:utmLatitudeBand(latitude)};
     const from=Math.floor(latitude/15)*15;
     return {key:"latitude",from,to:from+15};
   }
-  // For already-started saved investigations only. New cases never offer
-  // an associated landmark as evidence; the city archive still lists it.
-  function landmarkClue(index,level){
-    const place=cityAt(index),name=LANDMARKS[index];
-    // Supplemental cities have reliable coordinates but no curated landmark:
-    // offer a reproducible latitude sector, never an invented attraction.
-    if(index>=BASE_CITIES){
-      if(level==="hard")return {key:"utmBand",band:utmLatitudeBand(place[3])};
-      const from=Math.floor(place[3]/15)*15;
-      return {key:"latitude",from,to:from+15};
-    }
-    // Check the catalog name AND its English alias (e.g. Tóquio/Tokyo and Taipé/Taipei).
-    const revealsCity=[place[0],EN_CITY[place[0]]]
-      .filter(Boolean).some(candidate=>norm(name).includes(norm(candidate)));
-    if(level==="hard")return {key:"utmBand",band:utmLatitudeBand(place[3])};
-    if(revealsCity){
-      const from=Math.floor(place[3]/15)*15;
-      return {key:"latitude",from,to:from+15};
-    }
-    return {key:"landmark",name};
-  }
-  function referenceName(item){
-    return item.name+", "+displayRegion(item.country);
-  }
   function extraCountryClues(index,level){
     const code=COUNTRY_CODES[index],data=COUNTRY_INSIGHTS[code];
-    if(!data)throw Error("Missing country insights for "+code);
-    const candidates=[];
-    const add=(key,props)=>candidates.push({key,...props});
+    if(!data)throw Error("Missing country metadata for "+code);
+    const candidates=[],add=(key,props)=>candidates.push({key,...props});
     if(data.currency)add("countryCurrency",{
-      name:currencyClueName(data.currency,data.currencyName)
-    });
-    if(data.languageFamily){
-      const family=lang==="pt"?(COUNTRY_FAMILIES_PT[data.languageFamily]||data.languageFamily):data.languageFamily;
-      add("countryLanguageFamily",{family});
-    }
-    if(data.flagColor){
-      const color=COUNTRY_CLUE_I18N[lang]?.colors?.[data.flagColor]||
-        COUNTRY_CLUE_I18N.en?.colors?.[data.flagColor]||data.flagColor;
-      add("countryFlagColor",{color});
-    }
-    if(data.population&&data.populationYear)
-      add("countryPopulation",{...numericBoundary(data.population,
-        code+":countryPopulation:"+level),year:data.populationYear});
-    if(data.gdpPerCapita&&data.gdpYear)
-      add("countryGDP",{...numericBoundary(data.gdpPerCapita,
-        code+":countryGDP:"+level),year:data.gdpYear});
-    if(data.area)
-      add("countryArea",{...numericBoundary(data.area,
-        code+":countryArea:"+level)});
+      name:currencyClueName(data.currency,data.currencyName)});
+    if(data.languageFamily)add("countryLanguageFamily",{
+      family:lang==="pt"?(COUNTRY_FAMILIES_PT[data.languageFamily]||
+        data.languageFamily):data.languageFamily});
+    if(data.flagColor)add("countryFlagColor",{
+      color:COUNTRY_CLUE_I18N[lang]?.colors?.[data.flagColor]||
+        COUNTRY_CLUE_I18N.en?.colors?.[data.flagColor]||data.flagColor});
+    if(data.population>0&&data.populationYear)
+      add("countryPopulation",{...numericBoundary(data.population,code+":population:"+level),
+        year:data.populationYear});
+    if(data.gdpPerCapita>0&&data.gdpYear)
+      add("countryGDP",{...numericBoundary(data.gdpPerCapita,code+":gdp:"+level),
+        year:data.gdpYear});
+    if(data.area>0)
+      add("countryArea",{...numericBoundary(data.area,code+":area:"+level)});
     if(typeof data.landlocked==="boolean")
-      // Keep the source boolean, not a translated yes/no string.
       add("countryLandlocked",{landlocked:data.landlocked});
-    // Pair one cultural/civic fact with one numeric fact. This prevents two
-    // nearly identical population/GDP/area clues in a single investigation.
-    // Both buckets are available for every country in the current catalogue.
-    const cultural=candidates.filter(item=>["countryCurrency","countryLanguageFamily",
-      "countryFlagColor","countryLandlocked"].includes(item.key));
-    const numeric=candidates.filter(item=>["countryPopulation","countryGDP","countryArea"].includes(item.key));
-    if(!cultural.length||!numeric.length)throw Error("Insufficient distinct country evidence for "+code);
-    const id="country-evidence:"+code+":"+index+":"+level;
-    const first=cultural[hash(id+":cultural")%cultural.length];
-    const second=numeric[hash(id+":numeric")%numeric.length];
-    // Keep the two previously selected facts in their original order so
-    // in-progress daily cases retain all the hints they already purchased.
-    const chosen=hash(id+":order")%2?[second,first]:[first,second];
-    const remaining=candidates.filter(item=>!chosen.some(pick=>pick.key===item.key))
-      .sort((a,b)=>hash(id+":more:"+a.key)-hash(id+":more:"+b.key));
-    if(remaining.length<3)throw Error("Not enough additional verified evidence for "+code);
-    return [...chosen,...remaining.slice(0,3)];
+    return candidates;
   }
-  // City measurements are optional, never inferred from countrywide figures.
-  function extraCityClues(index){
-    const data=CITY_INDICATORS[index]||{},urban=CITY_URBAN_2025[index]||{};
-    const clues=[],add=(key,props)=>clues.push({key,...props});
-    const city=cityAt(index);
-    if(data.cap&&Number.isFinite(data.cap[0])&&data.cap[0]>0)
-      add("cityCapitalDistance",{value:number(data.cap[0]),capital:data.cap[1],year:2026});
-    // Natural Earth includes the Caspian Sea among its coastlines even
-    // though it is a lake: omit uncertain Caspian-basin coastal distances.
-    const nearCaspian=city[3]>=32&&city[3]<=50&&city[4]>=40&&city[4]<=61;
-    if(data.coast&&!nearCaspian)
-      add("cityCoastDistance",{value:number(data.coast),year:2026});
-    if(urban.population>0&&urban.year===2025)
-      add("cityPopulation",{...numericBoundary(urban.population,index+":cityPopulation"),year:2025});
-    if(urban.density>0&&urban.year===2025)
-      add("cityDensity",{...numericBoundary(urban.density,index+":cityDensity"),year:2025});
-    if(data.tz){
-      try{
-        const stamp=new Date();
-        const offset=new Intl.DateTimeFormat("en-US",{timeZone:data.tz,
-          timeZoneName:"shortOffset"}).formatToParts(stamp)
-          .find(part=>part.type==="timeZoneName")?.value;
-        if(offset&&/^GMT(?:[+-][0-9]{1,2}(?::[0-9]{2})?)?$/.test(offset))
-          add("cityTimezone",{offset:offset.replace("GMT","UTC"),
-            year:stamp.getUTCFullYear()});
-      }catch(error){/* Unknown local zone: skip, never guess an offset. */}
-    }
-    return clues;
-  }
-  function cluesFor(index,level,revision=null){
-    // Version 4 uses country-wide latitude belts and excludes city/capital hints.
-    // Version 3 retires landmark and administrative-region evidence.
-    // Preserve purchased hints in version 1/2 daily saves. The public city
-    // archive always requests version 3, regardless of the active save.
-    const evidenceVersion=revision??(game?.index===index
-      ?(game.evidenceVersion??2):3);
-    const legacy=evidenceVersion===1;
-    const archived=evidenceVersion<3;
-    const countryEdition=evidenceVersion>=4;
-    const cacheKey=index+":"+level+":"+lang+":"+evidenceVersion;
+  // New country cases use country-wide facts and a reference point for grids.
+  // No landscape, city population, capital-distance or coastal-distance clues.
+  function cluesFor(index,level){
+    const cacheKey=index+":"+level+":"+lang+":country5";
     if(clueCache.has(cacheKey))return clueCache.get(cacheKey);
-    const p=cityAt(index);
-     const terrain={key:"terrain",value:locationFeature(index)};
-    const zone={key:"zone",value:countryEdition?countryLatitudeZone(index):latitudeZone(p[3])};
-    const capital={key:"capital",value:tc(CAPITALS.has(p[0])?"yes":"no")};
-    const hemisphere={key:"hemisphere",value:tc(p[3]>=0?"north":"south")};
-    const hemisphereUseful=EQUATOR_CROSSING_CONTINENTS.has(continentKey(index));
-    const reliableCapital=!["Jerusalém","La Paz","Jacarta"].includes(p[0]);
-    // Hemisphere, when used at all, comes BEFORE the continent clue.
-    // It must never appear in a later evidence slot after the continent.
-    const choice=hash("opening:"+p[0])%3;
-    const opening=[7,8,10,35].includes(index)?terrain:
-      (choice===2&&hemisphereUseful?hemisphere:(choice===0?terrain:zone));
-    const extra=index>=BASE_CITIES?EXTENDED[index-BASE_CITIES]:null;
-    const safeRegion=extra&&p[2]&&!norm(p[2]).includes(norm(p[0]));
-    const third=countryEdition?(opening===terrain?zone:terrain):
-      extra?(archived&&safeRegion&&!extra.capital
-        ?{key:"adminRegion",value:p[2]}:capital)
-      :(reliableCapital&&hash("profile:"+p[0])%3===0?capital:
-        (opening===terrain?zone:terrain));
-    // Spread cultural, numeric and geographic clues across positions 3–7.
-    // Country fact cards never sit next to each other. The six stable layouts
-    // balance which positions carry the most useful evidence.
-    const countryFacts=extraCountryClues(index,level);
-    const countryPositions=[[0,2],[0,3],[0,4],[1,3],[1,4],[2,4]];
-    const positions=countryPositions[hash("fact-positions:"+index+":"+level)%countryPositions.length];
-    const mixed=Array(5);
-    mixed[positions[0]]=countryFacts[0];
-    mixed[positions[1]]=countryFacts[1];
-    const geographic=[third,coordinateClue(index,level),
-      archived?landmarkClue(index,level):latitudeGridClue(index,level)];
-    for(let i=geographic.length-1;i>0;i--){
-      const j=hash("geographic-order:"+index+":"+level+":"+i)%(i+1);
-      [geographic[i],geographic[j]]=[geographic[j],geographic[i]];
+    const geo=[
+      {key:"continent",value:continentName(index)},
+      {key:"zone",value:countryLatitudeZone(index)},
+      coordinateClue(index,level),
+      latitudeGridClue(index,level)
+    ];
+    const extras=extraCountryClues(index,level);
+    const reference=COUNTRIES[index];
+    const from=Math.floor(reference.lng/30)*30;
+    const bottom=Math.floor(reference.lat/15)*15;
+    const fallback=[
+      {key:"hemisphere",value:tc(reference.lat>=0?"north":"south")},
+      {key:"longitude",from,to:from+30},
+      {key:"latitude",from:bottom,to:bottom+15},
+      {key:"utmZone",zone:utmZone(reference.lat,reference.lng)},
+      {key:"utmBand",band:utmLatitudeBand(reference.lat)}
+    ];
+    // Vary the clue order by country AND difficulty, without duplicates.
+    const seed=reference.code+":"+level;
+    const byHash=(a,b)=>hash(seed+":"+a.key)-hash(seed+":"+b.key);
+    const available=[...extras].sort(byHash);
+    const initial=[geo[0],geo[1]];
+    const rest=[...available,...geo.slice(2),...fallback].sort(byHash);
+    for(const clue of rest){
+      if(initial.some(value=>value.key===clue.key))continue;
+      initial.push(clue);
+      if(initial.length===EVIDENCE_COUNT)break;
     }
-    let next=0;
-    for(let i=0;i<mixed.length;i++)if(!mixed[i])mixed[i]=geographic[next++];
-    // Versioned layouts preserve the first seven clues only for saved cases
-    // that already earned or purchased evidence. New games have no landmark
-    // or administrative-region clue, without altering their guess limits.
-    const clues=[opening,{key:"continent",value:continentName(index)},...mixed];
-    const usedKeys=new Set(clues.map(clue=>clue.key));
-    const extraGeographic=[
-      zone,terrain,
-      ...(!countryEdition&&(reliableCapital||index>=BASE_CITIES)?[capital]:[]),
-      ...(archived&&safeRegion?[{key:"adminRegion",value:p[2]}]:[])
-    ].find(clue=>!usedKeys.has(clue.key));
-    let additional;
-    if(legacy){
-      // Keep all three purchased late clues in pre-update daily cases.
-      additional=extraGeographic
-        ?[countryFacts[2],extraGeographic,countryFacts[3]]
-        :[countryFacts[2],countryFacts[3],countryFacts[4]];
-      if(extraGeographic&&mixed[4]?.key.startsWith("country"))
-        [additional[0],additional[1]]=[additional[1],additional[0]];
-    }else{
-      additional=[];
-      const fallbacks=[...(extraGeographic?[extraGeographic]:[]),
-        ...countryFacts.slice(2)];
-      for(const item of [...extraCityClues(index).filter(clue=>
-        !countryEdition||!["cityCapitalDistance","cityCoastDistance"].includes(clue.key)),
-        ...fallbacks]){
-        if(usedKeys.has(item.key)||additional.some(x=>x.key===item.key))continue;
-        additional.push(item);
-        if(additional.length===3)break;
-      }
-    }
-    if(additional.length!==3||additional.some(clue=>usedKeys.has(clue.key))||
-      new Set(additional.map(clue=>clue.key)).size!==3)
-      throw Error("Repeated or missing evidence in case "+index);
-    clues.push(...additional);
-    if(!archived&&clues.some(clue=>["landmark","adminRegion"].includes(clue.key)))
-      throw Error("Retired evidence in a new case "+index);
-    if(countryEdition&&clues.some(clue=>
-      ["capital","cityCapitalDistance","cityCoastDistance"].includes(clue.key)))
-      throw Error("Retired country-game evidence in case "+index);
-    if(clues.length!==EVIDENCE_COUNT)throw Error("Incomplete evidence set for "+index);
-    clueCache.set(cacheKey,clues);
-    return clues;
+    if(initial.length!==EVIDENCE_COUNT||
+      initial.some(clue=>["terrain","capital","cityCapitalDistance","cityCoastDistance"].includes(clue.key)))
+      throw Error("Invalid country clue set for "+reference.code);
+    clueCache.set(cacheKey,initial);
+    return initial;
   }
   function clueText(clue,referenceIndex=game.index){
     if(clue.key==="countryLandlocked"){
@@ -566,16 +306,18 @@
     return tc(clue.key,clue);
   }
   function maximum(){return DIFFICULTIES[difficulty].attempts}
-  // Most Normal cases deliberately feature capitals or recognizable cities;
-  // Hard still draws from the complete 500-location catalogue.
-  const NORMAL_FOCUS=PLACES.map((_,index)=>index).filter(index=>
-    index<BASE_CITIES||Boolean(EXTENDED[index-BASE_CITIES]?.capital)||
-    Number(EXTENDED[index-BASE_CITIES]?.populationRank)<=2);
+  // The same seeded permutation repeats after all 195 states are used.
+  // A fixed permutation prevents duplicates in ANY rolling 195-day window,
+  // including the date a new player starts or a 195-day boundary.
+  const DAY_MS=86400000;
   function dailyIndex(level=difficulty){
-    const seed=hash("GEODETECTIVE-v3|"+today()+"|"+level);
-    if(level==="normal"&&seed%10!==0&&NORMAL_FOCUS.length)
-      return NORMAL_FOCUS[seed%NORMAL_FOCUS.length];
-    return seed%PLACES.length;
+    const day=Math.floor(Date.parse(today()+"T00:00:00Z")/DAY_MS);
+    const offset=((day%COUNTRIES.length)+COUNTRIES.length)%COUNTRIES.length;
+    const seed="cartigma-country-daily-v5:"+level;
+    const order=COUNTRY_CODES.map((code,index)=>({code,index}))
+      .sort((a,b)=>hash(seed+":"+a.code)-hash(seed+":"+b.code)||
+        a.code.localeCompare(b.code));
+    return order[offset].index;
   }
   function dailyStorageKey(level=difficulty){return DAILY_KEY+today()+"-"+level}
   // Finished daily cases cannot be replayed, whether solved or closed after
@@ -596,8 +338,8 @@
     return {mode,index,difficulty,date:today(),serial:nextCaseNumber(),guesses:[],
       started:difficulty!=="rush",
       startedAt:difficulty==="rush"?null:Date.now(),endedAt:null,durationMs:null,
-      revealed:DIFFICULTIES[difficulty].initial,penalty:0,paidHints:0,
-      sectorMapPenalty:0,sectorReveals:[],evidenceVersion:4,targetKind:"country",
+      revealed:difficulty==="rush"?0:DIFFICULTIES[difficulty].initial,penalty:0,paidHints:0,
+      sectorMapPenalty:0,sectorReveals:[],evidenceVersion:5,targetKind:"country",
       finished:false,won:false,score:0};
   }
   function isRush(){return difficulty==="rush"}
@@ -631,6 +373,7 @@
     if(!game||!isRush()||game.finished||game.started)return;
     game.started=true;
     game.startedAt=Date.now();
+    game.revealed=DIFFICULTIES.rush.initial;
     rushCountryRequest++;
     save();render();clockTick();
   }
@@ -665,63 +408,50 @@
     if(count>game.revealed){game.revealed=count;save();renderClues();}
   }
   function savedDaily(){
-    const s=store.get(dailyStorageKey());
-    const valid=s&&s.mode==="daily"&&s.date===today()&&s.difficulty===difficulty
-      &&s.index===dailyIndex()&&Array.isArray(s.guesses)&&s.guesses.length<=maximum()
-      &&Number.isFinite(s.revealed)
-      &&s.guesses.every(g=>Number.isFinite(g.lat)&&Number.isFinite(g.lng)&&Number.isFinite(g.distance));
-    if(!valid)return null;
-    if(!Number.isInteger(s.evidenceVersion)){
-      // Older saved cases with slots 8–10 already revealed retain the
-      // original evidence, protecting points already spent.
-      s.evidenceVersion=s.revealed>7?1:2;
-      store.set(dailyStorageKey(),s);
+    const saved=store.get(dailyStorageKey());
+    if(!saved||saved.mode!=="daily"||saved.date!==today()||
+       saved.difficulty!==difficulty||saved.index!==dailyIndex()||
+       saved.targetKind!=="country"||saved.evidenceVersion!==5||
+       !Array.isArray(saved.guesses)||saved.guesses.length>maximum()||
+       !Number.isFinite(saved.revealed))return null;
+    if(isRush()&&!saved.started){
+      saved.startedAt=null;saved.revealed=0;
     }
-    if(s.difficulty==="rush"&&typeof s.started!=="boolean"){
-      // Previously opening a Rush daily started the timer without consent.
-      // Allow unopened, unguessed legacy cases to use the new Start gate.
-      if(!s.guesses.length){
-        s.started=false;s.startedAt=null;s.endedAt=null;s.durationMs=null;
-        s.finished=false;s.won=false;s.score=0;s.revealed=DIFFICULTIES.rush.initial;
-      }else s.started=Number.isFinite(s.startedAt);
-      store.set(dailyStorageKey(),s);
-    }
-    if(!Number.isFinite(s.startedAt)&&s.difficulty!=="rush"){
-      s.startedAt=s.finished?(Date.parse(s.guesses[0]?.at)||Date.now()):Date.now();
-      store.set(dailyStorageKey(),s);
-    }
-    // Saved city-target cases retain their original rules and earned hints.
-    if(!s.targetKind)s.targetKind="city";
-    // A never-played saved daily case can safely receive the new clue set.
-    // Cases with previous attempts or paid evidence retain their prior clues.
-    if(s.evidenceVersion<3&&!s.finished&&s.guesses.length===0&&
-      s.revealed===DIFFICULTIES[difficulty].initial&&!s.paidHints){
-      s.evidenceVersion=3;
-      store.set(dailyStorageKey(),s);
-    }
-    // Before this release, northern-only regions could receive a hemisphere
-    // map purchase. Refund its previous 600-point cost on open cases now that
-    // the evidence no longer appears in those continents.
-    if(!s.finished&&Array.isArray(s.sectorReveals)
-      &&s.sectorReveals.includes("hemisphere")
-      &&!EQUATOR_CROSSING_CONTINENTS.has(continentKey(s.index))){
-      s.sectorReveals=s.sectorReveals.filter(key=>key!=="hemisphere");
-      s.sectorMapPenalty=Math.max(0,(s.sectorMapPenalty||0)-600);
-      store.set(dailyStorageKey(),s);
-    }
-    return s;
+    return saved;
   }
   function save(){if(game?.mode==="daily")store.set(dailyStorageKey(),game)}
+  // A persistent, shared, fully shuffled bag prevents repetition until all
+  // 195 countries have appeared in Freeplay (across all difficulties).
+  const FREE_BAG_KEY="cartigma-freeplay-country-bag-v1";
+  function randomIndex(max){
+    const bytes=typeof window.crypto?.getRandomValues==="function"?
+      window.crypto.getRandomValues(new Uint32Array(1))[0]/4294967296:
+      Math.random();
+    return Math.floor(bytes*max);
+  }
   function chooseFree(){
-    const options=PLACES.map((_,i)=>i).filter(i=>i!==freeIndex);
-    // Bounded rerolls: Normal strongly favors capitals/famous cities,
-    // without banning lesser-known places or biasing the Hard catalogue.
-    for(let attempt=0;attempt<(difficulty==="normal"?4:1);attempt++){
-      const pick=options[Math.floor(Math.random()*options.length)];
-      freeIndex=pick;
-      if(difficulty!=="normal"||NORMAL_FOCUS.includes(pick))break;
+    let bag=store.get(FREE_BAG_KEY);
+    const possible=new Set(COUNTRY_CODES);
+    if(!bag||!Array.isArray(bag.remaining)||
+      bag.remaining.length===0||new Set(bag.remaining).size!==bag.remaining.length||
+      bag.remaining.some(code=>!possible.has(code))){
+      const previous=bag?.last;
+      const remaining=[...COUNTRY_CODES];
+      for(let i=remaining.length-1;i>0;i--){
+        const j=randomIndex(i+1);
+        [remaining[i],remaining[j]]=[remaining[j],remaining[i]];
+      }
+      if(remaining.length>1&&remaining.at(-1)===previous){
+        const j=randomIndex(remaining.length-1);
+        [remaining[j],remaining[remaining.length-1]]=
+          [remaining[remaining.length-1],remaining[j]];
+      }
+      bag={remaining,last:previous||null};
     }
-    return freeIndex;
+    const code=bag.remaining.pop();
+    bag.last=code;
+    store.set(FREE_BAG_KEY,bag);
+    return COUNTRY_CODES.indexOf(code);
   }
   function startDaily(){
     rushCountryRequest++;
@@ -758,7 +488,7 @@
     updateMapLanguage();
     syncMapFiltersUI();
     document.querySelectorAll("[data-i18n]").forEach(element=>{element.textContent=t(element.dataset.i18n)});
-    $("citySearch").placeholder=t(isCountryGame()?"rushSearchPlaceholder":"searchPlaceholder");
+    $("countrySearch").placeholder=t(isCountryGame()?"rushSearchPlaceholder":"searchPlaceholder");
     $("helpBtn").setAttribute("aria-label",t("help"));
     syncAtlasLanguage();
     $("resetViewBtn").title=t("reset");
@@ -771,16 +501,12 @@
   }
   // Reuse the clue-category lookup instead of rebuilding it for every row.
   const CLUE_CATEGORY_KEYS=Object.freeze({
-    terrain:"clueTerrain",continent:"clueRegion",zone:"clueClimate",adminRegion:"clueRegion",
-    countryCurrency:"clueCivic",countryLanguageFamily:"clueCivic",
-    countryFlagColor:"clueCivic",countryPopulation:"clueCivic",
-    countryGDP:"clueCivic",countryArea:"clueRegion",
-    countryLandlocked:"clueRegion",
-    hemisphere:"clueRegion",capital:"clueCivic",longitude:"clueRegion",
-    latitude:"clueRegion",utmZone:"clueRegion",utmBand:"clueRegion",
-    landmark:"clueLandmark",
-    cityCapitalDistance:"clueRegion",cityCoastDistance:"clueRegion",
-    cityPopulation:"clueCivic",cityDensity:"clueCivic",cityTimezone:"clueRegion"
+    continent:"clueRegion",zone:"clueClimate",hemisphere:"clueRegion",
+    longitude:"clueRegion",latitude:"clueRegion",utmZone:"clueRegion",
+    utmBand:"clueRegion",countryCurrency:"clueCivic",
+    countryLanguageFamily:"clueCivic",countryFlagColor:"clueCivic",
+    countryPopulation:"clueCivic",countryGDP:"clueCivic",
+    countryArea:"clueRegion",countryLandlocked:"clueRegion"
   });
   function revealGeographyOnMap(clue){
     const cost=overlayCost(clue.key);
@@ -831,10 +557,18 @@
     return pricedCost(HINT_PRICES[clue?.key]??HINT_COST);
   }
   function renderClues(){
+    const list=$("clueList");list.replaceChildren();
+    const waiting=isRush()&&!game.started&&!game.finished;
+    list.classList.toggle("hidden",waiting);
+    if(waiting){
+      $("hintCount").textContent="0 / "+EVIDENCE_COUNT;
+      $("revealBtn").disabled=true;
+      $("revealBtn").classList.add("hidden");
+      return; // No categories, locked types or first evidence leak pre-start.
+    }
     const clues=cluesFor(game.index,difficulty);
     const revealed=game.revealed;
     $("hintCount").textContent=revealed+" / "+clues.length;
-    const list=$("clueList");list.replaceChildren();
     const lockedText=t("locked");
     clues.forEach((clue,i)=>{
       const row=document.createElement("li");row.className="clue"+(i>=revealed?" locked":"");
@@ -842,9 +576,7 @@
       const body=document.createElement("span");body.className="clue-body";
       const category=document.createElement("span");category.className="clue-category";
       const categoryKey=CLUE_CATEGORY_KEYS[clue.key]||"clueRegion";
-      category.textContent=CITY_CLUES_I18N[lang]?.categories?.[clue.key]||
-        CITY_CLUES_I18N.en?.categories?.[clue.key]||
-        (clue.key==="countryLandlocked"
+      category.textContent=(clue.key==="countryLandlocked"
           ?(COUNTRY_CLUE_I18N[lang]?.countryLandlockedLabel||
             COUNTRY_CLUE_I18N.en?.countryLandlockedLabel||"Sea access")
           :t(categoryKey));
@@ -920,10 +652,8 @@
     return best;
   }
   function factFor(index){
-    const fact=FACTS[index];
-    if(fact&&lang==="pt")return fact[1];
-    if(fact&&lang==="en")return fact[0];
-    return t("reportFactFallback",{landmark:LANDMARKS[index]});
+    const history=COUNTRY_INSIGHTS[COUNTRY_CODES[index]]?.history;
+    return history?.[lang==="pt"?"pt":"en"]||history?.en||"";
   }
 
   function renderCountryProfile(info,code,place,targets={
@@ -951,8 +681,8 @@
     const countryWord=value=>typeof value==="boolean"
       ?tc(value?"yes":"no"):null;
     add("iso",code);
-    add("region",place[2]);
-    add("capital",countryWord(CAPITALS.has(place[0])));
+    add("region",continentName(COUNTRY_CODES.indexOf(code)));
+    add("capital",COUNTRIES[COUNTRY_CODES.indexOf(code)]?.capital||"—");
     add("currency",currencyName(info?.currency,info?.currencyName));
     if(info?.languageFamily)add("language",lang==="pt"
       ?COUNTRY_FAMILIES_PT[info.languageFamily]||info.languageFamily:info.languageFamily);
@@ -977,97 +707,57 @@
       cell.append(label,value);list.append(cell);
     }
   }
-  // Public 500-city archive: it only reads the same static catalogue and
-  // translated clue sources as the game. Neither selection nor opening it
-  // changes the active investigation, location marker, score, or saved state.
-  let atlasSelected=0;
-  let atlasButtons=[];
-  const ATLAS_ROWS=PLACES.map((place,index)=>({place,index}));
+  // Country dossier: the same 195-country metadata as the game.
+  let atlasSelected=0,atlasButtons=[];
+  const ATLAS_ROWS=COUNTRIES.map((country,index)=>({country,index}));
   function atlasText(key,vars={}){
     const template=ATLAS_I18N[lang]?.[key]||ATLAS_I18N.en?.[key]||key;
     return template.replace(/\{(\w+)\}/g,(_,name)=>String(vars[name]??""));
   }
-  function atlasFacts(index){
-    const place=cityAt(index),code=COUNTRY_CODES[index],details=COUNTRY_INSIGHTS[code]||{};
-    const list=$("atlasCityFacts");list.replaceChildren();
-    const add=(key,value)=>{
+  function atlasGeoFacts(index){
+    const country=COUNTRIES[index],list=$("atlasGeoFacts");list.replaceChildren();
+    function add(key,value){
       if(value===undefined||value===null||value==="")return;
-      const cell=document.createElement("div");
-      const dt=document.createElement("dt"),dd=document.createElement("dd");
+      const cell=document.createElement("div"),dt=document.createElement("dt"),
+        dd=document.createElement("dd");
       dt.textContent=atlasText(key);dd.textContent=String(value);
       cell.append(dt,dd);list.append(cell);
-    };
-    add("region",place[2]);
-    // Keep both descriptive fields recorded with every source city. They are
-    // Portuguese source text even when another interface language is active.
-    if(place[5])add("geoNote",place[5]);
-    if(place[6])add("catalogNote",place[6]);
-    add("coordinates",place[3].toFixed(4)+"°, "+place[4].toFixed(4)+"°");
+    }
     add("continent",continentName(index));
-    // A missing or disputed capital definition should not become a false fact.
-    if(!["Jerusalém","La Paz","Jacarta"].includes(place[0]))
-      add("nationalCapital",tc(CAPITALS.has(place[0])?"yes":"no"));
-    if(index<BASE_CITIES&&FEATURES[index]!=="urban")
-      add("landscape",locationFeature(index));
-    add("climateZone",latitudeZone(place[3]));
-    add("hemisphere",tc(place[3]>=0?"north":"south"));
-    const longitudeStart=Math.floor(place[4]/30)*30;
-    const latitudeStart=Math.floor(place[3]/15)*15;
-    add("longitudeSector",tc("longitude",{from:longitudeStart,to:longitudeStart+30}));
-    add("latitudeSector",tc("latitude",{from:latitudeStart,to:latitudeStart+15}));
-    if(place[3]>=-80&&place[3]<84){
-      add("utmZone",String(utmZone(place[3],place[4])));
-      add("utmBand",utmLatitudeBand(place[3]));
-    }
-    if(index<BASE_CITIES&&LANDMARKS[index])
-      add("landmark",LANDMARKS[index]);
-    for(const clue of extraCityClues(index)){
-      const key={
-        cityCapitalDistance:"capitalDistance",cityCoastDistance:"coastDistance",
-        cityPopulation:"cityPopulation",cityDensity:"cityDensity",cityTimezone:"timezone"
-      }[clue.key];
-      if(key){
-        // The archive keeps exact sourced statistics; only game evidence is bounded.
-        const source=CITY_URBAN_2025[index]||{};
-        const exact=clue.key==="cityPopulation"?source.population:
-          clue.key==="cityDensity"?source.density:null;
-        add(key,exact?tc(clue.key,{...clue,comparison:"≈",value:number(exact)}):
-          clueText(clue,index));
-      }
-    }
-    if(!list.children.length){
-      const p=document.createElement("p");p.textContent=atlasText("notAvailable");list.append(p);
-    }
+    add("climateZone",countryLatitudeZone(index));
+    add("nationalCapital",country.capital);
+    add("landlocked",tc(country.landlocked?"countryLandlockedYes":"countryLandlockedNo"));
   }
   function atlasEvidence(index,level,target){
     const list=$(target);list.replaceChildren();
-    cluesFor(index,level,4).forEach((clue,i)=>{
+    cluesFor(index,level).forEach((clue,i)=>{
       const row=document.createElement("li");row.className="report-evidence-row";
       const count=document.createElement("span");count.textContent=String(i+1).padStart(2,"0");
       const value=document.createElement("span");value.textContent=clueText(clue,index);
       row.append(count,value);list.append(row);
     });
   }
-  function renderAtlasCity(index){
-    if(!Number.isInteger(index)||index<0||index>=PLACES.length)return;
+  function renderAtlasCountry(index){
+    if(!Number.isInteger(index)||index<0||index>=COUNTRIES.length)return;
     atlasSelected=index;
-    const place=cityAt(index),code=COUNTRY_CODES[index],details=COUNTRY_INSIGHTS[code]||{};
-    $("atlasEntryNo").textContent=String(index+1).padStart(3,"0")+" / 500";
-    $("atlasCityName").textContent=cityName(place);
-    $("atlasCityCountry").textContent=countryName(index);
+    const country=COUNTRIES[index],code=country.code,
+      details=COUNTRY_INSIGHTS[code]||{};
+    $("atlasEntryNo").textContent=String(index+1).padStart(3,"0")+" / "+COUNTRIES.length;
+    $("atlasCountryName").textContent=countryName(index);
+    $("atlasCountryCode").textContent=code;
     const flag=$("atlasFlag"),fallback=$("atlasFlagFallback");
-    fallback.textContent=details.flag||"";
+    fallback.textContent=country.flag||details.flag||"";
     fallback.classList.add("hidden");flag.classList.remove("hidden");
     flag.alt=countryName(index);
     flag.onerror=()=>{flag.classList.add("hidden");fallback.classList.remove("hidden")};
-    flag.src=/^[A-Z]{2}$/.test(code)?"https://flagcdn.com/w160/"+code.toLowerCase()+".png":"";
-    atlasFacts(index);
-    $("atlasFact").textContent=factFor(index);
+    flag.src=/^[A-Z]{2}$/.test(code)?
+      "https://flagcdn.com/w160/"+code.toLowerCase()+".png":"";
+    atlasGeoFacts(index);
     $("atlasHistory").textContent=details.history?.[lang==="pt"?"pt":"en"]||
       details.history?.en||atlasText("notAvailable");
     $("atlasHistorySource").textContent=COUNTRY_CLUE_I18N[lang]?.countryHistorySource||
       COUNTRY_CLUE_I18N.en?.countryHistorySource||"";
-    renderCountryProfile(details,code,place,{
+    renderCountryProfile(details,code,countryAt(index),{
       title:"atlasCountryTitle",source:"atlasCountrySource",list:"atlasCountryStats"
     });
     atlasEvidence(index,"normal","atlasNormalEvidence");
@@ -1080,64 +770,56 @@
   }
   function renderAtlasOptions(query=""){
     const text=norm(query),tokens=text.split(/\s+/).filter(Boolean);
-    const matches=ATLAS_ROWS.map(({place,index})=>({
-      place,index,name:cityName(place),country:countryName(index),
-      exact:text.length>0&&(norm(place[0])===text||norm(cityName(place))===text||
-        norm(EN_CITY[place[0]]||"")===text)
-    })).filter(({place,index,name,country})=>{
-      const searchable=norm([place[0],EN_CITY[place[0]]||"",
-        PT_EXTRA_NAMES[place[0]]||"",place[1],place[2],
-        COUNTRY_CODES[index],name,country].join(" "));
+    const matches=ATLAS_ROWS.map(({country,index})=>({
+      country,index,name:countryName(index),
+      exact:text.length>0&&(norm(country.code)===text||
+        norm(countryName(index))===text||norm(country.name)===text)
+    })).filter(({country,name})=>{
+      const searchable=norm([country.code,country.name,name].join(" "));
       return tokens.every(term=>searchable.includes(term));
     }).sort((a,b)=>Number(b.exact)-Number(a.exact)||
       a.name.localeCompare(b.name,locale())||a.index-b.index);
     $("atlasCount").textContent=atlasText("count",{count:matches.length});
-    const options=$("atlasOptions");
-    atlasButtons=[];
+    const options=$("atlasOptions");atlasButtons=[];
     if(!matches.length){
       const message=document.createElement("div");message.className="atlas-no-results";
-      message.textContent=atlasText("noResults");options.replaceChildren(message);
-      return;
+      message.textContent=atlasText("noResults");
+      options.replaceChildren(message);return;
     }
     const nodes=matches.map(item=>{
-      const button=document.createElement("button");
-      button.type="button";button.className="atlas-option";
-      button.dataset.index=String(item.index);
+      const button=document.createElement("button");button.type="button";
+      button.className="atlas-option";button.dataset.index=String(item.index);
       button.setAttribute("role","option");
       button.setAttribute("aria-selected",String(atlasSelected===item.index));
-      button.setAttribute("aria-label",item.name+", "+item.country);
+      button.setAttribute("aria-label",item.name);
       if(atlasSelected===item.index)button.classList.add("selected");
       const flag=document.createElement("span");flag.className="atlas-option-flag";
-      flag.textContent=COUNTRY_INSIGHTS[COUNTRY_CODES[item.index]]?.flag||"";
+      flag.textContent=item.country.flag||"";
       flag.setAttribute("aria-hidden","true");
       const info=document.createElement("span");info.className="atlas-option-info";
       const title=document.createElement("span");title.className="atlas-option-name";
       title.textContent=item.name;
-      const country=document.createElement("span");country.className="atlas-option-country";
-      country.textContent=item.country;
-      info.append(title,country);
-      const ordinal=document.createElement("span");ordinal.className="atlas-option-number";
-      ordinal.textContent=String(item.index+1).padStart(3,"0");
-      button.append(flag,info,ordinal);
+      const code=document.createElement("span");code.className="atlas-option-country";
+      code.textContent=item.country.code;info.append(title,code);
+      const number=document.createElement("span");number.className="atlas-option-number";
+      number.textContent=String(item.index+1).padStart(3,"0");
+      button.append(flag,info,number);
       button.addEventListener("click",()=>{
-        renderAtlasCity(item.index);
-        // On phones the dossier scrolls below the compact city picker.
+        renderAtlasCountry(item.index);
         if(window.matchMedia?.("(max-width: 760px)")?.matches)
           $("atlasSheet").scrollTop=0;
       });
       button.addEventListener("keydown",event=>{
-        if(["ArrowDown","ArrowUp","Home","End"].includes(event.key)){
-          event.preventDefault();
-          const current=atlasButtons.indexOf(button);
-          const next=event.key==="Home"?0:event.key==="End"?atlasButtons.length-1:
-            (current+(event.key==="ArrowDown"?1:-1)+atlasButtons.length)%atlasButtons.length;
-          atlasButtons[next]?.focus?.();
-        }
+        if(!["ArrowDown","ArrowUp","Home","End"].includes(event.key))return;
+        event.preventDefault();
+        const current=atlasButtons.indexOf(button);
+        const next=event.key==="Home"?0:event.key==="End"?atlasButtons.length-1:
+          (current+(event.key==="ArrowDown"?1:-1)+atlasButtons.length)%atlasButtons.length;
+        atlasButtons[next]?.focus?.();
       });
       return button;
     });
-    atlasButtons=nodes;
-    options.replaceChildren(...nodes);
+    atlasButtons=nodes;options.replaceChildren(...nodes);
   }
   function syncAtlasLanguage(){
     $("atlasTitle").textContent=atlasText("title");
@@ -1150,24 +832,22 @@
     $("atlasBtn").title=atlasText("title");
     $("atlasCloseBtn").setAttribute("aria-label",atlasText("close"));
     $("atlasCloseBtn").title=atlasText("close");
-    $("atlasCitySectionTitle").textContent=atlasText("cityDetails");
-    $("atlasFactTitle").textContent=atlasText("story");
+    $("atlasGeoTitle").textContent=atlasText("geoDetails");
     $("atlasHistoryTitle").textContent=atlasText("history");
     $("atlasNormalLabel").textContent=atlasText("normalEvidence");
     $("atlasHardLabel").textContent=atlasText("hardEvidence");
     $("atlasDataNote").textContent=atlasText("availableNote");
+    $("countryCountLabel").textContent=atlasText("countryPlural");
     if($("atlasDialog").open){
       renderAtlasOptions($("atlasSearch").value);
-      renderAtlasCity(atlasSelected);
+      renderAtlasCountry(atlasSelected);
     }
   }
   function initAtlas(){
     const dialog=$("atlasDialog"),search=$("atlasSearch");
     $("atlasBtn").addEventListener("click",()=>{
-      syncAtlasLanguage();
-      search.value="";
-      renderAtlasOptions("");
-      renderAtlasCity(atlasSelected);
+      syncAtlasLanguage();search.value="";
+      renderAtlasOptions("");renderAtlasCountry(atlasSelected);
       dialog.showModal();
       if(window.matchMedia?.("(max-width: 760px)")?.matches)
         $("atlasCloseBtn").focus?.();
@@ -1182,8 +862,7 @@
     search.addEventListener("keydown",event=>{
       if(event.key!=="ArrowDown"&&event.key!=="Enter")return;
       if(atlasButtons.length){
-        event.preventDefault();
-        atlasButtons[0].focus?.();
+        event.preventDefault();atlasButtons[0].focus?.();
         if(event.key==="Enter")atlasButtons[0].click?.();
       }
     });
@@ -1204,10 +883,10 @@
   function renderDossier(){
     if(!game.finished)return;
     const best=bestGuess();
-    const place=cityAt(game.index);
+    const place=countryAt(game.index);
     $("reportCode").textContent=caseCode();
     $("reportVerdict").textContent=t(game.won?"caseSolved":"caseClosed");
-    $("reportHeading").textContent=isCountryGame()?countryName(game.index):cityName(place);
+    $("reportHeading").textContent=countryName(game.index);
     $("reportCountry").textContent=countryName(game.index);
     const iso=COUNTRY_CODES[game.index],details=COUNTRY_INSIGHTS[iso];
     const flagImage=$("reportFlag"),flagFallback=$("reportFlagFallback");
@@ -1238,7 +917,7 @@
     $("reportCoordinates").textContent=isCountryGame()?"—":place[3].toFixed(4)+"°, "+place[4].toFixed(4)+"°";
     $("reportContinent").textContent=continentName(game.index);
     renderCountryProfile(details,iso,place);
-    $("reportFact").textContent=isCountryGame()?t("countryCaseContext",{country:countryName(game.index)}):factFor(game.index);
+    $("reportFact").textContent=factFor(game.index);
     const log=$("reportTimeline");log.replaceChildren();
     for(const [i,g] of game.guesses.entries()){
       const row=document.createElement("li");row.className="report-log-row";
@@ -1293,16 +972,13 @@
     renderCaseNavigation();
     $("resultCard").classList.toggle("hidden",!game.finished);
     if(!game.finished)return;
-    const name=isCountryGame()?countryName(game.index):cityName(cityAt(game.index))+", "+countryName(game.index);
+    const name=countryName(game.index);
     $("resultKicker").textContent=t(game.won?"solved":"closed");
     $("resultTitle").textContent=name;
     $("resultDetail").textContent=isRush()
-      ?t(game.won?"rushFound":"rushLost",{country:name,count:game.guesses.length,
-        time:formatElapsed(game.durationMs??elapsedMs())})
-      :isCountryGame()?t(game.won?"countryFound":"countryLost",
-        {country:name,count:game.guesses.length})
-      :game.won?t("foundText",{city:name,count:game.guesses.length,
-        km:number(bestGuess().distance)}):t("lostText",{city:name});
+      ?t(game.won?"rushFound":"rushLost",{country:name,
+        count:game.guesses.length,time:formatElapsed(game.durationMs??elapsedMs())})
+      :t(game.won?"countryFound":"countryLost",{country:name,count:game.guesses.length});
     $("finalScore").textContent=number(game.score);
     renderDossier();
   }
@@ -1329,7 +1005,7 @@
     $("caseCode").textContent=code;
     $("caseNumber").textContent=t("caseWord")+" "+code;
     $("modeCaption").textContent=t(daily?"modeDaily":"modeFree");
-    $("caseTitle").textContent=game.finished?(isCountryGame()?countryName(game.index):cityName(cityAt(game.index))):t("unknown");
+    $("caseTitle").textContent=game.finished?countryName(game.index):t("unknown");
     $("caseStatus").textContent=t(game.finished?(game.won?"solved":"closed"):"active");
     $("caseStatus").classList.toggle("closed",game.finished);
     $("attemptCount").textContent=isRush()?t("rushUnlimited"):remaining+" / "+max;
@@ -1337,13 +1013,13 @@
     const dots=$("attemptDots");dots.replaceChildren();
     dots.style.setProperty("--attempt-total",max);
     if(!isRush())for(let i=0;i<max;i++){const dot=document.createElement("i");dot.classList.toggle("live",i<remaining);dots.append(dot)}
-    $("placeCount").textContent=String(PLACES.length);
+    $("placeCount").textContent=String(COUNTRIES.length);
     renderClues();renderHistory();renderResult();feedback();
     $("guessBtn").disabled=game.finished||!selected||(isRush()&&!game.started);
-    $("citySearch").disabled=game.finished||(isRush()&&!game.started);
-    $("citySearch").placeholder=t(isCountryGame()?"rushSearchPlaceholder":"searchPlaceholder");
+    $("countrySearch").disabled=game.finished||(isRush()&&!game.started);
+    $("countrySearch").placeholder=t(isCountryGame()?"rushSearchPlaceholder":"searchPlaceholder");
     $("searchLabel").textContent=t(isCountryGame()?"rushSearchLabel":"searchLabel");
-    $("citySearch").value="";
+    $("countrySearch").value="";
     $("suggestions").classList.add("hidden");
     $("selection").classList.toggle("hidden",game.finished);
     $("selectedText").textContent=selected?(selected.label||selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°"):t("noSelection");
@@ -1410,7 +1086,7 @@
       !cluesFor(game.index,difficulty).some(clue=>clue.key==="zone"))return;
     const countryEdition=game.evidenceVersion>=4;
     const belts=countryEdition?countryBelts(game.index).zones:
-      [latitudeZoneKey(cityAt(game.index)[3])];
+      [latitudeZoneKey(countryAt(game.index)[3])];
     // A country crossing several latitude belts highlights ALL of them.
     // Detached overseas territories do not imply intervening latitude belts.
     // Web Mercator clips poles to 85.05° and splits strips to prevent seams.
@@ -1549,7 +1225,7 @@
     if(!map||!mapStyleReady||!Array.isArray(game.sectorReveals)
       ||!game.sectorReveals.includes("hemisphere")
       ||!cluesFor(game.index,difficulty).some(clue=>clue.key==="hemisphere"))return;
-    const north=cityAt(game.index)[3]>=0;
+    const north=countryAt(game.index)[3]>=0;
     const lineId="case-hemisphere-line",arrowsId="case-hemisphere-arrows";
     map.addSource(lineId,{type:"geojson",data:{type:"Feature",properties:{},
       geometry:{type:"LineString",coordinates:[[-179.9,0],[179.9,0]]}}});
@@ -1667,23 +1343,14 @@
     drawUtmOverlays();
     drawHemisphereOverlay();
     drawContinentOutline();
-    const target=cityCoords(game.index);
     const best=game.finished?bestGuess():null;
-    if(!isRush())game.guesses.forEach((g,i)=>addMarker(g.lat,g.lng,i+1,g===best?"best":"past"));
-    if(game.finished){
-      if(!isCountryGame()){
-        const adjustedLng=best?target[1]+360*Math.round((best.lng-target[1])/360):target[1];
-        addMarker(target[0],adjustedLng,"★","target",
-          cityName(cityAt(game.index))+" · "+countryName(game.index));
-        if(best)addResultLine([best.lng,best.lat],[adjustedLng,target[0]]);
-        frameResult(best,target);
-      }
-    }else if(selected){
+    if(!isRush())game.guesses.forEach((g,i)=>
+      addMarker(g.lat,g.lng,i+1,g===best?"best":"past"));
+    if(!game.finished&&selected)
       marker=addMarker(selected.lat,selected.lng,isRush()?"✓":"+","current");
-    }
-    $("coordinates").textContent=game.finished
-      ?(isCountryGame()?countryName(game.index):target[0].toFixed(3)+"°, "+target[1].toFixed(3)+"°")
-      :selected?selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°":t("noSelection");
+    $("coordinates").textContent=game.finished?countryName(game.index):
+      selected?selected.label||selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°":
+      t("noSelection");
   }
   function resetMapView(){
     if(map&&!game.finished)map.easeTo({center:[8,15],zoom:1.7,duration:350});
@@ -1760,7 +1427,7 @@
       }
       selected={lat,lng,label:displayRegion(countryCode),countryCode};
       $("selectedText").textContent=selected.label;
-      $("citySearch").value=selected.label;
+      $("countrySearch").value=selected.label;
       $("suggestions").classList.add("hidden");
       $("guessBtn").disabled=false;
       renderMap();
@@ -1799,49 +1466,40 @@
   function guess(){
     if(isRush()&&!game?.started)return;
     clockTick();
-    if(!selected||game.finished)return;
-    const pos=[selected.lat,selected.lng],to=cityCoords(game.index),distance=dist(pos,to);
+    if(!selected||game.finished||!selected.countryCode)return;
     const now=Date.now(),elapsed=Math.max(0,now-game.startedAt);
     if(isRush()&&elapsed>=RUSH_DURATION_MS){clockTick();return}
     game.guesses.push({lat:selected.lat,lng:selected.lng,label:selected.label,
-      countryCode:selected.countryCode||null,at:new Date(now).toISOString(),
-      elapsedMs:elapsed,distance:Math.round(distance),bearing:Math.round(heading(pos,to))});
-    game.won=isCountryGame()?selected.countryCode===COUNTRY_CODES[game.index]:distance<=WIN_RADIUS;
+      countryCode:selected.countryCode,at:new Date(now).toISOString(),elapsedMs:elapsed});
+    game.won=selected.countryCode===COUNTRY_CODES[game.index];
     if(game.won||game.guesses.length>=maximum()){
       game.finished=true;game.revealed=EVIDENCE_COUNT;
-      game.endedAt=new Date(now).toISOString();
-      game.durationMs=elapsed;
+      game.endedAt=new Date(now).toISOString();game.durationMs=elapsed;
       game.score=game.won
         ?isRush()
-          ?Math.max(0,Math.round(5000*(1-Math.min(RUSH_DURATION_MS,elapsed)/RUSH_DURATION_MS))-(game.sectorMapPenalty||0))
-          :Math.max(0,Math.max(250,Math.round(5000*Math.pow(.78,game.guesses.length-1)*
-            (isCountryGame()?1:Math.max(.76,1-distance/425))-game.penalty))-
-            (game.sectorMapPenalty||0))
+          ?Math.max(0,Math.round(5000*(1-Math.min(RUSH_DURATION_MS,elapsed)/
+            RUSH_DURATION_MS))-(game.sectorMapPenalty||0))
+          :Math.max(0,Math.max(250,Math.round(5000*Math.pow(.78,game.guesses.length-1)-
+            game.penalty))-(game.sectorMapPenalty||0))
         :0;
-    }else if(!isRush())game.revealed=Math.min(EVIDENCE_COUNT,
-      Math.max(game.revealed,DIFFICULTIES[difficulty].initial+game.guesses.length));
+    }else if(!isRush()){
+      game.revealed=Math.min(EVIDENCE_COUNT,
+        Math.max(game.revealed,DIFFICULTIES[difficulty].initial+game.guesses.length));
+    }
     save();selected=null;render();
-    if(game.finished){showReport();}
-    // Keep the investigator’s chosen zoom after a wrong guess.
+    if(game.finished)showReport();
   }
   function searchLocal(term){
     const q=norm(term),results=[];
-    if(isCountryGame()){
-      for(const code of [...new Set(COUNTRY_CODES)].sort((a,b)=>
-        displayRegion(a).localeCompare(displayRegion(b),locale()))){
-        const name=displayRegion(code);
-        if(!norm(name).includes(q)&&!norm(code).includes(q))continue;
-        const index=COUNTRY_CODES.indexOf(code),place=cityAt(index);
-        results.push({name,description:code,lat:place[3],lon:place[4],
-          countryCode:code});
-        if(results.length===7)break;
-      }
-      return results;
-    }
-    for(const {place,index,terms} of LOCAL_SEARCH_INDEX){
-      if(!terms.includes(q))continue;
-      results.push({name:cityName(place),description:countryName(index),lat:place[3],lon:place[4]});
-      if(results.length===5)break;
+    for(const code of COUNTRY_CODES.slice().sort((a,b)=>
+      displayRegion(a).localeCompare(displayRegion(b),locale()))){
+      const name=displayRegion(code);
+      if(!norm(name).includes(q)&&!norm(code).includes(q)&&
+        !norm(COUNTRIES[COUNTRY_CODES.indexOf(code)].name).includes(q))continue;
+      const index=COUNTRY_CODES.indexOf(code),country=COUNTRIES[index];
+      results.push({name,description:code,lat:country.lat,lon:country.lng,
+        countryCode:code});
+      if(results.length===7)break;
     }
     return results;
   }
@@ -1862,32 +1520,11 @@
           $("suggestions").classList.add("hidden");
           renderMap();
         }else selectPoint(item.lat,item.lon,item.name);
-        $("citySearch").value=item.name;
+        $("countrySearch").value=item.name;
       });
       list.append(button);
     }
     list.classList.remove("hidden");
-  }
-  async function searchRemote(term){
-    if(term.length<3||game.finished||isCountryGame())return;
-    // Local matches were already rendered by the input handler.
-    const local=searchLocal(term);
-    if(controller)controller.abort();
-    const signaler=new AbortController();controller=signaler;
-    try{
-      const supported=GEOCODER_LANGUAGES.has(lang)?lang:"en";
-      const url="https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(term)+"&count=8&language="+supported+"&format=json";
-      const response=await fetch(url,{signal:signaler.signal});
-      if(!response.ok)throw Error("search failed");
-      const data=await response.json();
-      if(signaler!==controller||game.finished||$("citySearch").value.trim()!==term)return;
-      const all=[...local];
-      for(const p of data.results||[]){
-        if(!all.some(item=>dist([item.lat,item.lon],[p.latitude,p.longitude])<10))
-          all.push({name:p.name,description:[p.admin1,p.country].filter(Boolean).join(", "),lat:p.latitude,lon:p.longitude});
-      }
-      suggestions(all);
-    }catch(e){if(e.name!=="AbortError"&&!local.length)suggestions([])}
   }
   async function share(){
     const symbols=game.guesses.map(g=>isCountryGame()?(g.countryCode===COUNTRY_CODES[game.index]?"✓":"×"):g.distance<=WIN_RADIUS?"🟨":g.distance<500?"🟧":"⬛").join("");
@@ -2178,12 +1815,11 @@
     });
   }
   function init(){
-    if(PLACES.length!==500||EXTENDED.length!==426||
-       new Set(COUNTRY_CODES).size!==Object.keys(COUNTRY_INSIGHTS).length||
-       PLACES.length!==FEATURES.length||
-       PLACES.length!==COUNTRY_CODES.length||PLACES.length!==LANDMARKS.length||
-       PLACES.length!==FACTS.length||Object.keys(NEARBY_REFERENCES).length<45)
-      throw new Error("Location catalogue and metadata are out of sync");
+    if(COUNTRIES.length!==195||
+       new Set(COUNTRY_CODES).size!==195||
+       COUNTRIES.some(c=>!COUNTRY_INSIGHTS[c.code]||
+         !Number.isFinite(c.lat)||!Number.isFinite(c.lng)||!c.mask))
+      throw new Error("195-country catalogue is incomplete");
     document.documentElement.lang="en";
     $("difficultySelect").value=difficulty;
     $("langSelect").value=lang;
@@ -2225,15 +1861,15 @@
     $("closeHelpBtn").addEventListener("click",()=>$("helpDialog").close());
     $("startHelpBtn").addEventListener("click",()=>$("helpDialog").close());
     $("helpDialog").addEventListener("click",e=>{if(e.target===$("helpDialog"))$("helpDialog").close()});
-    $("citySearch").addEventListener("input",e=>{
+    $("countrySearch").addEventListener("input",e=>{
       const term=e.target.value.trim();
       if(controller)controller.abort();
       clearTimeout(debounce);
-      if(term.length<(isCountryGame()?1:3)){$("suggestions").classList.add("hidden");return}
+      if(term.length<1){$("suggestions").classList.add("hidden");return}
       suggestions(searchLocal(term));
-      if(!isCountryGame())debounce=setTimeout(()=>searchRemote(term),450);
+      // Local country catalogue only; no city geocoder or network search.
     });
-    $("citySearch").addEventListener("keydown",e=>{
+    $("countrySearch").addEventListener("keydown",e=>{
       if(e.key==="Escape")$("suggestions").classList.add("hidden");
       if(e.key==="Enter"){
         const option=$("suggestions").querySelector("button.suggestion");

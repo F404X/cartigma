@@ -1,279 +1,88 @@
 # Cartigma
 
-A browser-based geographic detective game. Read the evidence, place pins on a world map, and identify a hidden country in a limited number of attempts.
+A country-deduction game for the browser. Investigate geographic and historical clues, click a country on the map or search by name, and identify the hidden country.
 
 **Play:** https://cartigma.f404x.net/
 
-## Game rules
+## Countries, not cities
 
-- **Daily case:** one shared location for each difficulty on each UTC date. The daily progress and case ID are saved locally.
-- **Free play:** new random investigations without an account. Normal mode favors capitals and widely recognizable destinations through a bounded preference system; Hard mode can choose from all 500 cities.
-- **Normal:** 6 country guesses, 2 starting clues. Select the country on the map (territory polygons) or search by country name. Each wrong country unlocks another clue.
-- **Hard:** 4 country guesses, 1 starting clue. The same country-selection controls, with higher hint and overlay prices.
-- **Rush:** pink map difficulty bar, an explicit **Start** gate (no countdown before the button is pressed), and **country guesses by clicking a country on the map or searching its name**. Once started, you get **60 wall-clock seconds**, unlimited guesses, and **one opening clue plus another unlocked every 6 seconds** (all ten clues by 54 seconds). The clock stays paused on the start screen even after a daily-case reload. The map resolves clicked coordinates against Natural Earth admin-0 country polygons, not the nearest registered city; unsupported ocean/territory clicks prompt the player to use the search. The boundaries are loaded as a cached static GeoJSON resource; country-name search remains available if that resource is unavailable. There is no paid Reveal button. The potential score starts at 5,000 and decreases linearly to zero by 60 seconds; purchased map aids still deduct points. The mode has its own shared daily case and unlimited Free Play investigations.
-- **All difficulties:** win by naming or clicking the correct country. Rush must be solved within 60 seconds. Normal and Hard do not require pinpointing a city.
-- **Ten evidence cards:** an opening landscape/latitude-zone/hemisphere clue, the continent, five balanced geographic/civic/country clues, and three optional additional clues. The longitude sector covers 30° in Normal or becomes a UTM zone in Hard. A landmark that reveals the city's name is replaced with a 15° latitude sector; Hard instead uses UTM latitude bands. Cultural and numerical country facts are interleaved in nonadjacent positions among slots 3–7. Hemisphere clues only appear for Asia, Africa, South America, and Oceania, not Europe or North America. No distance-reference clue is shown, because the guess feedback already provides distance.
-- **Vector map filters:** a gear beside **Vector** opens a compact, scrollable panel above the map selector. Toggle national borders, state/region boundaries, country/city labels, roads, natural areas, rivers/lakes, and points of interest. Preferences persist locally across basemap and theme changes. These filters only change presentation: the paid clue that identifies the target continent still costs points. OpenStreetMap raster tiles cannot hide individual map layers, so the gear is disabled in that mode.
-- **Ten evidence slots**, including four or five distinct country-data facts plus geographic clues. The two original facts remain distributed among slots 3–7; the additional three clues appear in slots 8–10. Extra evidence can be purchased before any guess without consuming attempts.
-- Extra hints cost **150–500 points** depending on how revealing the next clue will be; the actual cost is shown on the Reveal button and deducted only if the player chooses to reveal it. Optional map aids cost **250 points** for the Equator/hemisphere arrows, **500** for the low-opacity (28%) continent coastline outline without fill, **1,000** for a yellow (10%-opacity) 30° longitude sector, and **1,100** for a yellow 15° latitude sector. Map aids are purchased once per case and persist through style changes and daily-case reloads. The original saved deductions are preserved; paid hints are counted separately from map purchases. The score is capped at zero to avoid negative results.
+Cartigma contains **195 playable countries**: the 193 UN member states and the two UN non-member observer states (the Holy See and the State of Palestine). The game and the searchable **Country Archive** use the same list. A country appears **once**, whether it has one large city or hundreds.
 
-The timer is rendered in a **separate row below the map toolbar**, keeping its title, remaining time and live score legible on desktop and mobile screens. The Rush start card appears above the map until the player explicitly begins the investigation.
+There is **no city/urban-place database**. The former 500-city catalogue, urban statistics, city references and city-specific facts have been deleted. Geographic reference coordinates are taken from country metadata and used only for map-sector calculations; they are not separate city answers. The searchable country dossier includes a flag, ISO code, geographic/latitude information, currency, country area, historical summary and any available dated population and GDP data. Absent source values are omitted instead of being invented.
 
-### Case numbering
+Country selection by map uses Natural Earth admin-0 polygons (50m with a 110m fallback). Tiny islands and micronations may be difficult to click on a world-scale map; selecting their name in search works regardless of geometry. Geographic boundaries are approximate and may follow Natural Earth's default de facto representation.
 
-Case identifiers follow **`#N-YYYYMMDD-01`**, **`#H-YYYYMMDD-01`**, or **`#R-YYYYMMDD-01`**. The first letter uses the **English** difficulty name (Normal, Hard, or Rush). The date is UTC and the final segment is the ordinal number of the case **opened in that browser on that UTC date**, starting at 01. Switching difficulty and starting free-play cases count as new investigations; revisiting an existing daily case preserves its original ID. The hidden daily location, however, is the same for every player of a given difficulty.
+## Game modes
 
-## Completed case file
+| Difficulty | Guess limit | Starting clues | Special rules |
+| --- | ---: | ---: | --- |
+| Normal | 6 | 2 | Country name or map click; optional paid hints |
+| Hard | 4 | 1 | Country name or map click; clues and map aids cost more |
+| Rush | Unlimited | **0 before Start**, 1 after | Explicit Start; identify the country within **60 seconds**. Another clue unlocks every **6 seconds** after the first. Score decreases over time |
 
-When an investigation ends, an interactive detective dossier displays a country flag, a country-specific historical milestone (for all 165 represented countries and territories), and:
+All modes target **the country**, not a city or its coordinates. Wrong guesses reveal further evidence in Normal and Hard. Rush never shows a clue (including its category) before **Start** is pressed. The 60-second countdown begins at Start and is based on the wall clock; hiding the tab does not pause it.
 
-- Case ID, outcome, city, country or territory, and continent.
-- Approximate target coordinates, mode, difficulty, guesses used, extra hints and score.
-- The **closest** attempt, all guess distances, and the final evidence list.
-- The original 74 cities retain curated English/Portuguese trivia. The 426 supplemental cities have factual, source-derived bilingual location notes (administrative region and approximate latitude), rather than invented landmarks; other languages use localized fallback information.
-- The result card offers **New case** and **View case file**. The dossier retains separate **Share** and **New case** controls.
+Every guess is timestamped and its elapsed time is displayed in the guess history and report. Results show the correct country, flag, history, guesses and score, but never disclose a nonexistent city target.
 
-The map automatically frames the **closest guess and the actual city**, with zoom caps adjusted to their separation, viewport padding and a line connecting both. The map also handles points that straddle the international date line. The case file opens as a **non-modal side panel on the right**, keeping the map visible (on phones it becomes a bottom panel).
+### Randomness and repetition
 
-## Design and languages
+- **Daily:** a fixed, seeded shuffle of all 195 countries per difficulty. Every country appears exactly once within **any consecutive 195-day window**, including cycle boundaries; the same randomized order repeats only after 195 days. The day's case is identical worldwide for the same UTC date and difficulty.
+- **Freeplay:** an independent, shuffled **bag of all 195 countries**, shared between difficulties and persisted in `localStorage`. A country cannot reappear until the bag is exhausted. The next shuffled bag avoids repeating the immediately previous country across the cycle boundary.
+- The country-only catalogue uses new saved-game keys so old city-based daily records cannot be confused with the new investigations.
 
-The game uses a restrained detective interface with **dark and light appearance modes**. Dark uses near-black and desaturated navy surfaces; light uses white and cool-gray surfaces. **Yellow is reserved for accents** such as interactive selections, map pins, clue markers and buttons, not large panel backgrounds. A header toggle switches modes and saves the preference in local storage. Evidence cards have larger typography, ruled separators, numbered sections and evidence classifications. **Evidence is stacked above the guess panel** on all screen sizes, with internal scrolling where necessary. On desktop, the game fits within the viewport, with internal scrolling where needed. **On smartphones (up to 760 px wide), the map is exactly square (1:1)** and the evidence, city search, guesses and results are arranged vertically below it in one scrollable investigation panel. When the available screen height is too short for a square map and a useful lower panel, the full page scrolls instead, so nothing is clipped. Touch controls are sized for fingers; the case report is shown inside the lower scroller rather than covering the map.
+### Evidence
 
-The theme button follows the currently selected UI language. On the vector map, the dark appearance uses OpenFreeMap **Dark** and the light appearance uses OpenFreeMap **Positron**, both keyless; the original OpenStreetMap tiles remain available, with their dark CSS filter disabled in light mode.
+Each investigation has **10 clues**, drawn from the available country-level facts and geographical references. Possible topics include continent, latitude belt, longitude/latitude sectors, UTM zone/band, hemisphere of the geographic reference, country currency denomination, language family, flag color where verified, country population, GDP per capita, territorial area and access to the sea.
 
-The UI supports **19 languages**: English (default), Portuguese, Spanish, Simplified Chinese, Japanese, Russian, French, German, Italian, Dutch, Polish, Swedish, Turkish, Arabic, Hebrew, Korean, Thai, Vietnamese and Indonesian. Arabic and Hebrew use RTL layout. The language selector is a searchable custom menu with a persistent globe icon, a representative flag image in **every option**, full native-language names, keyboard navigation and a visible selected state (with emoji fallback when a flag image cannot load). On smartphones, it opens as a **large centered dialog** (roughly 78% of the viewport height) with a dimmed backdrop, explicit close button, and scrollable language list; the desktop dropdown is unchanged. Preferences are stored locally. The primary map uses MapLibre vector labels that follow the selected language when translated name fields exist, falling back to the local name otherwise. **Label density is zoom-dependent:** countries appear at world scale, major cities at moderate zoom, and neighborhoods, local streets and points of interest at progressively higher zoom. This is applied directly to vector style layers; raster fallback tiles have fixed labels. A **map-style selector below the map** lets players switch between the vector map (localized names where available) and the classic OpenStreetMap raster map (fixed labels). The choice persists in local storage and retains the current case and map viewport. A **compass rose at the bottom-right of the map** adapts its cardinal lettering to the selected language. If WebGL, a CDN or the vector style fails, the Leaflet/OpenStreetMap raster map also loads automatically. Interface strings, clue templates, geographic terminology, and report controls are also translated.
+**Landscape (“Paisagem”) is not an evidence type.** National-capital status, distance to a capital and distance to a coast are also excluded from gameplay, as are city population and density. These old city-only facts do not appear in the country archive either.
 
-## Technology
+Numerical evidence uses a strictly valid rounded bound, such as `> 100,000,000` or `< 2,000,000 km²`. Source values and years remain available in the country dossier where verified. Missing economic data is never substituted with invented values.
 
-- Plain HTML, CSS, JavaScript, no build step or account.
-- **MapLibre GL JS 6.18.0** with [OpenFreeMap](https://openfreemap.org/) dark vector tiles, no API key, plus **Leaflet 1.9.4** as an automatic fallback when WebGL or the vector style is unavailable. Viewport gestures are distinguished from deliberate clicks (8 px pointer threshold plus drag suppression).
-- Open-Meteo Geocoding API for optional search suggestions.
-- Browser `Intl.DisplayNames` for country names; six continents have explicit localized names.
-- `localStorage` for daily results, sequence numbers, preferred language, preferred basemap and appearance theme.
+Countries that intersect multiple latitude bands display a representative band and the number of additional bands: **Mexico: Subtropical (+1)** and **Brazil: Tropical (+2)**. Purchasing the corresponding overlay highlights all represented latitude bands.
 
-Because this is entirely static, the answers and clues exist on the client; it is a casual game rather than a secure competition. No proprietary API secrets are required.
+### Optional map aids
 
-## Run and test
+The game has an interactive MapLibre vector map with an OpenStreetMap/Leaflet fallback. Where supported, paid overlays can show a latitude/longitude sector, equator/hemisphere, continent outline or UTM grid. Normal and Hard retain their existing hint price and score systems; Hard's assisted information is more expensive. Rush automatically unlocks hints over time, with no manual Reveal button.
+
+The map has layer filters for country/city *basemap labels*, state boundaries, roads and physical features. These are map labels, **not a city database** and cannot be selected as game answers. The map theme supports dark and light appearances and localized country names.
+
+## Country archive
+
+Use the list button in the header to browse **all 195 country dossiers** and their available facts. The archive includes localized country names, flags, histories, a country profile and the ten Normal/Hard evidence examples for each country. Browsing never changes the active case or score.
+
+The UI supports **19 languages**: English, Brazilian Portuguese, Spanish, Simplified Chinese, Japanese, Russian, French, German, Italian, Dutch, Polish, Swedish, Turkish, Arabic, Hebrew, Korean, Thai, Vietnamese and Indonesian. Arabic and Hebrew use RTL layout. On phones the map is square and the investigation content scrolls underneath.
+
+## Data provenance and limits
+
+- Country names, basic country/territory metadata, representative coordinates, administrative information, flag emojis, currencies and areas: [mledoze/countries](https://github.com/mledoze/countries).
+- The 193 UN membership list and two observer states: [United Nations membership](https://research.un.org/en/unmembers/currentmembers) and [UN observer states](https://research.un.org/en/unmembers/observers).
+- Latitude-band intersections and map hit testing: [Natural Earth admin-0 borders](https://www.naturalearthdata.com/downloads/110m-cultural-vectors/), with latitude-reference fallbacks for states omitted from its low-resolution maps.
+- Existing country-level population and GDP snapshots use year-marked historical [World Bank indicators](https://data.worldbank.org/). A newly added country with no verified value does not receive that kind of clue.
+- Historic country summaries retain the previously curated references to [CIA World Factbook](https://github.com/factbook/factbook.json); newly added entries note major independence and UN milestones.
+- Flag-color evidence is shown only where previously vetted source data exists; no color is inferred merely from a flag emoji.
+
+A country may span multiple geographical zones, and its area/currency/history may be recorded in different years. Cartigma presents static educational data, not a live authoritative geopolitical or economic registry. Source classification may differ for contested boundaries. The full correct answer necessarily exists in the browser's static code: this is an educational game, not an anti-cheat competition.
+
+## Technical details
+
+The site uses plain HTML, CSS and JavaScript without an account, a server-side API or a build step.
+
+| File | Purpose |
+| --- | --- |
+| `country-catalog.js` | The **195 unique countries**, geography, ISO codes and latitude bands |
+| `country-insights.js` | Country facts, ISO flags, source years and historical summaries |
+| `app.js` | Case state, country clues, country search, Rush, shuffle bag, map overlays and dossiers |
+| `atlas-i18n.js` | Translated country-archive labels in 19 languages |
+| `clues-i18n.js` / `country-clues-i18n.js` | Geographical and country-data clue translations |
+| `index.html`, `styles.css`, `mobile.css`, `themes.css` | Accessible responsive UI |
+| `map-bootstrap.js`, `map-fallback.js` | MapLibre/OpenStreetMap maps |
+| `tests/*.test.mjs` | Automated gameplay and compatibility checks |
+
+Run locally:
 
 ```bash
 python -m http.server 8000
-# In another terminal:
 node --test tests/*.test.mjs
 ```
 
-Open http://localhost:8000. The tests also run automatically on pushes and pull requests via GitHub Actions.
-
-## Files
-
-| File | Content |
-| --- | --- |
-| `index.html` | Single-screen UI and case report |
-| `styles.css` | Responsive investigation layout, lined evidence, map pins and report |
-| `mobile.css` | Square map and readable scrolling investigation panel for smartphones |
-| `themes.css` | Semantic dark/white palettes and contrast-safe appearance overrides |
-| `theme.js` | Localized appearance toggle, persistence, and map theme notification |
-| `places.js` | 500 cities with approximate locations |
-| `references.js` | Curated named regional reference coordinates used for distance clues |
-| `map-bootstrap.js` | Loads the vector engine from redundant CDNs and selects fallback when needed |
-| `map-fallback.js` | Loads Leaflet and adapts OpenStreetMap map interactions without WebGL |
-| `compass-i18n.js` | Cardinal directions, arrow labels, rose abbreviations and map selector labels in 19 languages |
-| `language-picker.js` | Searchable native-language list with national flags and keyboard support |
-| `facts.js` | 500 English and Portuguese location notes |
-| `i18n.js` | Main user interface translations |
-| `clues-i18n.js` | Geographic clue vocabulary and continent translations |
-| `report-i18n.js` | Case report and updated game-rule translations |
-| `app.js` | State, date-specific case IDs, clues, map, gameplay, reports |
-| `tests/smoke.test.mjs` | Automated gameplay and data integrity checks |
-
-The [GitHub Pages deployment workflow](.github/workflows/pages.yml) publishes the files to `https://f404x.github.io/cartigma/` after passing the automated tests.
-
-## Data accuracy
-
-The first 74 manually curated localities remain in their original order. A separate, static 426-city supplement was selected from the public-domain [Natural Earth 1:50m populated places](https://www.naturalearthdata.com/) dataset with additional Turkish destinations. The two European and Asian parts of Türkiye are separated by the Bosporus, Sea of Marmara and Dardanelles; Natural Earth's East Thrace polygon is assigned to Europe. Istanbul, on both sides of the straits, has a transcontinental clue. The Normal case selection heavily favors national capitals and major world cities; Hard can use the full catalogue. The additional notes describe geography rather than bespoke historical trivia.
- 
-The city center coordinates are approximate. Distances use the haversine formula, which describes straight-line distance on a sphere, **not** road distance. Physical landscape labels are simplified. Geographic comparison references draw from the city catalogue and a separately validated local reference dataset. The region-specific clue radius depends on the available locations in the catalog; this is a game-design heuristic, not an official geographic boundary. Location facts are educational descriptions, not live measurements. The vector map uses WebGL, while the fallback can work without it; both require internet access to download tiles. Not every map feature has names translated into all 19 languages.
-
-### Map outline data
-
-Continent borders are based on [Natural Earth](https://www.naturalearthdata.com/) geographic outlines via the MIT-licensed [power-bi-shape-maps world-continents topology](https://github.com/giobuzala/power-bi-shape-maps/blob/master/world-continents.json), simplified and converted to standalone GeoJSON for offline use. These are approximate geographic contours, not political border determinations.
-
-### Data provenance (country evidence and history)
-
-The optional country-data clues and the country section of the final case file are generated from a **static 165-country snapshot** (no runtime API key):
-
-- ISO flags, currencies, area, access to sea and official languages: [mledoze/countries](https://github.com/mledoze/countries).
-- GDP per capita: calculated from matched-year current-US-dollar GDP and population in [World Bank WDI GDP](https://github.com/datasets/gdp) and [WDI population](https://github.com/datasets/population). Mostly 2023, with older observations labeled by year. Population estimates also carry a year, usually 2025. These are **approximate** country-level clues, not city statistics.
-- Language family: classification of an identified official language; countries may have multiple languages/families.
-- Flag-color clue: one color attested in the historic [UCI Flags dataset](https://archive.ics.uci.edu/dataset/40/flags) and retained only where the flag record was suitable. A missing or uncertain color is never used.
-- Brief country-specific political history: milestones from the public-domain [CIA World Factbook almanac](https://github.com/factbook/factbook.json), with authored contextual notes for selected countries and special cases such as Taiwan and French Polynesia. Dates describe historical events, not current government status. Short Portuguese and English notes are available for all 165 entries.
-
-The country flag in the case file loads by ISO alpha-2 code from flagcdn.com, with an emoji fallback. Other report languages use English history text when a dedicated translation is unavailable.
-
-Every submitted hypothesis stores an absolute ISO timestamp and its elapsed time since the case opened; both are displayed in the live guess list and final dossier. Rush runs against a wall-clock deadline, so closing the tab does not reset the daily timer.
-
-The dossier displays all available country data (GDP per capita and population with reference years, area, ISO code, administrative region, currency, language family, a flag color and landlocked status). Its flag is larger and frameless. Map rotation is disabled on both touch and mouse input.
-
-- **Area-scope clarity:** every `km²` country-area clue and dossier statistic explicitly says it represents the whole **country or territory**, not the city, municipality, state or province. The source dataset does not provide subnational/city area values; all 19 supported languages use scoped labels.
-- **Case-file daily navigation:** once a daily case finishes, the dossier offers the other daily difficulty only if its same-day case has not already finished (win or loss). This respects both levels' separate saved state and immediately switches to the still-playable daily challenge. The main action in a daily result or dossier explicitly starts a new **Free Play** case; ordinary Free Play continues to use “New case.” All 19 locales are translated.
-
-### Balanced evidence and assistance prices
-
-Ten evidence slots retain the original first seven clues in their established order, separating the original two country facts (one cultural/civic, one numerical) in positions 3–7. The new 8th–10th clues add two different country facts and one unused geographic clue wherever available, without repeated clue types. The hemisphere clue appears only for Asia, Africa, South America and Oceania (continents with territory on both sides of the Equator), never for Europe or North America. Hints cost **150–500 points each** depending on precision; the price is shown on the button before purchasing. Country/terrain/flag clues are cheaper than detailed coordinate and landmark clues. Optional map overlays now cost **250 points** for the Equator hemisphere divider, **500** for a continent outline, **1,000** for the longitude sector, or **1,100** for the latitude sector. Old saved hint purchases retain their original penalty and remain counted correctly. The landlocked clue and the final case file use natural sentences instead of yes/no labels.
-
-- **Sea-access clue repair:** it has its own localized label ("Acesso ao mar"), rather than the generic "Região". The visible text comes directly from the country's landlocked boolean: "Sem acesso ao mar." or "Tem acesso ao mar." It never displays only "Sim" or "Não"; source assets are freshly fingerprinted on deployment.
-
-- **Currency names:** currency evidence now uses a **short, generic denomination** (e.g. “dólar”, “peso”, “real”, “iene”, “rupia”) rather than revealing the origin through “dólar americano” or “iene japonês”. An explicit ISO-to-denomination mapping covers the catalog's 131 currency codes; widely used denominations have translations in all 19 UI languages, while less common denominations use their short international names when a localized short name is not available. The completed case dossier and city archive retain full, localized CLDR currency names (e.g. “real brasileiro” or “iene japonês”) and the original ISO codes. The classification of country/territory currency and all other country indicators is unchanged.
-
-### Country-only gameplay and country-spanning latitude bands
-
-Normal, Hard, and Rush all target a country (ISO alpha-2), never a hidden city's exact coordinates. Normal allows 6 country guesses; Hard allows 4. A click is matched against country territory polygons, and the country name search offers the same answers. Failed country guesses are marked incorrect, unlock the next clue, and do not display misleading distances to a hidden reference city. Country-case dossiers do not expose that reference city's coordinates; historical city-based saved investigations retain their original recorded attempts and rules.
-
-Three **evidence types have been retired from new investigations**: national-capital status, distance to the national capital, and distance to the coast. The 500-city atlas retains previously sourced city facts as informational reference data.
-
-Latitude belts reflect the territorial latitude range of each country, rather than just one source city. For countries spanning several belts, the clue displays a representative belt and the number of other verified belts: for example, **Mexico: Subtropical (+1)** and **Brazil: Tropical (+2)**. The map overlay highlights *all* intersected belts. The metadata is derived from the Natural Earth low-resolution administrative boundary geometry with supplementary island coverage for Singapore and French Polynesia. Some geographically extensive countries intersect four or more belts and correctly display +3 or +4.
-
-### Statistical evidence as inequalities
-
-The five statistical clue types—country population, GDP per capita, country/territory area, urban population and urban population density—now use a **strict, rounded bound**, such as `> 180,000,000` or `< 12,000`. Each bound is derived deterministically from the underlying sourced statistic, with roughly 11–21% separation before coarse rounding. The direction and rounding are checked against the source value, preventing misleading bounds. The exact sourced numbers remain in the completed country dossier and the 500-city archive, with their available source years.
-
-### Ten clues, independent guesses
-
-Normal mode retains **6 guesses**, while Hard retains its original **4**; neither is increased by buying clues. The initial evidence remains 2 in Normal and 1 in Hard, with all remaining clues available for optional point purchases from the start. Incorrect guesses still reveal evidence at the existing pace. The first seven positions remain unchanged so that ongoing saved daily cases do not lose access to previously revealed clue and map-overlay purchases. The final report now lists all ten clues.
-
-### UTM map ruler and Hard-mode pricing
-
-Both UTM zone and UTM latitude-band evidence now offer a one-time paid **Map**
-button on Hard. Buying either displays a low-opacity geographic highlight of
-the respective UTM region and a UTM grid: real 6° zone boundaries, horizontal
-latitude-band boundaries C–X (including the 12° X band), numeric zone labels
-and band letters. The zone geometry includes the exceptions in western Norway
-and Svalbard. Purchases are stored separately, survive map-style changes and
-daily-case reloads, and do not use guesses.
-
-Hard charges **50% more** than Normal for every paid clue and existing overlay,
-with costs rounded up to the nearest 50 points. UTM zone and UTM latitude-band
-overlays have base costs 1,200/1,300 and therefore cost **1,800/1,950 points**
-on Hard. Normal-mode pricing remains unchanged. Existing charges from saved
-cases are not recalculated.
-
-### New city-specific evidence with source years
-
-Slots 8–10 now prioritize five additional conditional city-specific facts; 
-when a fact cannot be supported, an existing verified country clue fills
-its position. This avoids claiming all 500 cities have complete municipal
-statistics.
-
-- **Distance to the national capital**: 2026 rounded geodesic calculation
-  using Natural Earth 1:110m capital points. Shown only for non-capitals
-  with one unambiguous national capital; multi-capital cases are skipped.
-- **Distance to the ocean coastline**: 2026 approximate map calculation,
-  1:110m Natural Earth coastline v4.1.0. Shown only when the point is
-  inside mapped land and safely inland (>=150 km); omitted for landlocked
-  countries, missing islands and the uncertain Caspian basin.
-- **Urban population (2025)** and **urban density (2025)**: estimates of
-  URBAN AGGLOMERATIONS, not municipalities, from the UN 2025 World
-  Urbanization Prospects Degree of Urbanization tables, with rounded
-  estimates from the official 2025 report. Population currently has 20
-  curated city values; density has three. More are deliberately omitted
-  until independently verifiable, rather than reusing older natural-earth
-  urban-population projections as if they were 2025 censuses.
-- **Local UTC time zone (2026)**: IANA zone.tab cross-checks plus
-  current `Intl.DateTimeFormat` daylight-saving rules. Where the country
-  contains several zones and no verified city zone exists, omit the clue.
-
-The two distance clues now intentionally show **only an approximate value
-in km**, without naming the capital or displaying the calculation year:
-`≈ 875 km da capital` and `≈ 900 km do litoral` are examples in Portuguese.
-The calculations remain documented as 2026-vintage estimates, not official
-surveys. Population, density and time-zone clues retain their reference
-years. No additional map overlays are attached to these clues; they are
-available through the existing points-based reveal system.
-
-Sources: [Natural Earth capitals](https://www.naturalearthdata.com/downloads/110m-cultural-vectors/110m-populated-places/),
-[Natural Earth coastline](https://www.naturalearthdata.com/downloads/110m-physical-vectors/110m-coastline/),
-[IANA zone.tab](https://github.com/eggert/tz/blob/main/zone.tab),
-[UN World Urbanization Prospects 2025](https://population.un.org/wup/downloads/?tab=Cities),
-[UN Summary of Results](https://population.un.org/wup/assets/Publications/undesa_pd_2025_wup2025_summary_of_results_final.pdf)
-and [2025 UN city comparison](https://progrss.com/p/343-karachi-eleventh-biggest-city).
-
-The closest guess is underlined in the history and in the final dossier;
-ties favor the earliest closest attempt. Existing daily cases with paid
-positions 8–10 retain their original clues and prices.
-
-### Browse the 500-city archive
-
-The **list icon immediately beside “How to play”** opens a searchable city
-archive without starting a case, changing the map, revealing the daily
-answer, spending hints or consuming guesses. The picker lists all 500
-catalogue cities with country flags; searching is accent-insensitive and
-accepts city aliases, countries, ISO codes and administrative regions.
-Keyboard navigation works with the arrow, Home and End keys.
-
-Selecting a city shows its complete **known** static profile: name, country,
-flag, region, original Portuguese geographic descriptions (explicitly
-labelled as source language), coordinates, continent, capital status where
-unambiguous, physical/latitude context, hemisphere, longitude/latitude
-sectors, UTM zone and latitude band where defined, curated landmarks where
-available, 2025 urban population/density where sourced, rounded distances
-to the national capital/ocean coast for eligible cities, local IANA time
-zone where verified, the city note, national historical context, national
-currency/language family/flag color/population/year/GDP per capita/area/
-coastal access, and the **10 normal and 10 hard evidence cards** in
-collapsible sections. Unknown data are omitted, not invented. Source dates
-remain with the statistics; capital and coast distance clue values remain
-short and do not name the capital or show a year, as in gameplay.
-
-The panel works in all 19 UI languages and adapts to a compact phone
-layout. It is a separate modal archive and never mutates the active case.
-
-### Paid latitude-belt map overlays
-
-A revealed **latitude/climate** clue such as `Faixa de latitude: Equatorial`
-has its own optional Map button. The separate overlay costs **600 points
-on Normal** and **900 on Hard** (the existing 50% Hard surcharge), in addition
-to any cost for revealing the clue itself. Purchasing it does not consume
-guesses, can only be done once per case, and survives style changes and
-reopening a saved daily case. Unknown or locked clues have no purchase button.
-
-The yellow, translucent world-map highlight uses the same boundaries as
-the six existing latitude-belt labels: Equatorial (10°S–10°N), Tropical
-(10°–23.5°), Subtropical (23.5°–35°), Temperate (35°–55°),
-Subpolar (55°–66.5°) and Polar (66.5°–90°, clipped to ±85.05°
-for Web Mercator). Except Equatorial, **both northern and southern
-bands** are always highlighted, so buying the overlay does not reveal an
-otherwise unknown hemisphere. The new map source has independent cleanup
-and works with both MapLibre and Leaflet fallback.
-
-### Retired evidence: landmarks and administrative regions
-
-**New investigations (evidence revision 3)** no longer generate
-`landmark` ("Associated landmark" / "Referência conhecida") or
-`adminRegion` ("Administrative region" / "Região administrativa")
-as purchasable or automatically revealed evidence. Every city still has
-**10 distinct evidence cards**. In their place, geographic slots draw
-from the existing latitude sector or UTM latitude band, capital status,
-terrain, and the already sourced country/city information. Normal still
-offers six guesses and Hard four.
-
-The city archive continues to show curated landmarks and administrative
-regions as reference information. Its normal/hard evidence lists always
-use the new revision.
-
-Older **in-progress daily cases with guesses or previously purchased hints**
-keep their original evidence order and purchases to avoid silently swapping
-paid information. Previously saved cases that have not made a guess or bought
-a hint automatically upgrade to the new selection. No old scores are
-recalculated.
-
-### Cleaner purchased map overlays
-
-Purchased latitude belts, latitude/longitude sectors and UTM highlights now
-use **borderless, translucent yellow fills**. Their GeoJSON can still be
-split into antimeridian-safe rectangles, but neither renderer strokes the
-artificial internal boundaries. MapLibre disables fill edge antialiasing to
-avoid hairline seams; Leaflet draws the overlay polygons with `stroke:false`.
-The explicitly requested UTM coordinate grid stays available and labelled,
-but its lines are less intrusive (0.65 px, 18% opacity). The outline-only
-continent purchase and the equatorial-direction indicator retain their
-intentional line styling. Geometries, scoring, clue purchase prices and
-saved map-overlay purchases are unchanged.
+The GitHub Actions workflow tests and publishes the site to GitHub Pages, used by the custom domain [cartigma.f404x.net](https://cartigma.f404x.net/).
