@@ -87,7 +87,7 @@
   function syncMobilePanels(){
     if(!game)return;
     const mobile=isMobileScreen();
-    const waiting=isRush()&&!game.started&&!game.finished;
+    const waiting=!game.started&&!game.finished;
     // A finished case is still explorable: the map, evidence and complete
     // guess history must remain accessible after closing the final report.
     const active=mobile&&!waiting?mobilePanel:null;
@@ -142,7 +142,7 @@
   }
   function setMobilePanel(panel){
     if(!isMobileScreen()||!game)return;
-    if(isRush()&&!game.started&&!game.finished)return;
+    if(!game.started&&!game.finished)return;
     mobilePanel=mobilePanel===panel?null:panel;
     syncMobilePanels();
   }
@@ -400,9 +400,9 @@
   }
   function newGame(mode,index) {
     return {mode,index,difficulty,date:today(),serial:nextCaseNumber(),guesses:[],
-      started:difficulty!=="rush",
-      startedAt:difficulty==="rush"?null:Date.now(),endedAt:null,durationMs:null,
-      revealed:difficulty==="rush"?0:DIFFICULTIES[difficulty].initial,penalty:0,paidHints:0,
+      started:false,
+      startedAt:null,endedAt:null,durationMs:null,
+      revealed:0,penalty:0,paidHints:0,
       sectorMapPenalty:0,sectorReveals:[],evidenceVersion:6,targetKind:"country",
       finished:false,won:false,score:0};
   }
@@ -433,15 +433,91 @@
   function rushRemaining(){
     return !game?.started?RUSH_DURATION_MS:Math.max(0,RUSH_DURATION_MS-elapsedMs());
   }
-  function startRush(){
-    if(!game||!isRush()||game.finished||game.started)return;
-    game.started=true;
-    game.startedAt=Date.now();
-    game.revealed=DIFFICULTIES.rush.initial;
-    mobilePanel="clues";
-    rushCountryRequest++;
-    save();render();clockTick();
+  // All three modes use the existing Rush map start gate. A signed-in
+  // player's first attempt is automatically verified and saved by the API.
+  async function startCase(){
+    if(!game||game.finished||game.started||game.pending)return;
+    const current=game;
+    current.pending=true;
+    $("rushStartBtn").disabled=true;
+    try{
+      const ranked=await window.CartigmaRanking?.beginRanked?.({
+        mode:game.mode,difficulty
+      });
+      if(game!==current)return;
+      if(ranked){
+        current.ranked=true;
+        applyRankedState(ranked);
+      }else{
+        current.started=true;
+        current.startedAt=Date.now();
+        current.revealed=DIFFICULTIES[difficulty].initial;
+      }
+      mobilePanel="clues";
+      rushCountryRequest++;
+      save();render();clockTick();
+    }catch(error){
+      if(game===current){
+        $("rushIntroText").textContent=error.message||"Não foi possível iniciar.";
+        toast(error.message||"Não foi possível iniciar.");
+      }
+    }finally{
+      if(game===current){current.pending=false;$("rushStartBtn").disabled=false;}
+    }
   }
+  function applyRankedState(response){
+    if(!game||!game.ranked)return;
+    const previous=game.guesses||[];
+    game.rankedClues=response.clues||[];
+    game.rankedId=response.id;
+    game.started=true;
+    game.startedAt=response.startedAt;
+    game.revealed=response.revealed;
+    game.penalty=response.penalty||0;
+    game.paidHints=response.hints||0;
+    game.won=Boolean(response.won);
+    game.finished=Boolean(response.finished);
+    game.score=response.score||0;
+    game.guesses=(response.guesses||[]).map((item,i)=>{
+      const code=item.code,old=previous[i];
+      const coords=COUNTRIES[COUNTRY_CODES.indexOf(code)];
+      const point=old?.countryCode===code?old:
+        i===response.guesses.length-1&&selected?.countryCode===code?selected:null;
+      return {
+        lat:point?.lat??coords?.lat??0,lng:point?.lng??coords?.lng??0,
+        label:point?.label||displayRegion(code),countryCode:code,
+        at:new Date(response.startedAt+(item.elapsedMs||0)).toISOString(),
+        elapsedMs:item.elapsedMs||0
+      };
+    });
+    if(game.finished){
+      const index=COUNTRY_CODES.indexOf(response.target);
+      if(index<0)throw Error("Resposta inválida do servidor");
+      game.index=index;
+      game.endedAt=new Date().toISOString();
+      game.durationMs=Date.now()-game.startedAt;
+      game.revealed=EVIDENCE_COUNT;
+    }else game.index=-1; // do not disclose the target through local game state
+  }
+  async function rankedAction(action,payload={}){
+    if(!game?.ranked||game.pending||game.finished)return;
+    const current=game;
+    current.pending=true;
+    try{
+      const response=await window.CartigmaRanking.gameAction(action,payload);
+      if(game!==current)return;
+      applyRankedState(response);
+      selected=null;
+      if(isMobileScreen())mobilePanel=game.finished?null:"clues";
+      render();
+      if(game.finished)showReport();
+    }catch(error){
+      if(game===current)toast(error.message||"Erro na partida online");
+    }finally{
+      if(game===current){current.pending=false;render();}
+    }
+  }
+  let nextRankedRushStatus=0,rankedRushTimeoutPending=false;
   function updateClock(){
     if(!game)return;
     const rush=isRush(),waiting=rush&&!game.started&&!game.finished;
@@ -462,6 +538,22 @@
     if(!game)return;
     updateClock();
     if(!isRush()||game.finished||!game.started)return;
+    if(game.ranked){
+      if(game.pending)return;
+      if(rushRemaining()===0){
+        if(!rankedRushTimeoutPending){
+          rankedRushTimeoutPending=true;
+          rankedAction("finish").finally(()=>{rankedRushTimeoutPending=false;});
+        }
+        return;
+      }
+      const bucket=Math.floor(elapsedMs()/RUSH_CLUE_INTERVAL_MS);
+      if(bucket>0&&bucket>nextRankedRushStatus){
+        nextRankedRushStatus=bucket;
+        rankedAction("state");
+      }
+      return;
+    }
     if(rushRemaining()===0){
       game.finished=true;game.won=false;game.revealed=EVIDENCE_COUNT;
       game.endedAt=new Date(game.startedAt+RUSH_DURATION_MS).toISOString();
@@ -555,7 +647,7 @@
     // Rush unlocks evidence by time and never offers purchasable overlays.
     if(isRush())return;
     const cost=overlayCost(clue.key);
-    if(game.finished||!map||!mapStyleReady||!cost)return;
+    if(game.ranked||game.finished||!game.started||!map||!mapStyleReady||!cost)return;
     if(clue.key==="continent"&&!CONTINENT_BORDERS[continentKey(game.index)])return;
     if(!cluesFor(game.index,difficulty).slice(0,game.revealed).some(item=>
       item.key===clue.key&&(
@@ -597,19 +689,42 @@
     toast(tc(message,{cost:number(cost)}));
   }
   function nextHintCost(){
+    if(game?.ranked)return difficulty==="hard"?450:300;
     if(!game||game.finished||isRush()||game.revealed>=EVIDENCE_COUNT)return 0;
     const clue=cluesFor(game.index,difficulty)[game.revealed];
     return pricedCost(HINT_PRICES[clue?.key]??HINT_COST);
   }
   function renderClues(){
     const list=$("clueList");list.replaceChildren();
-    const waiting=isRush()&&!game.started&&!game.finished;
+    const waiting=!game.started&&!game.finished;
     list.classList.toggle("hidden",waiting);
     if(waiting){
       $("hintCount").textContent="0 / "+EVIDENCE_COUNT;
       $("revealBtn").disabled=true;
       $("revealBtn").classList.add("hidden");
       return; // No categories, locked types or first evidence leak pre-start.
+    }
+    if(game.ranked){
+      const clues=game.rankedClues||[];
+      $("hintCount").textContent=clues.length+" / "+EVIDENCE_COUNT;
+      for(let i=0;i<EVIDENCE_COUNT;i++){
+        const row=document.createElement("li");
+        row.className="clue"+(i>=clues.length?" locked":"");
+        if(i===clues.length-1)row.classList.add("latest");
+        const idx=document.createElement("span");idx.className="clue-index";
+        idx.textContent=String(i+1).padStart(2,"0");
+        const body=document.createElement("span");body.className="clue-body";
+        const category=document.createElement("span");category.className="clue-category";
+        category.textContent=i<clues.length?clues[i].label:t("locked");
+        const value=document.createElement("span");value.className="clue-text";
+        value.textContent=i<clues.length?clues[i].value:t("locked");
+        body.append(category,value);row.append(idx,body);list.append(row);
+      }
+      $("revealBtn").disabled=game.pending||game.finished||isRush()||clues.length>=EVIDENCE_COUNT;
+      $("revealCost").textContent=game.finished||clues.length>=EVIDENCE_COUNT?"":"−"+number(nextHintCost());
+      $("revealBtn").classList.toggle("hidden",game.finished||isRush());
+      syncMobilePanels();
+      return;
     }
     const clues=cluesFor(game.index,difficulty);
     const revealed=game.revealed;
@@ -1002,10 +1117,10 @@
       const item=document.createElement("li");item.textContent=t("reportNoGuesses");log.append(item);
     }
     const evidence=$("reportEvidenceList");evidence.replaceChildren();
-    cluesFor(game.index,difficulty).forEach((clue,i)=>{
+    (game.ranked?game.rankedClues:cluesFor(game.index,difficulty)).forEach((clue,i)=>{
       const item=document.createElement("li");item.className="report-evidence-row";
       const n=document.createElement("span");n.textContent=String(i+1).padStart(2,"0");
-      const value=document.createElement("span");value.textContent=clueText(clue);
+      const value=document.createElement("span");value.textContent=game.ranked?clue.label+": "+clue.value:clueText(clue);
       item.append(n,value);evidence.append(item);
     });
   }
@@ -1066,7 +1181,7 @@
     const code=caseCode();
     $("caseCode").textContent=code;
     $("caseNumber").textContent=t("caseWord")+" "+code;
-    $("modeCaption").textContent=t(daily?"modeDaily":"modeFree");
+    $("modeCaption").textContent=t(daily?"modeDaily":"modeFree")+(game.ranked?" / RANKED":"");
     $("caseTitle").textContent=game.finished?countryName(game.index):t("unknown");
     $("caseStatus").textContent=t(game.finished?(game.won?"solved":"closed"):"active");
     $("caseStatus").classList.toggle("closed",game.finished);
@@ -1077,8 +1192,8 @@
     if(!isRush())for(let i=0;i<max;i++){const dot=document.createElement("i");dot.classList.toggle("live",i<remaining);dots.append(dot)}
     $("placeCount").textContent=String(COUNTRIES.length);
     renderClues();renderHistory();renderResult();feedback();
-    $("guessBtn").disabled=game.finished||!selected||(isRush()&&!game.started);
-    $("countrySearch").disabled=game.finished||(isRush()&&!game.started);
+    $("guessBtn").disabled=game.finished||game.pending||!selected||!game.started;
+    $("countrySearch").disabled=game.finished||!game.started||game.pending;
     $("countrySearch").placeholder=t(isCountryGame()?"rushSearchPlaceholder":"searchPlaceholder");
     $("searchLabel").textContent=t(isCountryGame()?"rushSearchLabel":"searchLabel");
     $("countrySearch").value="";
@@ -1086,11 +1201,11 @@
     $("selection").classList.toggle("hidden",game.finished);
     $("selectedText").textContent=selected?(selected.label||selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°"):t("noSelection");
     $("mapHint").textContent=t(game.finished?"mapRevealed":
-      isRush()&&!game.started?"rushIntroHint":isCountryGame()?"rushMapHint":"mapHint");
-    $("rushIntro").classList.toggle("hidden",!isRush()||game.started||game.finished);
-    $("rushIntro").setAttribute("aria-hidden",String(!isRush()||game.started||game.finished));
-    $("rushIntroTitle").textContent=t("rushIntroTitle");
-    $("rushIntroText").textContent=t("rushIntroText");
+      !game.started?"rushIntroHint":isCountryGame()?"rushMapHint":"mapHint");
+    $("rushIntro").classList.toggle("hidden",game.started||game.finished);
+    $("rushIntro").setAttribute("aria-hidden",String(game.started||game.finished));
+    $("rushIntroTitle").textContent=isRush()?t("rushIntroTitle"):t(difficulty);
+    $("rushIntroText").textContent=isRush()?t("rushIntroText"):t(daily?"modeDaily":"modeFree");
     $("rushStartBtn").textContent=t("rushStart");
     updateClock();renderMap();
     syncMobilePanels();
@@ -1446,7 +1561,7 @@
     // reconfigured, including on style reloads and Rush clue unlocks.
     syncCasePins();
     clearMapOverlays();
-    if(!isRush()){
+    if(!isRush()&&!game.ranked){
       drawSectorOverlays();
       drawLatitudeBeltOverlay();
       drawUtmOverlays();
@@ -1561,9 +1676,9 @@
       })();
       return;
     }
-    if(game.finished)return;
+    if(game.finished||!game.started)return;
     if(isCountryGame()){
-      if(isRush()&&!game.started)return;
+      if(!game.started)return;
       selectCountryPoint(Number(lat),Number(lng));
       return;
     }
@@ -1576,7 +1691,8 @@
     renderMap();
   }
   function reveal(){
-    if(game.finished||isRush()||game.revealed>=EVIDENCE_COUNT)return;
+    if(game?.ranked){rankedAction("reveal");return;}
+    if(game.finished||!game.started||isRush()||game.revealed>=EVIDENCE_COUNT)return;
     const cost=nextHintCost();
     if(!cost)return;
     if(!Number.isInteger(game.paidHints))
@@ -1587,7 +1703,11 @@
     save();renderClues();toast(t("hintUsed",{cost:number(cost)}));
   }
   function guess(){
-    if(isRush()&&!game?.started)return;
+    if(!game?.started)return;
+    if(game.ranked){
+      if(!selected?.countryCode)return;
+      rankedAction("guess",{code:selected.countryCode});return;
+    }
     clockTick();
     if(!selected||game.finished||!selected.countryCode)return;
     const now=Date.now(),elapsed=Math.max(0,now-game.startedAt);
@@ -1976,7 +2096,7 @@
     },pointerOptions);
     map.on("click",event=>{
       // A drag release must never be interpreted as a fresh pin.
-      if(game.finished||pointerMoved||Date.now()-lastDragAt<220)return;
+      if(game.finished||!game.started||pointerMoved||Date.now()-lastDragAt<220)return;
       selectPoint(event.lngLat.lat,event.lngLat.lng,"");
     });
   }
@@ -2003,7 +2123,7 @@
     window.addEventListener?.("geodetective:themechange",updateMapTheme);
     $("revealBtn").addEventListener("click",reveal);
     $("guessBtn").addEventListener("click",guess);
-    $("rushStartBtn").addEventListener("click",startRush);
+    $("rushStartBtn").addEventListener("click",startCase);
     $("mobileEvidenceBtn").addEventListener("click",()=>setMobilePanel("clues"));
     $("mobileGuessBtn").addEventListener("click",()=>setMobilePanel("guess"));
     $("mobileReportBtn").addEventListener("click",()=>{
@@ -2056,7 +2176,7 @@
     });
     $("countrySearch").addEventListener("keydown",e=>{
       if(e.isComposing||e.keyCode===229||game.finished||
-        (isRush()&&!game.started))return;
+        !game.started)return;
       if(e.key==="Escape"){
         hideSuggestions();
         return;
