@@ -1260,7 +1260,10 @@
       const id="case-sector-"+clue.key;
       map.addSource(id,{type:"geojson",data:{type:"Feature",properties:{},geometry}});
       map.addLayer({id,type:"fill",source:id,
-        paint:{"fill-color":"#ffd449","fill-opacity":0.10,"fill-outline-color":"#ffd449"}});
+        // Do not stroke the artificial 60° tile edges of geographic overlays.
+        // Disabling fill antialiasing removes hairline seams between tiles.
+        paint:{"fill-color":"#ffd449","fill-opacity":0.10,
+          "fill-antialias":false}});
     }
   }
   function drawLatitudeBeltOverlay(){
@@ -1277,7 +1280,7 @@
       geometry:{type:"MultiPolygon",coordinates}}});
     map.addLayer({id,type:"fill",source:id,
       paint:{"fill-color":"#ffd449","fill-opacity":0.10,
-        "fill-outline-color":"#ffd449"}});
+        "fill-antialias":false}});
   }
   // UTM grid spans 80°S–84°N. Bands C–W are 8° high; X is 12°.
   // Norway's 32V and Svalbard's 31X/33X/35X/37X boundaries are irregular.
@@ -1322,7 +1325,7 @@
       map.addSource(id,{type:"geojson",data:{type:"Feature",properties:{},geometry}});
       map.addLayer({id,type:"fill",source:id,
         paint:{"fill-color":"#ffd449","fill-opacity":opacity,
-          "fill-outline-color":"#ffd449"}});
+          "fill-antialias":false}});
     };
     if(purchased.includes("utmZone")&&zoneClue)
       addShape("case-utm-zone",{type:"MultiPolygon",coordinates:
@@ -1348,8 +1351,8 @@
     map.addSource("case-utm-grid",{type:"geojson",data:{type:"Feature",
       properties:{},geometry:{type:"MultiLineString",coordinates:lines}}});
     map.addLayer({id:"case-utm-grid",type:"line",source:"case-utm-grid",
-      paint:{"line-color":"#ffd449","line-width":0.8,
-        "line-opacity":0.36,"line-dasharray":[2,3]}});
+      paint:{"line-color":"#ffd449","line-width":0.65,
+        "line-opacity":0.18,"line-dasharray":[2,3]}});
     // Numbered zones and lettered latitude bands make the overlay a readable
     // geographic ruler, rather than an unlabeled highlighted rectangle.
     const annotations=[];

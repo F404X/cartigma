@@ -69,7 +69,7 @@ test("both keyless vector and fallback raster scripts are included in Pages",()=
   assert.match(app,/switchToFallback/);
   assert.match(app,/mapStyleTimeout/);
   assert.match(app,/typeof libre\.supported==="function"/);
-  assert.ok(html.includes('src="map-fallback.js?v=20261116-utm-ruler"'));
+  assert.ok(html.includes('src="map-fallback.js?v=20261117-clean-overlays"'));
   assert.match(html,/leaflet@1\.9\.4\/dist\/leaflet\.css/);
   assert.match(workflow,/map-fallback\.js/);
 });
@@ -85,7 +85,8 @@ test("raster fallback renders UTM grids and labels with cleanup",async()=>{
   map.addLayer({id:"case-utm-grid",source:"case-utm-grid",type:"line"});
   assert.equal(state.polygons.length,1);
   assert.equal(state.polygons[0].options.style.fill,undefined);
-  assert.equal(state.polygons[0].options.style.opacity,.36);
+  assert.equal(state.polygons[0].options.style.opacity,.18);
+  assert.equal(state.polygons[0].options.style.weight,.65);
   map.addSource("case-utm-annotations",{data:{type:"FeatureCollection",features:[
     {type:"Feature",properties:{label:"32"},geometry:{type:"Point",coordinates:[9,0]}},
     {type:"Feature",properties:{label:"S"},geometry:{type:"Point",coordinates:[9,36]}}
@@ -100,6 +101,27 @@ test("raster fallback renders UTM grids and labels with cleanup",async()=>{
   assert.equal(state.groups[0].markers.length,2);
 });
 
+test("Leaflet fallback renders adjacent geographic fills without polygon seams",async()=>{
+  const {leaflet,state}=mockLeaflet(),window={L:leaflet};
+  runInNewContext(source,{window,document:{},Promise,Map,queueMicrotask,console});
+  const lib=await window.GeoMapFallback.ensure();
+  const map=new lib.Map({container:"map",center:[0,0],zoom:3});
+  const geometry={type:"MultiPolygon",coordinates:[
+    [[[-180,-10],[-120,-10],[-120,10],[-180,10],[-180,-10]]],
+    [[[-120,-10],[-60,-10],[-60,10],[-120,10],[-120,-10]]]
+  ]};
+  for(const [id,alpha] of [["case-latitude-belt",.10],["case-utm-band",.085],
+    ["case-sector-latitude",.10],["case-utm-zone",.10]]){
+    map.addSource(id,{data:{geometry}});
+    map.addLayer({id,source:id,type:"fill",paint:{"fill-color":"#ffd449","fill-opacity":alpha}});
+    const style=state.polygons.at(-1).options.style;
+    assert.equal(style.stroke,false,id+" must not outline the 60-degree seams");
+    assert.equal(style.fillColor,"#ffd449",id);
+    assert.equal(style.fillOpacity,alpha,id);
+    assert.equal(style.interactive,false,id);
+  }
+  assert.equal(state.polygons.length,4);
+});
 test("Leaflet fallback restores map, markers, line and click coordinates",async()=>{
   const {leaflet,state}=mockLeaflet();
   const window={L:leaflet};
@@ -138,6 +160,8 @@ test("Leaflet fallback restores map, markers, line and click coordinates",async(
   assert.equal(state.polygons.length,1);
   assert.equal(state.polygons[0].options.style.fillColor,"#ffd449");
   assert.equal(state.polygons[0].options.style.fillOpacity,0.10);
+  assert.equal(state.polygons[0].options.style.stroke,false,
+    "A transparent polygon fill should not draw a border");
   map.addLayer({id:"case-hemisphere-arrows",source:"case-hemisphere-line",
     type:"symbol",layout:{"text-field":"↑","symbol-spacing":88}});
   assert.equal(state.polygons.length,1);

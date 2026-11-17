@@ -1497,7 +1497,7 @@ test("a correct fifth guess in Cape Town has no distance or bearing in history o
 });
 
 test("fresh deployments fingerprint both game engine and translated clues",()=>{
-  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-retired-clues"'));
+  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261117-clean-overlays"'));
   assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-profile-diversity"'));
   assert.ok(files["map-bootstrap.js"].includes('new URL(import.meta.url).searchParams.get("v")'));
   assert.ok(files["app.js"].includes("function guessMetricText(g)"));
@@ -1556,7 +1556,8 @@ test("paid UTM zone draws correct Norwegian and Svalbard exceptions with labeled
     const labels=g.mapState.sources.get("case-utm-annotations").data.features;
     assert.equal(labels.length,60);
     assert.ok(labels.some(f=>f.properties.label===String(expectedZone)));
-    assert.equal(g.mapState.layers.get("case-utm-grid").paint["line-opacity"],.36);
+    assert.equal(g.mapState.layers.get("case-utm-grid").paint["line-opacity"],.18);
+    assert.equal(g.mapState.layers.get("case-utm-grid").paint["line-width"],.65);
     assert.equal(g.mapState.layers.get("case-utm-zone").paint["fill-opacity"],.10);
     assert.equal(g.mapState.fits.length>0,true);
     button.handlers.click();
@@ -1738,6 +1739,48 @@ test("paid latitude-zone overlays persist across daily case reloads and map-styl
     "New case must not inherit the previous difficulty's overlay");
 });
 
+test("all purchased region fills have no internal outlines or edge seams",()=>{
+  const places=boot().window.GEODETECTIVE_PLACES;
+  const cases=[
+    {name:"Taipé",level:"normal",clues:[
+      ["Longitude sector:","case-sector-longitude"],
+      ["Latitude sector:","case-sector-latitude"]
+    ]},
+    {name:"Lagos",level:"normal",clues:[
+      ["Latitude belt:","case-latitude-belt"]
+    ]},
+    {name:"Oslo",level:"hard",clues:[
+      ["UTM zone:","case-utm-zone"],
+      ["UTM latitude band:","case-utm-band"]
+    ]}
+  ];
+  const checked=[];
+  for(const item of cases){
+    const index=places.findIndex(p=>p[0]===item.name);
+    assert.ok(index>=0,item.name+" missing");
+    const g=boot({map:true,randomValue:(index+.25)/places.length});
+    g.difficulty(item.level);g.get("freeBtn").handlers.click();
+    for(const [prefix,layerId] of item.clues){
+      const {button}=unlockClue(g,new RegExp("^"+prefix));
+      assert.ok(button&&!button.disabled,"Missing paid overlay "+layerId);
+      button.handlers.click();
+      const layer=g.mapState.layers.get(layerId);
+      assert.equal(layer?.type,"fill",layerId);
+      assert.equal(layer.paint["fill-color"],"#ffd449",layerId);
+      assert.ok(layer.paint["fill-opacity"]>0&&layer.paint["fill-opacity"]<=.10,layerId);
+      assert.equal(layer.paint["fill-antialias"],false,layerId+" should suppress seams");
+      assert.equal(Object.hasOwn(layer.paint,"fill-outline-color"),false,layerId+
+        " should not stroke boundaries between adjacent GeoJSON polygons");
+      checked.push(layerId);
+    }
+    if(item.level==="hard"){
+      const ruler=g.mapState.layers.get("case-utm-grid");
+      assert.equal(ruler.paint["line-opacity"],.18);
+      assert.equal(ruler.paint["line-width"],.65);
+    }
+  }
+  assert.equal(checked.length,5);
+});
 test("paid longitude sector remains available regardless of shuffled evidence order",()=>{
   const places=boot().window.GEODETECTIVE_PLACES;
   const index=places.findIndex(p=>p[0]==="Taipé");

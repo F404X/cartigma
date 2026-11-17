@@ -247,3 +247,16 @@ keep their original evidence order and purchases to avoid silently swapping
 paid information. Previously saved cases that have not made a guess or bought
 a hint automatically upgrade to the new selection. No old scores are
 recalculated.
+
+### Cleaner purchased map overlays
+
+Purchased latitude belts, latitude/longitude sectors and UTM highlights now
+use **borderless, translucent yellow fills**. Their GeoJSON can still be
+split into antimeridian-safe rectangles, but neither renderer strokes the
+artificial internal boundaries. MapLibre disables fill edge antialiasing to
+avoid hairline seams; Leaflet draws the overlay polygons with `stroke:false`.
+The explicitly requested UTM coordinate grid stays available and labelled,
+but its lines are less intrusive (0.65 px, 18% opacity). The outline-only
+continent purchase and the equatorial-direction indicator retain their
+intentional line styling. Geometries, scoring, clue purchase prices and
+saved map-overlay purchases are unchanged.

@@ -133,7 +133,7 @@
           update();
         }else if(geo?.type==="MultiLineString"&&layer.type==="line"){
           const grid=L.geoJSON({type:"Feature",properties:{},geometry:geo},{
-            style:{color:"#ffd449",weight:0.8,opacity:.36,
+            style:{color:"#ffd449",weight:0.65,opacity:.18,
               dashArray:"3 4",interactive:false}
           }).addTo(this.root);
           this._layers.set(layer.id,grid);
@@ -148,8 +148,10 @@
           const style=outline?
             {color:"#ffd449",weight:1.7,opacity:.28,fill:false,
               fillOpacity:0,interactive:false}:
-            {color:"#ffd449",weight:1,opacity:.45,fillColor:"#ffd449",
-              fillOpacity:0.10,interactive:false};
+            // No stroke: a MultiPolygon is split into multiple artificial
+            // rectangles. Stroking each tile drew distracting vertical lines.
+            {stroke:false,fillColor:layer.paint?.["fill-color"]||"#ffd449",
+              fillOpacity:layer.paint?.["fill-opacity"]??0.10,interactive:false};
           const polygon=L.geoJSON({type:"Feature",properties:{},geometry:geo},{
             style
           }).addTo(this.root);
