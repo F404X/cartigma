@@ -72,6 +72,12 @@ jobs:
           JS
       - name: Apply idempotent D1 schema
         run: npx wrangler d1 execute cartigma-ranking-staging --remote --file schema.sql --yes
+      - name: Assemble isolated playable preview
+        working-directory: .
+        run: |
+          mkdir -p preview-dist
+          cp index.html styles.css themes.css mobile.css ranking.css ranking-client.js ranking-panel.html theme.js app.js country-catalog.js continent-borders.js atlas-i18n.js country-insights.js country-clues-i18n.js currency-denominations.js country-profile-i18n.js map-filters-i18n.js map-bootstrap.js map-fallback.js language-picker.js i18n.js clues-i18n.js compass-i18n.js report-i18n.js favicon.svg sitemap.xml robots.txt preview-dist/
+          touch preview-dist/.nojekyll
       - name: Deploy Worker to workers.dev staging
         run: npx wrangler deploy
       - name: Initialize missing Worker secrets without rotating existing ones
