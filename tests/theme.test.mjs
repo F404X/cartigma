@@ -113,7 +113,7 @@ test("vector map follows dark/light appearance while keeping keyless OpenStreetM
 test("mobile header list icon is not followed by a duplicate question mark",()=>{
   // Before this fix a generic .header-button::after rule injected '?' below
   // the inline SVG in the country-list button on phones.
-  const small=stylesheet.match(/@media\(max-width:520px\)\{([\s\S]*?)\n\}/)?.[1]||"";
+  const small=stylesheet.slice(stylesheet.indexOf("@media(max-width:520px){"),stylesheet.indexOf("@media(max-width:390px){",stylesheet.indexOf("@media(max-width:520px){")));
   assert.ok(small,"Mobile header media query should be present");
   assert.match(small,/#helpBtn::after\{content:"\?"/);
   assert.match(small,/\.atlas-trigger::after\{content:none\}/);
