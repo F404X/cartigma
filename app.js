@@ -88,7 +88,14 @@
     if(!game)return;
     const mobile=isMobileScreen();
     const waiting=isRush()&&!game.started&&!game.finished;
-    const active=mobile&&!waiting&&!game.finished?mobilePanel:null;
+    // A finished case is still explorable: the map, evidence and complete
+    // guess history must remain accessible after closing the final report.
+    const active=mobile&&!waiting?mobilePanel:null;
+    $("mobilePanelTabs").classList.toggle("finished",game.finished);
+    $("mobileReportBtn").hidden=!game.finished;
+    $("mobileReportBtn").disabled=!game.finished;
+    $("mobileReportBtn").setAttribute("aria-label",t("openReport"));
+    $("mobileGuessPanel").classList.toggle("mobile-case-finished",game.finished);
     for(const [kind,panelId,buttonId] of [
       ["clues","mobileEvidencePanel","mobileEvidenceBtn"],
       ["guess","mobileGuessPanel","mobileGuessBtn"]
@@ -1985,6 +1992,9 @@
     $("rushStartBtn").addEventListener("click",startRush);
     $("mobileEvidenceBtn").addEventListener("click",()=>setMobilePanel("clues"));
     $("mobileGuessBtn").addEventListener("click",()=>setMobilePanel("guess"));
+    $("mobileReportBtn").addEventListener("click",()=>{
+      if(game?.finished)showReport();
+    });
     $("resetViewBtn").addEventListener("click",resetMapView);
     $("mapVectorBtn").addEventListener("click",()=>setMapStyle("vector"));
     $("mapOsmBtn").addEventListener("click",()=>setMapStyle("osm"));
@@ -1995,6 +2005,11 @@
     $("reportCloseBtn").addEventListener("click",closeReport);
     $("reportMapBtn").addEventListener("click",()=>{
       closeReport();
+      if(isMobileScreen()){
+        // Leave the map unobstructed, with all three bottom controls usable.
+        mobilePanel=null;
+        syncMobilePanels();
+      }
       // Normal, Hard and Rush all reveal a country-answer marker. Make sure
       // 'View map' always takes the player to it, including tiny Lesotho.
       if(game.finished&&map){
