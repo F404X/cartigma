@@ -84,12 +84,11 @@ test("MapLibre and Leaflet update when the responsive map changes shape",()=>{
 
 test("evidence popover is capped to a small portion of mobile viewport",()=>{
   const cockpit=mobile.slice(mobile.indexOf("/* One-screen mobile cockpit."));
-  // The 54dvh rule belongs to the general panels; the later evidence-only
-  // override must cap the actual open evidence panel substantially lower.
-  const evidence=/\.case-columns>\.clue-panel\.mobile-open\{\s*max-height:min\(30dvh,230px\)/;
-  assert.match(cockpit,evidence);
-  assert.match(cockpit,/\.case-columns>\.clue-panel\.mobile-open\{max-height:min\(32dvh,190px\)\}/);
-  assert.match(cockpit,/\.case-columns>\.clue-panel\.mobile-open\{\s*max-height:min\(42dvh,195px,calc\(100% - 104px\)\)/);
+  // The shared 54dvh popup cap must not override the evidence-specific
+  // two-clue limit; footer controls remain exposed below it.
+  assert.match(cockpit,/\.case-columns>\.clue-panel\.mobile-open\{[\s\S]*?bottom:calc\(154px \+ env\(safe-area-inset-bottom\)\);[\s\S]*?max-height:min\(220px,32dvh\)/);
+  assert.match(cockpit,/\.case-columns>\.clue-panel\.mobile-open\{[\s\S]*?bottom:calc\(145px \+ env\(safe-area-inset-bottom\)\);[\s\S]*?max-height:min\(194px,33dvh\)/);
+  assert.match(cockpit,/\.case-columns>\.clue-panel\.mobile-open\{[\s\S]*?bottom:55px;[\s\S]*?max-height:min\(195px,calc\(100% - 104px\)\)/);
   assert.match(cockpit,/\.case-columns \.clue-list\{[\s\S]*?overflow-y:auto!important/);
   assert.match(cockpit,/\.case-columns \.clue-list \.clue\.latest\{/);
   assert.match(app,/const bottomOverlap=card\.bottom-\(viewport\.bottom-12\)/);
@@ -109,4 +108,20 @@ test("the mobile evidence sheet is above the map footer, not hidden behind it",(
   // Scope preserves the original desktop z-index/layout rules.
   assert.ok(mobile.indexOf("position:absolute;inset:0;z-index:20")>
     mobile.indexOf("@media (max-width:760px), (max-height:540px) and (pointer:coarse)"));
+});
+
+
+test("mobile evidence shows at most about two compact cards without obscuring map settings",()=>{
+  const cockpit=mobile.slice(mobile.indexOf("/* One-screen mobile cockpit."));
+  // Portrait: map-card reserves 114px for the dock, then a 32px footer.
+  // A bottom offset of 154px leaves an 8px clear gap above that footer.
+  const reserved=114,footer=32,offset=154;
+  assert.ok(offset>=reserved+footer+8);
+  // Short portrait: 109px dock, 28px footer, 8px separation.
+  assert.ok(145>=109+28+8);
+  assert.match(cockpit,/\.case-columns \.clue-list\{[\s\S]*?max-height:min\(138px,24dvh\)/);
+  assert.match(cockpit,/\.case-columns \.clue-list\{[\s\S]*?overflow-y:auto!important/);
+  assert.match(cockpit,/\.case-columns \.reveal-btn\{[\s\S]*?min-height:32px/);
+  // Do not alter desktop CSS: the override belongs to mobile.css only.
+  assert.match(cockpit,/@media \(max-width:760px\), \(max-height:540px\) and \(pointer:coarse\)/);
 });

@@ -651,9 +651,14 @@
   /* Evidence is a small bottom sheet, not a half-screen wall over the map.
      Only the clue list scrolls; the heading and hint action remain visible. */
   .case-columns>.clue-panel.mobile-open{
-    max-height:min(30dvh,230px);
+    /* The footer starts 146px above the viewport bottom (114px reserved
+       dock + 32px map controls). Position the entire sheet above it,
+       keeping a visible 8px gap and the footer controls unobstructed. */
+    bottom:calc(154px + env(safe-area-inset-bottom));
+    /* Enough for the header and about two compact clue cards. Other clues
+       remain scrollable within the list, not in an ever-growing sheet. */
+    max-height:min(220px,32dvh);
     overflow:hidden;
-    /* Keep the whole sheet, including its last line, above the map footer. */
     isolation:isolate;
   }
   .case-columns>.guess-panel.mobile-open{
@@ -669,7 +674,7 @@
   .case-columns .section-heading>span{font-size:11px}
   .case-columns .clue-list{
     display:flex;flex:1 1 auto;flex-direction:column;
-    height:auto;min-height:0;max-height:min(41dvh,344px);
+    height:auto;min-height:0;max-height:min(138px,24dvh);
     gap:2px;overflow-y:auto!important;overflow-x:hidden;
     -webkit-overflow-scrolling:touch;
     overscroll-behavior-y:contain;scrollbar-width:thin;
@@ -699,8 +704,8 @@
     padding:5px 7px;min-height:32px;
   }
   .case-columns .reveal-btn{
-    flex:0 0 auto;min-height:39px;
-    margin-top:8px;padding:7px 10px;font-size:12px;
+    flex:0 0 auto;min-height:32px;
+    margin-top:5px;padding:5px 9px;font-size:11px;
   }
   .case-columns .search-label{
     flex:0 0 auto;font-size:11px;margin:0 0 6px;
@@ -800,7 +805,11 @@
     padding:8px 10px;
   }
   .case-columns>.guess-panel.mobile-open{max-height:min(57dvh,330px)}
-  .case-columns>.clue-panel.mobile-open{max-height:min(32dvh,190px)}
+  .case-columns>.clue-panel.mobile-open{
+    /* 109px bottom dock + 28px footer + 8px separation. */
+    bottom:calc(145px + env(safe-area-inset-bottom));
+    max-height:min(194px,33dvh);
+  }
   .map-card{padding-bottom:calc(109px + env(safe-area-inset-bottom))}
   .compass-rose{bottom:calc(145px + env(safe-area-inset-bottom))}
   .rush-intro{inset:72px 0 calc(137px + env(safe-area-inset-bottom))}
@@ -831,9 +840,11 @@
   }
   .case-columns>.guess-panel.mobile-open{max-height:calc(100% - 104px)}
   .case-columns>.clue-panel.mobile-open{
-    max-height:min(42dvh,195px,calc(100% - 104px));
+    /* Landscape uses the side dock; do not apply portrait footer offset. */
+    bottom:55px;
+    max-height:min(195px,calc(100% - 104px));
   }
-  .case-columns .clue-list{max-height:100%}
+  .case-columns .clue-list{max-height:min(138px,100%)}
   .map-bottom{flex-basis:28px}
   .compass-rose{bottom:57px}
   .rush-intro{inset:72px 0 28px}
