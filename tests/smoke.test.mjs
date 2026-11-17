@@ -659,3 +659,114 @@ test("None of the 195 source profiles reuse history as separate trivia",()=>{
     }
   }
 });
+
+
+test("Rush has no purchasable evidence overlays, including on old saved cases",()=>{
+  const Clock=fakeClock();
+  const storage=new Map();
+  const initial=boot({clock:Clock,map:true,storage}),$=initial.get;
+  initial.difficulty("rush");
+  $("rushStartBtn").click();
+  const key=CATALOG_KEY+"2026-11-17-rush";
+  const saved=JSON.parse(storage.get(key));
+  assert.equal(saved.revealed,1);
+  assert.ok($("clueList").children.length>0);
+  assert.equal($("clueList").children.filter(row=>
+    row.children[1]?.children?.some(child=>
+      child.className?.includes("sector-map-btn"))).length,0);
+  assert.equal($("revealBtn").classList.contains("hidden"),true);
+  saved.sectorReveals=["zone","longitude","utmZone","utmBand","hemisphere","continent"];
+  storage.set(key,JSON.stringify(saved));
+  storage.set("geodetective-difficulty",JSON.stringify("rush"));
+  const reloaded=boot({clock:Clock,map:true,storage}),layers=reloaded.mapState.layers;
+  assert.ok(![...layers.keys()].some(id=>id.startsWith("case-")),
+    "Old saved Rush overlays must not be rendered");
+  Clock.ms+=54000;reloaded.tick();
+  const $r=reloaded.get;
+  assert.equal($r("hintCount").textContent,"10 / 10");
+  assert.equal($r("clueList").children.length,10);
+  assert.ok($r("clueList").children.every(row=>
+    !row.children[1]?.children?.some(child=>
+      child.className?.includes("sector-map-btn"))));
+});
+
+test("Normal and Hard still offer overlay buttons for available clues",()=>{
+  for(const level of ["normal","hard"]){
+    const g=boot({map:true}),$=g.get;
+    g.difficulty(level);
+    // Evidence starts with the continent/latitude, which can be mapped.
+    assert.ok($("clueList").children.some(row=>
+      row.children[1]?.children?.some(child=>
+        child.className?.includes("sector-map-btn"))),
+      level+" must keep optional overlays");
+  }
+});
+
+test("Mobile controls toggle compact evidence/guess windows and update counts",()=>{
+  const g=boot({mobile:true,map:true}),$=g.get;
+  assert.equal($("mobileEvidenceBtn").attributes["aria-expanded"],"true");
+  assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),true);
+  assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),false);
+  assert.equal($("mobileEvidencePreview").textContent,"2 / 10");
+  assert.equal($("mobileGuessPreview").textContent,"0 / 6");
+  $("mobileGuessBtn").click();
+  assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),false);
+  assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),true);
+  assert.equal($("mobileGuessBtn").attributes["aria-expanded"],"true");
+  $("mobileGuessBtn").click();
+  assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),false);
+  $("mobileEvidenceBtn").click();
+  assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),true);
+  const target=g.window.CartigmaCountries[Math.floor(.42*195)];
+  const wrong=g.window.CartigmaCountries.find(c=>c.code!==target.code);
+  g.select(wrong.name);
+  $("guessBtn").click();
+  assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),true);
+  assert.equal($("mobileEvidencePreview").textContent,"3 / 10");
+  assert.equal($("mobileGuessPreview").textContent,"1 / 6");
+});
+
+test("Mobile Rush reveals no clues before Start and shows evidence popup after Start",()=>{
+  const Clock=fakeClock();
+  const g=boot({mobile:true,clock:Clock,map:true}),$=g.get;
+  g.difficulty("rush");
+  assert.equal($("mobileEvidenceBtn").disabled,true);
+  assert.equal($("mobileGuessBtn").disabled,true);
+  assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),false);
+  assert.equal($("mobileEvidencePreview").textContent,"0 / 10");
+  $("mobileEvidenceBtn").click();
+  $("mobileGuessBtn").click();
+  assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),false);
+  assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),false);
+  $("rushStartBtn").click();
+  assert.equal($("mobileEvidenceBtn").disabled,false);
+  assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),true);
+  assert.equal($("mobileEvidencePreview").textContent,"1 / 10");
+  Clock.ms+=6000;g.tick();
+  assert.equal($("mobileEvidencePreview").textContent,"2 / 10");
+  $("mobileGuessBtn").click();
+  assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),true);
+  const saved=JSON.parse(g.storage.get(CATALOG_KEY+"2026-11-17-rush"));
+  const target=g.window.CartigmaCountries[saved.index];
+  const wrong=g.window.CartigmaCountries.find(c=>c.code!==target.code);
+  g.select(wrong.name);$("guessBtn").click();
+  assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),true);
+  assert.equal($("mobileGuessPreview").textContent,"1 / ∞");
+  Clock.ms+=60000;g.tick();
+  assert.equal($("reportDialog").open,true);
+  assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),false);
+  assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),false);
+});
+
+test("On desktop, both original evidence and guess panels remain available",()=>{
+  const g=boot(),$=g.get;
+  assert.equal($("mobileEvidenceBtn").attributes["aria-expanded"],"false");
+  assert.equal($("mobileGuessBtn").attributes["aria-expanded"],"false");
+  assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),false);
+  assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),false);
+  assert.ok(!$("mobileEvidencePanel").attributes["aria-hidden"]);
+  assert.ok(!$("mobileGuessPanel").attributes["aria-hidden"]);
+  // Hidden mobile-only buttons must not affect desktop behavior.
+  $("mobileGuessBtn").click();
+  assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),false);
+});

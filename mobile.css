@@ -509,3 +509,312 @@
   .map-toolbar .case-timer{flex:0 0 auto}
   .guess-timestamp{font-size:9px}
 }
+
+/* One-screen mobile cockpit. These overrides are deliberately scoped to
+   touch-sized viewports; the desktop grid and two-column panels stay intact. */
+.mobile-panel-tabs{display:none}
+@media (max-width:760px), (max-height:540px) and (pointer:coarse){
+  html,body{height:100%;overflow:hidden}
+  .app{height:100dvh;min-height:0;max-height:100dvh;overflow:hidden}
+  main{flex:1 1 0;height:auto;min-height:0;overflow:hidden}
+  .toolbar{flex:0 0 40px;height:40px;min-height:40px}
+  .game-grid{
+    display:flex;position:relative;flex:1 1 0;
+    flex-direction:column;height:auto;min-height:0;overflow:hidden;
+  }
+  .map-card{
+    position:relative;display:flex;flex:1 1 0;
+    flex-direction:column;align-items:stretch;
+    width:100%;height:100%;min-height:0;
+    padding:0 0 calc(114px + env(safe-area-inset-bottom));
+    overflow:hidden;border-right:0;border-bottom:0;
+  }
+  .map-toolbar{flex:0 0 32px;height:32px;min-height:32px;padding-inline:10px}
+  .map-status{min-width:0;max-width:76%;font-size:10px}
+  #map{
+    display:block;flex:1 1 0;
+    width:100%;height:0!important;min-height:0;
+    aspect-ratio:auto;align-self:stretch;
+  }
+  .map-bottom{
+    flex:0 0 32px;height:32px;min-height:32px;
+    padding-inline:9px;gap:6px;
+  }
+  .compass-rose{
+    bottom:calc(153px + env(safe-area-inset-bottom));
+    right:10px;width:57px;height:57px;
+  }
+  .compass-rose .compass-art{top:11px;left:11px;width:35px;height:35px}
+  .compass-rose>span{font-size:8px}
+  .rush-intro{
+    inset:82px 0 calc(146px + env(safe-area-inset-bottom));
+    min-height:0;z-index:8;
+  }
+  .rush-intro-card{
+    padding:clamp(9px,3dvh,20px) 16px;
+    gap:7px;max-height:100%;overflow-y:auto;
+  }
+  .rush-intro-card h2{font-size:19px}
+  .rush-intro-card p{font-size:12px}
+  .rush-intro-card .primary-btn{min-height:38px}
+  .case-card{
+    position:absolute;inset:0;z-index:7;
+    display:block;flex:none;width:100%;height:100%;
+    min-width:0;min-height:0;max-height:100%;
+    padding:0;background:transparent;
+    overflow:visible;pointer-events:none;
+  }
+  .case-header{
+    position:absolute;top:auto;left:8px;right:8px;
+    bottom:calc(61px + env(safe-area-inset-bottom));
+    z-index:8;display:flex;align-items:center;
+    width:auto;height:44px;min-height:44px;
+    padding:5px 11px;gap:8px;
+    border:1px solid var(--border-strong);border-radius:9px;
+    background:var(--surface);
+    box-shadow:0 5px 22px #0005;pointer-events:auto;
+  }
+  .case-header .case-kicker{
+    font-size:9px;line-height:1.1;margin-bottom:2px;
+  }
+  .case-header .case-title h1{
+    font-size:13px;line-height:1.15;
+    text-overflow:ellipsis;white-space:nowrap;
+  }
+  .case-header .case-status{display:none}
+  .case-header .attempts{
+    display:flex;align-items:center;justify-content:flex-end;
+    flex:0 0 auto;width:auto;gap:7px;
+  }
+  .attempts .label-muted{font-size:10px;white-space:nowrap}
+  .attempts strong{font-size:12px}
+  .case-header .attempt-dots{display:none}
+  .mobile-panel-tabs{
+    position:absolute;bottom:max(8px,env(safe-area-inset-bottom));
+    left:8px;right:8px;z-index:9;
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+    height:47px;gap:8px;pointer-events:auto;
+    direction:inherit;
+  }
+  .mobile-panel-tab{
+    display:flex;align-items:center;min-width:0;gap:9px;
+    padding:6px 10px;border-radius:11px;
+    border:1px solid var(--border-strong);
+    background:var(--surface2);color:var(--text);
+    box-shadow:0 3px 12px #0004;text-align:start;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .mobile-panel-tab svg{flex:0 0 20px;color:var(--accent)}
+  .mobile-panel-tab .mobile-tab-copy{
+    display:flex;flex:1;flex-direction:column;
+    gap:1px;min-width:0;
+  }
+  .mobile-tab-copy strong{
+    font:600 12px/1.2 var(--font);
+    overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+  }
+  .mobile-tab-copy small{font:500 10px/1.2 var(--mono);color:var(--muted)}
+  .mobile-tab-caret{
+    font-size:17px;line-height:1;color:var(--muted);
+    transition:transform .18s ease;
+  }
+  .mobile-panel-tab.active{
+    background:var(--surface3);border-color:var(--accent);
+    box-shadow:0 0 0 1px var(--accent-soft),0 6px 18px #0005;
+  }
+  .mobile-panel-tab.active .mobile-tab-caret{transform:rotate(180deg);color:var(--accent)}
+  .mobile-panel-tab:disabled{opacity:.48;cursor:not-allowed}
+  body.rush-mode .mobile-panel-tab.active{border-color:#ec4899}
+  body.rush-mode .mobile-panel-tab.active svg,
+  body.rush-mode .mobile-panel-tab.active .mobile-tab-caret{color:#ef7bb6}
+  .case-columns{
+    display:contents;direction:inherit;
+    height:auto;min-height:0;overflow:visible;
+  }
+  .case-columns>.clue-panel,.case-columns>.guess-panel{
+    position:absolute;left:8px;right:8px;top:auto;
+    bottom:calc(114px + env(safe-area-inset-bottom));
+    z-index:11;display:none;flex-direction:column;
+    width:auto;height:auto;min-height:0;min-width:0;
+    max-height:min(54dvh,450px);
+    overflow:hidden;padding:11px 12px 12px;
+    border:1px solid var(--border-strong);border-radius:13px;
+    background:var(--surface);
+    box-shadow:0 12px 42px #0009;
+    pointer-events:auto;direction:inherit;
+    touch-action:auto;
+  }
+  .case-columns>.clue-panel.mobile-open,
+  .case-columns>.guess-panel.mobile-open{display:flex}
+  .case-columns>.guess-panel.mobile-open{
+    max-height:min(62dvh,480px);
+    overflow-y:auto;overscroll-behavior-y:contain;
+    -webkit-overflow-scrolling:touch;
+  }
+  .case-columns .section-heading{
+    flex:0 0 auto;min-height:28px;
+    padding:0 1px 7px;margin:0 0 6px;gap:6px;
+  }
+  .case-columns .section-heading h2{font-size:13px}
+  .case-columns .section-heading>span{font-size:11px}
+  .case-columns .clue-list{
+    display:flex;flex:1 1 auto;flex-direction:column;
+    height:auto;min-height:0;max-height:min(41dvh,344px);
+    gap:2px;overflow-y:auto!important;overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior-y:contain;scrollbar-width:thin;
+    padding:0 2px;
+  }
+  .case-columns .clue-list .clue.locked{display:none}
+  .case-columns .clue{
+    flex:0 0 auto;min-height:0;display:grid;
+    grid-template-columns:20px minmax(0,1fr);
+    gap:7px;padding:8px 7px;
+    border-left-width:2px;
+  }
+  .case-columns .clue-index{font-size:10px}
+  .case-columns .clue-category{font-size:9px;letter-spacing:.4px}
+  .case-columns .clue-text{
+    font-size:12px;line-height:1.35;overflow-wrap:anywhere;
+    display:block;-webkit-line-clamp:unset;
+  }
+  .case-columns .sector-map-btn{
+    padding:5px 7px;min-height:32px;
+  }
+  .case-columns .reveal-btn{
+    flex:0 0 auto;min-height:39px;
+    margin-top:8px;padding:7px 10px;font-size:12px;
+  }
+  .case-columns .search-label{
+    flex:0 0 auto;font-size:11px;margin:0 0 6px;
+  }
+  .case-columns .search-wrap{flex:0 0 auto;position:relative}
+  .case-columns .search-wrap input{
+    height:43px;min-height:43px;
+    font-size:16px;padding-inline-start:34px;
+  }
+  .case-columns .search-icon{top:5px}
+  .case-columns .suggestions{
+    top:44px;max-height:min(26dvh,164px);
+    overflow-y:auto;z-index:30;border-radius:7px;
+  }
+  .case-columns .suggestion{min-height:39px;padding:8px 10px;font-size:12px}
+  .case-columns .selection{
+    flex:0 0 auto;min-height:28px;
+    font-size:11px;gap:6px;
+  }
+  .case-columns .primary-btn{
+    flex:0 0 auto;min-height:42px;font-size:12px;
+  }
+  .case-columns .feedback{
+    flex:0 0 auto;font-size:11px;padding:7px 9px;margin-top:6px;
+  }
+  .case-columns .history-heading{
+    flex:0 0 auto;margin-top:9px;padding-bottom:5px;
+  }
+  .case-columns .history-heading h3{font-size:11px}
+  .case-columns .guess-history{
+    flex:0 0 auto;min-height:0;
+    height:auto;max-height:93px;
+    overflow-y:auto!important;overflow-x:hidden!important;
+    scrollbar-width:thin;padding:0 0 3px;
+  }
+  .case-columns .history-item{
+    min-height:30px;padding:6px 2px;
+    font-size:11px;line-height:1.2;
+  }
+  .case-columns .empty-history{font-size:11px;padding:9px 2px}
+  .case-columns .result-card{
+    position:relative;inset:auto;
+    width:100%;margin-top:8px;
+    padding:10px;overflow:visible;
+  }
+  .case-columns .result-card h3{font-size:17px}
+  .case-columns .result-actions{gap:6px}
+  .case-columns .result-actions button{min-height:39px}
+  .status-bar{display:none}
+
+  /* Finished-case details use one internally scrollable modal rather than
+     forcing a second page beneath the full-height mobile cockpit. */
+  dialog.case-report,dialog.case-report[open]{
+    position:fixed;inset:0;
+    width:min(96vw,570px);height:min(88dvh,720px);
+    max-width:96vw;max-height:88dvh;
+    margin:auto;min-height:0;overflow:hidden;
+    border:1px solid var(--border-strong);
+    border-top:2px solid var(--accent);border-radius:13px;
+    box-shadow:0 22px 75px #000c;
+    background:var(--surface);pointer-events:auto;z-index:1400;
+  }
+  dialog.case-report[open]{display:flex;flex-direction:column}
+  dialog.case-report::backdrop{background:#050913aa;backdrop-filter:blur(3px)}
+  dialog.case-report .report-topbar{flex:0 0 auto;min-height:39px}
+  dialog.case-report .report-heading{flex:0 0 auto;padding:9px 13px}
+  dialog.case-report .report-heading h2{font-size:20px}
+  dialog.case-report .report-body{
+    flex:1 1 0;height:auto;min-height:0;
+    max-height:none;overflow-y:auto;overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;padding:11px 13px;
+  }
+  dialog.case-report .report-footer{
+    flex:0 0 auto;gap:6px;padding:9px 13px;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  dialog.case-report .report-footer button{min-height:37px;font-size:11px}
+  dialog.case-report #reportNextBtn{grid-column:1/-1}
+  [dir="rtl"] .mobile-panel-tabs{direction:rtl}
+  [dir="rtl"] .case-columns>.clue-panel,
+  [dir="rtl"] .case-columns>.guess-panel{direction:rtl}
+}
+@media (max-width:760px) and (max-height:560px),
+       (max-height:540px) and (pointer:coarse) {
+  .site-header{flex:0 0 41px;height:41px;min-height:41px}
+  .toolbar{flex-basis:36px;height:36px;min-height:36px}
+  .case-header{height:38px;min-height:38px}
+  .map-toolbar{flex-basis:29px;height:29px;min-height:29px}
+  .case-timer{height:29px;padding-block:4px}
+  .rush-mode .case-timer{height:43px;padding-block:5px}
+  .map-bottom{flex-basis:28px;height:28px;min-height:28px}
+  .mobile-panel-tabs{height:43px}
+  .case-header{bottom:calc(57px + env(safe-area-inset-bottom))}
+  .case-columns>.clue-panel,.case-columns>.guess-panel{
+    bottom:calc(108px + env(safe-area-inset-bottom));
+    max-height:min(52dvh,300px);
+    padding:8px 10px;
+  }
+  .case-columns>.guess-panel.mobile-open{max-height:min(57dvh,330px)}
+  .map-card{padding-bottom:calc(109px + env(safe-area-inset-bottom))}
+  .compass-rose{bottom:calc(145px + env(safe-area-inset-bottom))}
+  .rush-intro{inset:72px 0 calc(137px + env(safe-area-inset-bottom))}
+  .rush-intro-card{padding:8px 12px}
+}
+@media (max-height:540px) and (pointer:coarse) and (orientation:landscape){
+  .game-grid{display:flex;flex-direction:row;align-items:stretch}
+  .map-card{
+    flex:1 1 auto;width:65%;min-width:0;height:100%;
+    padding-bottom:0;border-right:1px solid var(--border-strong);
+  }
+  .case-card{
+    position:relative;inset:auto;flex:0 0 min(35%,320px);
+    width:min(35%,320px);height:100%;
+    overflow:hidden;background:var(--surface);pointer-events:auto;
+  }
+  .case-header{top:6px;bottom:auto;left:6px;right:6px;padding:4px 8px}
+  .mobile-panel-tabs{left:6px;right:6px;bottom:6px;gap:5px}
+  .mobile-panel-tab{padding-inline:7px;gap:5px}
+  .mobile-panel-tab svg{width:15px;height:15px;flex-basis:15px}
+  .mobile-tab-copy strong{font-size:10px}
+  .mobile-tab-copy small{font-size:9px}
+  .mobile-tab-caret{font-size:13px}
+  .case-columns>.clue-panel,.case-columns>.guess-panel{
+    left:6px;right:6px;bottom:55px;
+    max-height:calc(100% - 104px);
+    padding:7px 8px;
+  }
+  .case-columns>.guess-panel.mobile-open{max-height:calc(100% - 104px)}
+  .case-columns .clue-list{max-height:100%}
+  .map-bottom{flex-basis:28px}
+  .compass-rose{bottom:57px}
+  .rush-intro{inset:72px 0 28px}
+  .rush-intro-card p{font-size:11px}
+}
