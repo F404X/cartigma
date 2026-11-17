@@ -97,7 +97,7 @@
       panel.classList.toggle("mobile-open",open);
       button.classList.toggle("active",open);
       button.setAttribute("aria-expanded",String(open));
-      button.disabled=kind==="clues"&&waiting;
+      button.disabled=waiting;
       if(mobile)panel.setAttribute("aria-hidden",String(!open));
       else panel.removeAttribute?.("aria-hidden");
     }
@@ -108,7 +108,7 @@
   }
   function setMobilePanel(panel){
     if(!isMobileScreen()||!game)return;
-    if(panel==="clues"&&isRush()&&!game.started&&!game.finished)return;
+    if(isRush()&&!game.started&&!game.finished)return;
     mobilePanel=mobilePanel===panel?null:panel;
     syncMobilePanels();
   }
@@ -1560,7 +1560,10 @@
         Math.max(game.revealed,DIFFICULTIES[difficulty].initial+game.guesses.length));
     }
     save();selected=null;
-    if(isMobileScreen())mobilePanel=game.finished?null:"clues";
+    if(isMobileScreen()){
+      $("countrySearch").blur?.(); // Dismiss mobile keyboard on confirmation.
+      mobilePanel=game.finished?null:"clues";
+    }
     render();
     if(game.finished)showReport();
   }
