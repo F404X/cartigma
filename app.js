@@ -70,7 +70,8 @@
   let lang = typeof savedLang === "string" && TRANSLATIONS[savedLang] ? savedLang : "en";
   const savedDifficulty = store.get("geodetective-difficulty");
   let difficulty = DIFFICULTIES[savedDifficulty] ? savedDifficulty : "normal";
-  let game = null, selected = null, map = null, marker = null, overlayMarkers = [], freeIndex = -1;
+  let game=null,selected=null,map=null,marker=null,guessMarkers=[];
+  let markerCase=null,markerMap=null;
   let activeLine=false, mapStyleReady=false, lastDragAt=0, pointerDown=null, pointerMoved=false;
   let fallbackSwitching=false, mapStyleTimeout=null, mapSwitching=false, mapPointerController=null;
   let activeMapStyle=window.maplibregl?.isFallback?"osm":"vector";
@@ -1014,9 +1015,18 @@
     element.addEventListener("click",event=>event.stopPropagation());
     return new window.maplibregl.Marker({element,anchor:"bottom"});
   }
+  function clearCasePins(){
+    // Guess pins are not transient clue overlays: keep them through every
+    // render and only remove them when switching cases or replacing the map.
+    for(const pin of guessMarkers)pin.remove();
+    guessMarkers=[];
+    marker?.remove();
+    marker=null;
+    markerCase=null;
+    markerMap=null;
+  }
   function clearMapOverlays(){
-    overlayMarkers.forEach(pin=>pin.remove());
-    overlayMarkers=[];
+    // Do NOT clear the guess markers when redrawing clue overlays.
     if(!map||!mapStyleReady)return;
     if(map.getLayer("case-distance-line"))map.removeLayer("case-distance-line");
     if(map.getSource("case-distance-line"))map.removeSource("case-distance-line");
@@ -1220,7 +1230,6 @@
       const text=document.createElement("div");text.textContent=popupText;
       pin.setPopup(new window.maplibregl.Popup({offset:22}).setDOMContent(text));
     }
-    overlayMarkers.push(pin);
     return pin;
   }
   function addResultLine(from,to){
@@ -1304,22 +1313,39 @@
       }
     }
   }
+  function syncCasePins(){
+    // A stable, dedicated set of guess markers survives both failed guesses
+    // and map overlay redraws. Do not rebuild previous pins on every render.
+    if(markerCase!==game||markerMap!==map||
+       game.guesses.length<guessMarkers.length){
+      clearCasePins();
+      markerCase=game;
+      markerMap=map;
+    }
+    const best=game.finished?bestGuess():null;
+    for(let i=guessMarkers.length;i<game.guesses.length;i++){
+      const guess=game.guesses[i];
+      const pin=addMarker(guess.lat,guess.lng,i+1,
+        guess===best?"best":"past",guess.label||"");
+      guessMarkers.push(pin);
+    }
+    // The + pin is temporary. Submitted numbered pins are never removed here.
+    marker?.remove();
+    marker=null;
+    if(!game.finished&&selected)
+      marker=addMarker(selected.lat,selected.lng,"+","current",selected.label||"");
+  }
   function renderMap(){
     if(!map)return;
+    // Persist pins independently of overlays. Clue layers can safely be
+    // reconfigured, including on style reloads and Rush clue unlocks.
+    syncCasePins();
     clearMapOverlays();
     drawSectorOverlays();
     drawLatitudeBeltOverlay();
     drawUtmOverlays();
     drawHemisphereOverlay();
     drawContinentOutline();
-    const best=game.finished?bestGuess():null;
-    // All modes must show numbered markers for guesses already submitted.
-    // Rush previously suppressed these markers entirely after confirmation.
-    game.guesses.forEach((guess,i)=>
-      addMarker(guess.lat,guess.lng,i+1,guess===best?"best":"past",guess.label||""));
-    // An unconfirmed country chosen by map click or search gets its own pin.
-    if(!game.finished&&selected)
-      marker=addMarker(selected.lat,selected.lng,"+","current",selected.label||"");
     $("coordinates").textContent=game.finished?countryName(game.index):
       selected?selected.label||selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°":
       t("noSelection");
@@ -1663,9 +1689,10 @@
       const engine=await window.GeoMapLoader.load(style);
       clearTimeout(mapStyleTimeout);
       mapPointerController?.abort();
+      clearCasePins();
       if(map){try{map.remove()}catch(error){console.warn(error)}}
       $("map").replaceChildren();
-      map=null;mapStyleReady=false;overlayMarkers=[];marker=null;activeLine=false;
+      map=null;mapStyleReady=false;activeLine=false;
       pointerDown=null;pointerMoved=false;lastDragAt=Date.now();
       window.maplibregl=engine;
       activeMapStyle=style;

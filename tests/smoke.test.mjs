@@ -407,3 +407,68 @@ test("No latitude-sector clue is used alongside country latitude belt in any loc
     assert.ok(pack.countryBorders.includes("{value}"),lang);
   }
 });
+
+
+test("Confirmed Rush pins keep their identity across guesses, map redraws, and timeout",()=>{
+  const Clock=fakeClock();
+  const g=boot({clock:Clock,map:true}),$=g.get;
+  g.difficulty("rush");
+  $("rushStartBtn").click();
+  const saved=JSON.parse(g.storage.get(CATALOG_KEY+"2026-11-17-rush"));
+  const country=g.window.CartigmaCountries[saved.index];
+  const guesses=["BR","MX","CA"]
+    .filter(code=>code!==country.code)
+    .slice(0,2)
+    .map(code=>g.window.CartigmaCountries.find(c=>c.code===code));
+  const pinWithNumber=n=>g.mapState.markers.find(m=>
+    m.element.children[0]?.textContent===String(n));
+  assert.equal(guesses.length,2);
+  // First wrong guess: the temporary plus becomes a numbered marker.
+  g.select(guesses[0].name);
+  const current=g.mapState.markers.find(m=>
+    m.element.children[0]?.textContent==="+");
+  assert.ok(current);
+  $("guessBtn").click();
+  const firstPin=pinWithNumber(1);
+  assert.ok(firstPin,"first Rush guess must remain as a numbered pin");
+  assert.ok(!g.mapState.markers.includes(current),
+    "only the unconfirmed plus marker should be removed");
+  // Selecting another country must not remove or replace the old marker.
+  g.select(guesses[1].name);
+  assert.equal(pinWithNumber(1),firstPin);
+  $("guessBtn").click();
+  const secondPin=pinWithNumber(2);
+  assert.ok(secondPin,"second Rush guess must remain a numbered pin");
+  assert.equal(pinWithNumber(1),firstPin);
+  assert.equal(g.mapState.markers.filter(m=>
+    ["1","2"].includes(m.element.children[0]?.textContent)).length,2);
+  // Map style/clue redraw must not remove or re-create already confirmed pins.
+  g.mapState.events["style.load"]();
+  g.tick();
+  assert.equal(pinWithNumber(1),firstPin);
+  assert.equal(pinWithNumber(2),secondPin);
+  // Even after Rush times out, pins remain for reviewing the case.
+  Clock.ms+=60001;
+  g.tick();
+  assert.equal($("reportDialog").open,true);
+  assert.equal(pinWithNumber(1),firstPin);
+  assert.equal(pinWithNumber(2),secondPin);
+  // A genuinely new case, unlike a redraw, clears the old case's pins.
+  $("freeBtn").click();
+  assert.equal(pinWithNumber(1),undefined);
+  assert.equal(pinWithNumber(2),undefined);
+});
+
+test("Other difficulties also retain numbered pins across consecutive guesses",()=>{
+  const g=boot({map:true}),$=g.get;
+  $("freeBtn").click();
+  const target=g.window.CartigmaCountries[Math.floor(.42*195)];
+  const guesses=["BR","MX","CA"].filter(code=>code!==target.code)
+    .slice(0,2).map(code=>g.window.CartigmaCountries.find(c=>c.code===code));
+  g.select(guesses[0].name);$("guessBtn").click();
+  const first=g.mapState.markers.find(m=>m.element.children[0]?.textContent==="1");
+  assert.ok(first);
+  g.select(guesses[1].name);$("guessBtn").click();
+  assert.ok(g.mapState.markers.includes(first));
+  assert.ok(g.mapState.markers.some(m=>m.element.children[0]?.textContent==="2"));
+});
