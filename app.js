@@ -2023,7 +2023,8 @@
     });
     document.addEventListener("click",e=>{
       if(!e.target.closest(".search-wrap"))hideSuggestions();
-      if(isMobileScreen()&&mobilePanel&&!e.target.closest(".case-card")){
+      if(isMobileScreen()&&mobilePanel&&
+        !e.target.closest(".case-card")&&!e.target.closest(".map-card")){
         mobilePanel=null;syncMobilePanels();
       }
     });
