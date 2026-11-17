@@ -246,6 +246,28 @@
     const key=latitudeZoneKey(latitude);
     return CLUE_I18N[lang]?.zones?.[key] || CLUE_I18N.en?.zones?.[key] || key;
   }
+  // Verified latitude-band intersections by country/territory. Generated from
+  // Natural Earth low-resolution sovereign geometries; PF and SG are supplied
+  // from their island extents. Each entry is primary-band index:6-bit mask.
+  const COUNTRY_BELT_NAMES=Object.freeze(
+    ["equatorial","tropical","subtropical","temperate","subpolar","polar"]);
+  const COUNTRY_BELT_DATA=Object.freeze(Object.fromEntries(
+    "AE=2:6 AF=2:12 AL=3:8 AM=3:8 AO=1:3 AR=3:30 AT=3:8 AU=2:14 AZ=3:8 BA=3:8 BD=2:6 BE=3:8 BF=1:3 BG=3:8 BI=0:1 BJ=0:3 BN=0:1 BO=1:3 BR=1:7 BT=2:4 BW=1:6 BY=3:24 BZ=1:2 CA=4:56 CD=0:3 CF=0:3 CG=0:1 CH=3:8 CI=0:3 CL=3:30 CM=0:3 CN=3:14 CO=0:3 CR=0:3 CU=1:2 CZ=3:8 DE=3:8 DJ=1:2 DK=4:24 DO=1:2 DZ=2:14 EC=0:1 EE=4:16 EG=2:6 ER=1:2 ES=3:8 ET=0:3 FI=4:48 FJ=1:2 FR=3:9 GA=0:1 GB=3:24 GE=3:8 GH=0:3 GM=1:2 GN=1:3 GQ=0:1 GR=3:12 GT=1:2 GW=1:2 GY=0:1 HN=1:2 HR=3:8 HT=1:2 HU=3:8 ID=0:3 IE=3:24 IL=2:4 IN=1:15 IQ=2:12 IR=2:12 IS=4:48 IT=3:8 JM=1:2 JO=2:4 JP=3:12 KE=0:1 KG=3:8 KH=1:2 KP=3:8 KR=3:12 KW=2:4 KZ=3:24 LA=1:2 LB=2:4 LK=0:1 LR=0:1 LS=2:4 LT=4:24 LU=3:8 LV=4:16 LY=2:6 MA=2:14 MD=3:8 ME=3:8 MG=1:6 MK=3:8 ML=1:6 MM=1:6 MN=3:8 MR=1:6 MW=1:3 MX=2:6 MY=0:1 MZ=1:6 NA=1:6 NE=1:2 NG=0:3 NI=1:2 NL=3:8 NO=5:48 NP=2:4 NZ=3:12 OM=1:6 PA=0:1 PE=0:3 PF=1:7 PG=0:3 PH=1:3 PK=2:12 PL=3:8 PT=3:8 PY=1:6 QA=2:4 RO=3:8 RS=3:8 RU=4:56 RW=0:1 SA=2:6 SB=0:3 SD=1:3 SE=4:48 SG=0:1 SI=3:8 SK=3:8 SL=0:3 SN=1:2 SO=0:3 SR=0:1 SV=1:2 SY=3:12 SZ=2:4 TD=1:3 TG=0:3 TH=1:3 TJ=3:8 TL=0:1 TM=3:8 TN=2:12 TR=3:8 TT=1:2 TW=2:6 TZ=0:3 UA=3:8 UG=0:1 US=3:62 UY=2:4 UZ=3:8 VE=0:3 VN=1:3 VU=1:2 YE=1:2 ZA=2:6 ZM=1:3 ZW=1:2".split(" ").map(item=>{
+      const [code,record]=item.split("="),[primary,mask]=record.split(":").map(Number);
+      return [code,Object.freeze({primary,mask})];
+    })));
+  function countryBelts(index){
+    const code=COUNTRY_CODES[index],record=COUNTRY_BELT_DATA[code];
+    if(!record)throw Error("Missing country latitude coverage: "+code);
+    return {code,primary:COUNTRY_BELT_NAMES[record.primary],
+      zones:COUNTRY_BELT_NAMES.filter((_,n)=>record.mask&(1<<n))};
+  }
+  function countryLatitudeZone(index){
+    const {primary,zones}=countryBelts(index);
+    const name=CLUE_I18N[lang]?.zones?.[primary]||
+      CLUE_I18N.en?.zones?.[primary]||primary;
+    return name+(zones.length>1?" (+"+(zones.length-1)+")":"");
+  }
   // Latitude belts describe angular position, not meteorological climate.
   // All non-equatorial belts occur in both hemispheres. Keep both visible,
   // since a latitude clue alone must not disclose the target's hemisphere.
