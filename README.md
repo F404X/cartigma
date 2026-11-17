@@ -10,7 +10,8 @@ A browser-based geographic detective game. Read the evidence, place pins on a wo
 - **Free play:** new random investigations without an account. Normal mode favors capitals and widely recognizable destinations through a bounded preference system; Hard mode can choose from all 500 cities.
 - **Normal:** 6 guesses, 2 starting clues, distance and a **localized full cardinal direction with matching arrow** after an incorrect guess (for example, *Nordeste ↗* in Portuguese).
 - **Hard:** 4 guesses, 1 starting clue, **only the distance** after an incorrect guess. Direction remains hidden even in the final case report.
-- Win when a guess falls within **100 km straight-line distance** of the city's approximate coordinates.
+- **Rush:** pink map difficulty bar; choose the **country** by searching its name rather than pinpointing a city. You get **60 wall-clock seconds**, unlimited guesses, and **one opening clue plus another unlocked every 6 seconds** (all ten clues by 54 seconds). There is no paid Reveal button. The potential score starts at 5,000 and decreases linearly to zero by 60 seconds; purchased map aids still deduct points. The mode has its own shared daily case and unlimited Free Play investigations, each with independent saved daily progress.
+- Normal/Hard: win when a guess falls within **100 km straight-line distance** of the city's approximate coordinates. Rush: win by naming the correct **country** before time expires.
 - **Ten evidence cards:** an opening landscape/latitude-zone/hemisphere clue, the continent, five balanced geographic/civic/country clues, and three optional additional clues. The longitude sector covers 30° in Normal or becomes a UTM zone in Hard. A landmark that reveals the city's name is replaced with a 15° latitude sector; Hard instead uses UTM latitude bands. Cultural and numerical country facts are interleaved in nonadjacent positions among slots 3–7. Hemisphere clues only appear for Asia, Africa, South America, and Oceania, not Europe or North America. No distance-reference clue is shown, because the guess feedback already provides distance.
 - **Vector map filters:** a gear beside **Vector** opens a compact, scrollable panel above the map selector. Toggle national borders, state/region boundaries, country/city labels, roads, natural areas, rivers/lakes, and points of interest. Preferences persist locally across basemap and theme changes. These filters only change presentation: the paid clue that identifies the target continent still costs points. OpenStreetMap raster tiles cannot hide individual map layers, so the gear is disabled in that mode.
 - **Ten evidence slots**, including four or five distinct country-data facts plus geographic clues. The two original facts remain distributed among slots 3–7; the additional three clues appear in slots 8–10. Extra evidence can be purchased before any guess without consuming attempts.
@@ -18,7 +19,7 @@ A browser-based geographic detective game. Read the evidence, place pins on a wo
 
 ### Case numbering
 
-Case identifiers follow **`#N-YYYYMMDD-01`** or **`#H-YYYYMMDD-01`**. The first letter uses the **English** difficulty name (Normal or Hard). The date is UTC and the final segment is the ordinal number of the case **opened in that browser on that UTC date**, starting at 01. Switching difficulty and starting free-play cases count as new investigations; revisiting an existing daily case preserves its original ID. The hidden daily location, however, is the same for every player of a given difficulty.
+Case identifiers follow **`#N-YYYYMMDD-01`**, **`#H-YYYYMMDD-01`**, or **`#R-YYYYMMDD-01`**. The first letter uses the **English** difficulty name (Normal, Hard, or Rush). The date is UTC and the final segment is the ordinal number of the case **opened in that browser on that UTC date**, starting at 01. Switching difficulty and starting free-play cases count as new investigations; revisiting an existing daily case preserves its original ID. The hidden daily location, however, is the same for every player of a given difficulty.
 
 ## Completed case file
 
@@ -106,6 +107,8 @@ The optional country-data clues and the country section of the final case file a
 
 The country flag in the case file loads by ISO alpha-2 code from flagcdn.com, with an emoji fallback. Other report languages use English history text when a dedicated translation is unavailable.
 
+Every submitted hypothesis stores an absolute ISO timestamp and its elapsed time since the case opened; both are displayed in the live guess list and final dossier. Rush runs against a wall-clock deadline, so closing the tab does not reset the daily timer.
+
 The dossier displays all available country data (GDP per capita and population with reference years, area, ISO code, administrative region, currency, language family, a flag color and landlocked status). Its flag is larger and frameless. Map rotation is disabled on both touch and mouse input.
 
 - **Area-scope clarity:** every `km²` country-area clue and dossier statistic explicitly says it represents the whole **country or territory**, not the city, municipality, state or province. The source dataset does not provide subnational/city area values; all 19 supported languages use scoped labels.
@@ -118,6 +121,10 @@ Ten evidence slots retain the original first seven clues in their established or
 - **Sea-access clue repair:** it has its own localized label ("Acesso ao mar"), rather than the generic "Região". The visible text comes directly from the country's landlocked boolean: "Sem acesso ao mar." or "Tem acesso ao mar." It never displays only "Sim" or "Não"; source assets are freshly fingerprinted on deployment.
 
 - **Currency names:** currency evidence now uses a **short, generic denomination** (e.g. “dólar”, “peso”, “real”, “iene”, “rupia”) rather than revealing the origin through “dólar americano” or “iene japonês”. An explicit ISO-to-denomination mapping covers the catalog's 131 currency codes; widely used denominations have translations in all 19 UI languages, while less common denominations use their short international names when a localized short name is not available. The completed case dossier and city archive retain full, localized CLDR currency names (e.g. “real brasileiro” or “iene japonês”) and the original ISO codes. The classification of country/territory currency and all other country indicators is unchanged.
+
+### Statistical evidence as inequalities
+
+The five statistical clue types—country population, GDP per capita, country/territory area, urban population and urban population density—now use a **strict, rounded bound**, such as `> 180,000,000` or `< 12,000`. Each bound is derived deterministically from the underlying sourced statistic, with roughly 11–21% separation before coarse rounding. The direction and rounding are checked against the source value, preventing misleading bounds. The exact sourced numbers remain in the completed country dossier and the 500-city archive, with their available source years.
 
 ### Ten clues, independent guesses
 

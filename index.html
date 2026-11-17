@@ -19,24 +19,24 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.18.0/dist/maplibre-gl.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=20261116-profile-diversity">
-  <link rel="stylesheet" href="themes.css">
-  <link rel="stylesheet" href="mobile.css">
+  <link rel="stylesheet" href="styles.css?v=20261117-rush">
+  <link rel="stylesheet" href="themes.css?v=20261117-rush">
+  <link rel="stylesheet" href="mobile.css?v=20261117-rush">
   
   <script defer src="places.js"></script>
   <script defer src="continent-borders.js?v=20261116-profile-diversity"></script>
-  <script defer src="i18n.js"></script>
+  <script defer src="i18n.js?v=20261117-rush"></script>
   <script defer src="clues-i18n.js?v=20261116-profile-diversity"></script>
   <script defer src="map-filters-i18n.js?v=20261116-profile-diversity"></script>
   <script defer src="report-i18n.js?v=20261116-daily-navigation"></script>
   <script defer src="facts.js"></script>
   <script defer src="cities-extended.js?v=20261116-profile-diversity"></script>
   <script defer src="country-insights.js?v=20261116-currency-names"></script>
-  <script defer src="country-clues-i18n.js?v=20261116-currency-names"></script>
+  <script defer src="country-clues-i18n.js?v=20261117-numeric-bounds"></script>
   <script defer src="currency-denominations.js?v=20261116-short-currency"></script>
   <script defer src="city-indicators.js?v=20261116-city-evidence"></script>
   <script defer src="urban-2025.js?v=20261116-city-evidence"></script>
-  <script defer src="city-clues-i18n.js?v=20261116-short-distances"></script>
+  <script defer src="city-clues-i18n.js?v=20261117-numeric-bounds"></script>
   <script defer src="atlas-i18n.js?v=20261116-city-archive"></script>
   <script defer src="country-profile-i18n.js?v=20261116-area-scope"></script>
   <script defer src="references.js"></script>
@@ -44,7 +44,7 @@
   <script defer src="theme.js"></script>
   <script defer src="map-fallback.js?v=20261117-clean-overlays"></script>
   <script defer src="language-picker.js"></script>
-  <script type="module" src="map-bootstrap.js?v=20261117-clean-overlays"></script>
+  <script type="module" src="map-bootstrap.js?v=20261117-rush"></script>
 </head>
 <body>
 <div class="app">
@@ -107,6 +107,7 @@
         <select id="difficultySelect" aria-label="Difficulty">
           <option value="normal" selected data-i18n="normal">Normal</option>
           <option value="hard" data-i18n="hard">Hard</option>
+          <option value="rush" data-i18n="rush">Rush</option>
         </select>
         <span class="toolbar-separator" aria-hidden="true"></span>
         <span class="case-code" id="caseCode">CASE #000</span>
@@ -117,6 +118,7 @@
       <div class="map-card">
         <div class="map-toolbar" id="mapToolbar">
           <span class="map-status"><svg class="map-title-globe" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg><span id="mapTitle">World map - Normal</span><span class="map-hint" id="mapHint"></span></span>
+          <div class="case-timer" id="caseTimer" role="timer"><span class="timer-caption" id="timerLabel">Elapsed</span><strong id="gameTimer">00:00</strong><small id="timerScore" class="timer-score hidden"></small><div class="timer-track hidden" id="timerTrack"><i id="timerProgress"></i></div></div>
           <button id="resetViewBtn" type="button" class="ghost-button" data-i18n="reset">Reset view</button>
         </div>
         <div id="map" role="application" aria-label="Interactive map for placing your guess"></div>
@@ -201,7 +203,7 @@
               <h2 id="guessHeading"><span class="section-index">02</span> <span data-i18n="yourGuess">Your guess</span></h2>
               <span id="guessCounter">0 / 6</span>
             </div>
-            <label class="search-label" for="citySearch" data-i18n="searchLabel">Search or select on the map</label>
+            <label class="search-label" for="citySearch" id="searchLabel" data-i18n="searchLabel">Search or select on the map</label>
             <div class="search-wrap">
               <span class="search-icon" aria-hidden="true">⌕</span>
               <input id="citySearch" type="search" placeholder="City or region..." autocomplete="off" autocapitalize="off" enterkeyhint="search" spellcheck="false" aria-autocomplete="list" aria-controls="suggestions">
@@ -304,6 +306,7 @@
     <li data-i18n="rule3">Win by getting within 100 km of the target. Hint prices vary from 150 to 500 points.</li>
     <li data-i18n="rule4">Normal: 6 guesses with direction. Hard: 4 guesses without direction.</li>
     <li data-i18n="rule5">Daily cases are shared worldwide per difficulty and reset at 00:00 UTC.</li>
+    <li data-i18n="rushRule">Rush: identify the country in 60 seconds. A clue unlocks every 6 seconds; score falls as time passes.</li>
   </ol>
   <button id="startHelpBtn" type="button" class="primary-btn" data-i18n="gotIt">Got it</button>
 </dialog>

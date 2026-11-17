@@ -280,3 +280,9 @@ dialog.case-report,dialog.case-report[open]{background:var(--surface);color:var(
 /* Map layer popover inherits light and dark UI surface tokens. */
 .map-filter-popover{background:var(--surface);border-color:var(--border-strong);color:var(--text)}
 :root[data-theme="light"] .map-filter-popover{box-shadow:0 12px 28px #17233829}
+
+/* Rush is distinct from Normal (gold) and Hard (red), in both themes. */
+.map-toolbar.is-rush{background:#ec4899;color:#fff;border-bottom-color:#b83176}
+.map-toolbar.is-rush .status-dot{background:#fff}
+.map-toolbar.is-rush .ghost-button{background:#ffffff18;border-color:#ffffff87;color:#fff}
+.map-toolbar.is-rush .ghost-button:hover{background:#ffffff30;border-color:#fff}

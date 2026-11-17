@@ -35,5 +35,34 @@
     if(!pricingText[lang])throw Error("Missing hint pricing translation: "+lang);
     [PACKS[lang].rule3,PACKS[lang].hintUsed]=pricingText[lang];
   }
+
+  // Rush UI stays fully localized without changing the legacy clue key order.
+  const RUSH_KEYS="rush|elapsedTime|rushRemaining|rushUnlimited|rushSearchPlaceholder|rushSearchLabel|rushMapHint|rushFound|rushLost|rushWrong|rushRule".split("|");
+  const RUSH_DATA={
+    en:"Rush|Elapsed|Time left|Unlimited|Country name...|Search for a country|Use country search|Found {country} in {time} with {count} guesses.|Time is up. The country was {country}.|Wrong country. Try another.|Rush: find the country in 60 seconds. A clue unlocks every 6 seconds, and your score decreases over time.",
+    pt:"Rush|Tempo decorrido|Tempo restante|Ilimitadas|Nome do país...|Pesquise um país|Pesquise um país|Acertou {country} em {time}, com {count} palpites.|Tempo esgotado! O país era {country}.|País incorreto. Tente outro.|Rush: descubra o país em 60 segundos. Uma evidência é liberada a cada 6 segundos, e a pontuação diminui com o tempo.",
+    es:"Rush|Tiempo transcurrido|Tiempo restante|Ilimitados|Nombre del país...|Busca un país|Busca un país|Encontraste {country} en {time} con {count} intentos.|Se acabó el tiempo. El país era {country}.|País incorrecto. Prueba otro.|Rush: encuentra el país en 60 segundos. Se desbloquea una pista cada 6 segundos y la puntuación baja con el tiempo.",
+    zh:"Rush|已用时间|剩余时间|不限次数|国家名称...|搜索国家|请搜索国家|用时 {time}，猜了 {count} 次，找到了 {country}。|时间到！正确国家是 {country}。|国家不对，请重试。|Rush：60 秒内猜出国家。每 6 秒解锁一条线索，得分随时间下降。",
+    ja:"Rush|経過時間|残り時間|無制限|国名...|国を検索|国を検索|{time}、{count} 回の回答で {country} を当てました。|時間切れ！正解は {country} です。|国が違います。もう一度。|Rush：60 秒以内に国を当てよう。6 秒ごとにヒントが公開され、得点は時間とともに減ります。",
+    ru:"Rush|Прошло времени|Осталось|Без лимита|Название страны...|Найти страну|Ищите страну|Вы нашли {country} за {time}, попыток: {count}.|Время истекло. Это была страна {country}.|Неверная страна. Попробуйте ещё.|Rush: угадайте страну за 60 секунд. Каждые 6 секунд открывается подсказка, а очки постепенно уменьшаются.",
+    fr:"Rush|Temps écoulé|Temps restant|Illimitées|Nom du pays...|Rechercher un pays|Rechercher un pays|Vous avez trouvé {country} en {time}, avec {count} essais.|Temps écoulé ! Le pays était {country}.|Mauvais pays. Réessayez.|Rush : trouvez le pays en 60 secondes. Un indice se débloque toutes les 6 secondes et le score diminue avec le temps.",
+    de:"Rush|Verstrichene Zeit|Restzeit|Unbegrenzt|Ländername...|Land suchen|Land suchen|{country} in {time} mit {count} Versuchen gefunden.|Zeit abgelaufen. Das Land war {country}.|Falsches Land. Erneut versuchen.|Rush: Errate das Land in 60 Sekunden. Alle 6 Sekunden wird ein Hinweis freigeschaltet, während die Punkte sinken.",
+    it:"Rush|Tempo trascorso|Tempo rimasto|Illimitati|Nome del paese...|Cerca un paese|Cerca un paese|Hai trovato {country} in {time} con {count} tentativi.|Tempo scaduto! Il paese era {country}.|Paese sbagliato. Riprova.|Rush: trova il paese in 60 secondi. Un indizio si sblocca ogni 6 secondi e il punteggio diminuisce con il tempo.",
+    nl:"Rush|Verstreken tijd|Tijd over|Onbeperkt|Landnaam...|Zoek een land|Zoek een land|{country} gevonden in {time} met {count} pogingen.|De tijd is om. Het land was {country}.|Verkeerd land. Probeer opnieuw.|Rush: raad het land binnen 60 seconden. Elke 6 seconden komt een aanwijzing vrij, terwijl je score daalt.",
+    pl:"Rush|Czas gry|Pozostały czas|Bez limitu|Nazwa kraju...|Szukaj kraju|Szukaj kraju|Odgadnięto {country} w {time}, prób: {count}.|Czas minął. To był kraj {country}.|Nieprawidłowy kraj. Spróbuj ponownie.|Rush: odgadnij kraj w 60 sekund. Co 6 sekund pojawia się wskazówka, a wynik maleje z czasem.",
+    sv:"Rush|Förfluten tid|Tid kvar|Obegränsat|Landets namn...|Sök ett land|Sök ett land|Du hittade {country} på {time} med {count} gissningar.|Tiden är slut. Landet var {country}.|Fel land. Försök igen.|Rush: gissa landet på 60 sekunder. En ledtråd låses upp var sjätte sekund och poängen minskar med tiden.",
+    tr:"Rush|Geçen süre|Kalan süre|Sınırsız|Ülke adı...|Ülke ara|Ülke ara|{country} ülkesini {time} sürede {count} tahminle buldunuz.|Süre doldu. Ülke {country} idi.|Yanlış ülke. Tekrar deneyin.|Rush: 60 saniyede ülkeyi bulun. Her 6 saniyede bir ipucu açılır, puan zamanla azalır.",
+    ar:"Rush|الوقت المنقضي|الوقت المتبقي|غير محدود|اسم الدولة...|ابحث عن دولة|ابحث عن دولة|وجدت {country} خلال {time} بعد {count} محاولات.|انتهى الوقت! الدولة هي {country}.|الدولة غير صحيحة. حاول مجدداً.|Rush: اكتشف الدولة خلال 60 ثانية. يظهر دليل كل 6 ثوانٍ وتنخفض النقاط بمرور الوقت.",
+    he:"Rush|זמן שחלף|זמן שנותר|ללא הגבלה|שם המדינה...|חפש מדינה|חפש מדינה|מצאת את {country} בתוך {time} עם {count} ניסיונות.|הזמן נגמר. המדינה הייתה {country}.|מדינה שגויה. נסה שוב.|Rush: נחש את המדינה בתוך 60 שניות. רמז חדש נפתח כל 6 שניות והניקוד יורד עם הזמן.",
+    ko:"Rush|경과 시간|남은 시간|무제한|국가 이름...|국가 검색|국가 검색|{time} 동안 {count}번 시도해 {country}을(를) 찾았습니다.|시간 종료! 정답은 {country}입니다.|틀린 국가입니다. 다시 시도하세요.|Rush: 60초 안에 국가를 맞히세요. 6초마다 단서가 공개되고 점수는 시간이 지날수록 줄어듭니다.",
+    th:"Rush|เวลาที่ใช้|เวลาที่เหลือ|ไม่จำกัด|ชื่อประเทศ...|ค้นหาประเทศ|ค้นหาประเทศ|พบ {country} ใน {time} ด้วยการเดา {count} ครั้ง|หมดเวลา! ประเทศคือ {country}|ประเทศไม่ถูกต้อง ลองอีกครั้ง|Rush: ทายประเทศภายใน 60 วินาที เบาะแสเปิดทุก 6 วินาที และคะแนนจะลดลงตามเวลา",
+    vi:"Rush|Thời gian đã qua|Thời gian còn lại|Không giới hạn|Tên quốc gia...|Tìm quốc gia|Tìm quốc gia|Đã tìm ra {country} trong {time} sau {count} lần đoán.|Hết giờ! Quốc gia là {country}.|Sai quốc gia. Thử lại.|Rush: tìm quốc gia trong 60 giây. Mỗi 6 giây mở thêm một gợi ý và điểm giảm theo thời gian.",
+    id:"Rush|Waktu berjalan|Sisa waktu|Tak terbatas|Nama negara...|Cari negara|Cari negara|Menemukan {country} dalam {time} dengan {count} tebakan.|Waktu habis! Negaranya adalah {country}.|Negara salah. Coba lagi.|Rush: temukan negara dalam 60 detik. Petunjuk terbuka setiap 6 detik dan skor berkurang seiring waktu."
+  };
+  for(const [lang,raw] of Object.entries(RUSH_DATA)){
+    const values=raw.split("|");
+    if(values.length!==RUSH_KEYS.length||!PACKS[lang])throw Error("Rush translation mismatch: "+lang);
+    Object.assign(PACKS[lang],Object.fromEntries(RUSH_KEYS.map((key,i)=>[key,values[i]])));
+  }
   window.GeoI18n = {PACKS,langNames,keys:KEYS};
 })();

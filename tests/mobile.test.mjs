@@ -10,7 +10,7 @@ const fallback=readFileSync(new URL("map-fallback.js",root),"utf8");
 const workflow=readFileSync(new URL(".github/workflows/pages.yml",root),"utf8");
 
 test("smartphone layout is loaded last and leaves desktop styling unchanged",()=>{
-  const cssLinks=[...html.matchAll(/<link rel="stylesheet" href="([^"]+\.css)">/g)].map(m=>m[1]);
+  const cssLinks=[...html.matchAll(/<link rel="stylesheet" href="([^"]+\.css(?:\?[^"]*)?)">/g)].map(m=>m[1].split("?")[0]);
   assert.equal(cssLinks.at(-1),"mobile.css");
   assert.ok(cssLinks.indexOf("themes.css")<cssLinks.indexOf("mobile.css"));
   assert.ok(mobile.startsWith("/* Cartigma"));
