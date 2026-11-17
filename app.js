@@ -112,7 +112,22 @@
       const list=$("clueList"),currentCase=game;
       const scrollNewest=()=>{
         if(game!==currentCase||!isMobileScreen()||mobilePanel!=="clues")return;
-        if(Number.isFinite(list.scrollHeight))list.scrollTop=list.scrollHeight;
+        // Align the complete last unlocked card inside the list's own
+        // scrolling viewport. Never scroll the map, page or outer popup.
+        const latest=Array.from(list.children).find(row=>
+          row.classList.contains("latest"));
+        if(!latest)return;
+        const viewport=list.getBoundingClientRect?.();
+        const card=latest.getBoundingClientRect?.();
+        if(viewport?.height>0&&card?.height>0){
+          const bottomOverlap=card.bottom-(viewport.bottom-12);
+          if(bottomOverlap>0)list.scrollTop+=bottomOverlap;
+          if(card.height<=viewport.height-12&&card.top<viewport.top)
+            list.scrollTop+=card.top-viewport.top;
+        }else if(Number.isFinite(list.scrollHeight)){
+          // Older browsers and the mock DOM use ordinary scroll metrics.
+          list.scrollTop=list.scrollHeight;
+        }
       };
       if(typeof requestAnimationFrame==="function")requestAnimationFrame(scrollNewest);
       else scrollNewest();
