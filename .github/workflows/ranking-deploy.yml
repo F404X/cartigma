@@ -1,0 +1,91 @@
+name: Deploy ranking API to Cloudflare staging
+on:
+  workflow_dispatch:
+  push:
+    branches: ["feature/ranking"]
+    paths:
+      - "backend/**"
+      - ".github/workflows/ranking-deploy.yml"
+permissions:
+  contents: read
+concurrency:
+  group: cartigma-ranking-staging
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.repository == 'F404X/cartigma'
+    name: Provision D1 and deploy staging Worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ranking-staging
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check credentials exist
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::CLOUDFLARE_API_TOKEN missing"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::CLOUDFLARE_ACCOUNT_ID missing"; exit 1; }
+      - name: Install Wrangler
+        run: npm install --no-audit --no-fund
+      - name: Provision dedicated staging D1 only if absent
+        run: |
+          set -euo pipefail
+          npx wrangler d1 list --json > /tmp/cartigma-d1-list.json
+          node --input-type=module - <<'JS'
+          import fs from "node:fs";
+          const list=JSON.parse(fs.readFileSync("/tmp/cartigma-d1-list.json","utf8"));
+          const rows=Array.isArray(list)?list:(list.result||[]);
+          const db=rows.find(d=>d.name==="cartigma-ranking-staging");
+          fs.writeFileSync("/tmp/cartigma-d1-id",db?(db.uuid||db.id||""):"");
+          JS
+          if [ ! -s /tmp/cartigma-d1-id ]; then
+            npx wrangler d1 create cartigma-ranking-staging --json > /tmp/cartigma-d1-new.json
+            node --input-type=module - <<'JS'
+          import fs from "node:fs";
+          const data=JSON.parse(fs.readFileSync("/tmp/cartigma-d1-new.json","utf8"));
+          fs.writeFileSync("/tmp/cartigma-d1-id",data.uuid||data.id||data.result?.uuid||"");
+          JS
+          fi
+          node --input-type=module - <<'JS'
+          import fs from "node:fs";
+          const id=fs.readFileSync("/tmp/cartigma-d1-id","utf8").trim();
+          if(!/^[0-9a-f-]{36}$/i.test(id))throw Error("Invalid D1 UUID");
+          const path="wrangler.toml";
+          const text=fs.readFileSync(path,"utf8").replace("00000000-0000-0000-0000-000000000000",id);
+          fs.writeFileSync(path,text);
+          console.log("D1 binding configured (UUID hidden)");
+          JS
+      - name: Apply idempotent D1 schema
+        run: npx wrangler d1 execute cartigma-ranking-staging --remote --file schema.sql --yes
+      - name: Deploy Worker to workers.dev staging
+        run: npx wrangler deploy --yes
+      - name: Initialize missing Worker secrets without rotating existing ones
+        run: |
+          set -euo pipefail
+          npx wrangler secret list --format=json > /tmp/cartigma-worker-secrets.json
+          for secret in AUTH_PEPPER GAME_SECRET; do
+            if node --input-type=module - "$secret" <<'JS'
+          import fs from "node:fs";
+          const name=process.argv[2];
+          const secrets=JSON.parse(fs.readFileSync("/tmp/cartigma-worker-secrets.json","utf8"));
+          if(!secrets.some(secret=>secret.name===name))process.exit(1);
+          JS
+            then
+              echo "Required $secret already configured"
+            else
+              openssl rand -hex 32 | npx wrangler secret put "$secret" --name cartigma-ranking-staging
+              echo "Initialized missing $secret (value never printed)"
+            fi
+          done
+      - name: Publish staging status
+        run: |
+          echo "Cloudflare staging Worker deployed; no production hostname or GitHub Pages changed." >> "$GITHUB_STEP_SUMMARY"
+          echo "D1 schema applied. Secret names verified, values never logged." >> "$GITHUB_STEP_SUMMARY"
