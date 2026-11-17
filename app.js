@@ -573,10 +573,18 @@
     return pricedCost(HINT_PRICES[clue?.key]??HINT_COST);
   }
   function renderClues(){
+    const list=$("clueList");list.replaceChildren();
+    const waiting=isRush()&&!game.started&&!game.finished;
+    list.classList.toggle("hidden",waiting);
+    if(waiting){
+      $("hintCount").textContent="0 / "+EVIDENCE_COUNT;
+      $("revealBtn").disabled=true;
+      $("revealBtn").classList.add("hidden");
+      return; // No categories, locked types or first evidence leak pre-start.
+    }
     const clues=cluesFor(game.index,difficulty);
     const revealed=game.revealed;
     $("hintCount").textContent=revealed+" / "+clues.length;
-    const list=$("clueList");list.replaceChildren();
     const lockedText=t("locked");
     clues.forEach((clue,i)=>{
       const row=document.createElement("li");row.className="clue"+(i>=revealed?" locked":"");
@@ -584,9 +592,7 @@
       const body=document.createElement("span");body.className="clue-body";
       const category=document.createElement("span");category.className="clue-category";
       const categoryKey=CLUE_CATEGORY_KEYS[clue.key]||"clueRegion";
-      category.textContent=CITY_CLUES_I18N[lang]?.categories?.[clue.key]||
-        CITY_CLUES_I18N.en?.categories?.[clue.key]||
-        (clue.key==="countryLandlocked"
+      category.textContent=(clue.key==="countryLandlocked"
           ?(COUNTRY_CLUE_I18N[lang]?.countryLandlockedLabel||
             COUNTRY_CLUE_I18N.en?.countryLandlockedLabel||"Sea access")
           :t(categoryKey));
@@ -662,10 +668,8 @@
     return best;
   }
   function factFor(index){
-    const fact=FACTS[index];
-    if(fact&&lang==="pt")return fact[1];
-    if(fact&&lang==="en")return fact[0];
-    return t("reportFactFallback",{landmark:LANDMARKS[index]});
+    const history=COUNTRY_INSIGHTS[COUNTRY_CODES[index]]?.history;
+    return history?.[lang==="pt"?"pt":"en"]||history?.en||"";
   }
 
   function renderCountryProfile(info,code,place,targets={
@@ -693,8 +697,8 @@
     const countryWord=value=>typeof value==="boolean"
       ?tc(value?"yes":"no"):null;
     add("iso",code);
-    add("region",place[2]);
-    add("capital",countryWord(CAPITALS.has(place[0])));
+    add("region",continentName(COUNTRY_CODES.indexOf(code)));
+    add("capital",COUNTRIES[COUNTRY_CODES.indexOf(code)]?.capital||"—");
     add("currency",currencyName(info?.currency,info?.currencyName));
     if(info?.languageFamily)add("language",lang==="pt"
       ?COUNTRY_FAMILIES_PT[info.languageFamily]||info.languageFamily:info.languageFamily);
@@ -949,7 +953,7 @@
     const place=cityAt(game.index);
     $("reportCode").textContent=caseCode();
     $("reportVerdict").textContent=t(game.won?"caseSolved":"caseClosed");
-    $("reportHeading").textContent=isCountryGame()?countryName(game.index):cityName(place);
+    $("reportHeading").textContent=countryName(game.index);
     $("reportCountry").textContent=countryName(game.index);
     const iso=COUNTRY_CODES[game.index],details=COUNTRY_INSIGHTS[iso];
     const flagImage=$("reportFlag"),flagFallback=$("reportFlagFallback");
@@ -980,7 +984,7 @@
     $("reportCoordinates").textContent=isCountryGame()?"—":place[3].toFixed(4)+"°, "+place[4].toFixed(4)+"°";
     $("reportContinent").textContent=continentName(game.index);
     renderCountryProfile(details,iso,place);
-    $("reportFact").textContent=isCountryGame()?t("countryCaseContext",{country:countryName(game.index)}):factFor(game.index);
+    $("reportFact").textContent=factFor(game.index);
     const log=$("reportTimeline");log.replaceChildren();
     for(const [i,g] of game.guesses.entries()){
       const row=document.createElement("li");row.className="report-log-row";
@@ -1035,7 +1039,7 @@
     renderCaseNavigation();
     $("resultCard").classList.toggle("hidden",!game.finished);
     if(!game.finished)return;
-    const name=isCountryGame()?countryName(game.index):cityName(cityAt(game.index))+", "+countryName(game.index);
+    const name=countryName(game.index);
     $("resultKicker").textContent=t(game.won?"solved":"closed");
     $("resultTitle").textContent=name;
     $("resultDetail").textContent=isRush()
@@ -1071,7 +1075,7 @@
     $("caseCode").textContent=code;
     $("caseNumber").textContent=t("caseWord")+" "+code;
     $("modeCaption").textContent=t(daily?"modeDaily":"modeFree");
-    $("caseTitle").textContent=game.finished?(isCountryGame()?countryName(game.index):cityName(cityAt(game.index))):t("unknown");
+    $("caseTitle").textContent=game.finished?countryName(game.index):t("unknown");
     $("caseStatus").textContent=t(game.finished?(game.won?"solved":"closed"):"active");
     $("caseStatus").classList.toggle("closed",game.finished);
     $("attemptCount").textContent=isRush()?t("rushUnlimited"):remaining+" / "+max;
@@ -1079,7 +1083,7 @@
     const dots=$("attemptDots");dots.replaceChildren();
     dots.style.setProperty("--attempt-total",max);
     if(!isRush())for(let i=0;i<max;i++){const dot=document.createElement("i");dot.classList.toggle("live",i<remaining);dots.append(dot)}
-    $("placeCount").textContent=String(PLACES.length);
+    $("placeCount").textContent=String(COUNTRIES.length);
     renderClues();renderHistory();renderResult();feedback();
     $("guessBtn").disabled=game.finished||!selected||(isRush()&&!game.started);
     $("citySearch").disabled=game.finished||(isRush()&&!game.started);
@@ -1920,12 +1924,11 @@
     });
   }
   function init(){
-    if(PLACES.length!==500||EXTENDED.length!==426||
-       new Set(COUNTRY_CODES).size!==Object.keys(COUNTRY_INSIGHTS).length||
-       PLACES.length!==FEATURES.length||
-       PLACES.length!==COUNTRY_CODES.length||PLACES.length!==LANDMARKS.length||
-       PLACES.length!==FACTS.length||Object.keys(NEARBY_REFERENCES).length<45)
-      throw new Error("Location catalogue and metadata are out of sync");
+    if(COUNTRIES.length!==195||
+       new Set(COUNTRY_CODES).size!==195||
+       COUNTRIES.some(c=>!COUNTRY_INSIGHTS[c.code]||
+         !Number.isFinite(c.lat)||!Number.isFinite(c.lng)||!c.mask))
+      throw new Error("195-country catalogue is incomplete");
     document.documentElement.lang="en";
     $("difficultySelect").value=difficulty;
     $("langSelect").value=lang;
