@@ -99,7 +99,7 @@
       button.setAttribute("aria-expanded",String(open));
       button.disabled=kind==="clues"&&waiting;
       if(mobile)panel.setAttribute("aria-hidden",String(!open));
-      else panel.removeAttribute("aria-hidden");
+      else panel.removeAttribute?.("aria-hidden");
     }
     $("mobileEvidencePreview").textContent=
       (waiting?0:game.revealed)+" / "+EVIDENCE_COUNT;
@@ -987,11 +987,12 @@
     const mobile=window.matchMedia?.("(max-width: 760px)")?.matches===true;
     const destination=mobile?document.querySelector(".case-card"):document.body;
     if(destination&&dialog.parentElement!==destination)destination.append(dialog);
-    if(!dialog.open)dialog.show();
-    if(mobile){
-      const move=()=>dialog.scrollIntoView?.({behavior:"smooth",block:"start"});
-      if(typeof requestAnimationFrame==="function")requestAnimationFrame(move);
-      else move();
+    if(!dialog.open){
+      if(mobile){
+        mobilePanel=null;
+        syncMobilePanels();
+        dialog.showModal();
+      }else dialog.show();
     }
   }
   function renderResult(){
@@ -1558,7 +1559,9 @@
       game.revealed=Math.min(EVIDENCE_COUNT,
         Math.max(game.revealed,DIFFICULTIES[difficulty].initial+game.guesses.length));
     }
-    save();selected=null;render();
+    save();selected=null;
+    if(isMobileScreen())mobilePanel=game.finished?null:"clues";
+    render();
     if(game.finished)showReport();
   }
   function searchLocal(term){
@@ -1948,6 +1951,8 @@
     $("revealBtn").addEventListener("click",reveal);
     $("guessBtn").addEventListener("click",guess);
     $("rushStartBtn").addEventListener("click",startRush);
+    $("mobileEvidenceBtn").addEventListener("click",()=>setMobilePanel("clues"));
+    $("mobileGuessBtn").addEventListener("click",()=>setMobilePanel("guess"));
     $("resetViewBtn").addEventListener("click",resetMapView);
     $("mapVectorBtn").addEventListener("click",()=>setMapStyle("vector"));
     $("mapOsmBtn").addEventListener("click",()=>setMapStyle("osm"));
@@ -2018,6 +2023,15 @@
     });
     document.addEventListener("click",e=>{
       if(!e.target.closest(".search-wrap"))hideSuggestions();
+      if(isMobileScreen()&&mobilePanel&&!e.target.closest(".case-card")){
+        mobilePanel=null;syncMobilePanels();
+      }
+    });
+    document.addEventListener("keydown",event=>{
+      if(event.key!=="Escape"||!isMobileScreen()||!mobilePanel||
+        $("reportDialog").open)return;
+      mobilePanel=null;syncMobilePanels();
+      event.preventDefault();
     });
     startDaily();
     setLanguage(lang);
