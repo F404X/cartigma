@@ -1637,6 +1637,87 @@
   function resetMapView(){
     if(map&&!game.finished)map.easeTo({center:[8,15],zoom:1.7,duration:350});
   }
+
+  // A country must be selected by its actual territory, not by the nearest
+  // catalogued city (which gives wrong results along borders and in large states).
+  // Natural Earth admin-0 boundaries are small enough to cache in one request.
+  const RUSH_BORDERS_URLS=Object.freeze([
+    "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson",
+    "https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_110m_admin_0_countries.geojson"
+  ]);
+  function rushCountryFeatures(){
+    if(!countryShapesPromise){
+      countryShapesPromise=(async()=>{
+        let error;
+        for(const url of RUSH_BORDERS_URLS){
+          try{
+            const response=await fetch(url,{cache:"force-cache"});
+            if(!response.ok)throw Error("Could not retrieve country boundaries");
+            const geojson=await response.json();
+            if(!Array.isArray(geojson?.features)||geojson.features.length<100)
+              throw Error("Invalid country boundary dataset");
+            return geojson.features;
+          }catch(failed){error=failed}
+        }
+        throw error||Error("Country boundary data unavailable");
+      })().catch(error=>{countryShapesPromise=null;throw error});
+    }
+    return countryShapesPromise;
+  }
+  // GeoJSON uses [longitude, latitude]. Check outer rings and exclude holes.
+  function pointInRing(lng,lat,ring){
+    let inside=false;
+    for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+      const [x,y]=ring[i], [prevX,prevY]=ring[j];
+      if((y>lat)!==(prevY>lat)&&lng<
+        (prevX-x)*(lat-y)/(prevY-y)+x)inside=!inside;
+    }
+    return inside;
+  }
+  function pointInCountry(lng,lat,geometry){
+    if(!geometry)return false;
+    const polygons=geometry.type==="Polygon"?[geometry.coordinates]:
+      geometry.type==="MultiPolygon"?geometry.coordinates:[];
+    return polygons.some(rings=>
+      Array.isArray(rings)&&rings.length>0&&pointInRing(lng,lat,rings[0])&&
+      !rings.slice(1).some(hole=>pointInRing(lng,lat,hole)));
+  }
+  function codeForCountryFeature(feature){
+    const info=feature?.properties||{};
+    return [info.ISO_A2,info.ISO_A2_EH,info.POSTAL,info.WB_A2]
+      .find(code=>typeof code==="string"&&COUNTRY_INSIGHTS[code]&&
+        COUNTRY_CODES.includes(code))||null;
+  }
+  async function selectRushPoint(lat,lng){
+    const session=game,request=++rushCountryRequest;
+    selected=null;
+    $("guessBtn").disabled=true;
+    $("selectedText").textContent=t("rushCheckingMap");
+    try{
+      const features=await rushCountryFeatures();
+      if(game!==session||!isRush()||game.finished||!game.started||
+        request!==rushCountryRequest)return;
+      clockTick();
+      if(game.finished)return;
+      const feature=features.find(item=>
+        codeForCountryFeature(item)&&pointInCountry(lng,lat,item.geometry));
+      const countryCode=feature&&codeForCountryFeature(feature);
+      if(!countryCode){
+        $("selectedText").textContent=t("noSelection");
+        toast(t("rushNoCountry"));return;
+      }
+      selected={lat,lng,label:displayRegion(countryCode),countryCode};
+      $("selectedText").textContent=selected.label;
+      $("citySearch").value=selected.label;
+      $("suggestions").classList.add("hidden");
+      $("guessBtn").disabled=false;
+      renderMap();
+    }catch(error){
+      if(game!==session||request!==rushCountryRequest)return;
+      $("selectedText").textContent=t("noSelection");
+      toast(t("rushMapUnavailable"));
+    }
+  }
   function selectPoint(lat,lng,label){
     if(game.finished)return;
     if(isRush()){
@@ -1725,6 +1806,7 @@
           selected={lat:item.lat,lng:item.lon,label:item.name,countryCode:item.countryCode};
           $("guessBtn").disabled=false;$("selectedText").textContent=item.name;
           $("suggestions").classList.add("hidden");
+          renderMap();
         }else selectPoint(item.lat,item.lon,item.name);
         $("citySearch").value=item.name;
       });
