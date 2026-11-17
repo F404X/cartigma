@@ -601,6 +601,7 @@
       finished:false,won:false,score:0};
   }
   function isRush(){return difficulty==="rush"}
+  function isCountryGame(){return isRush()||game?.targetKind==="country"}
   function caseCode(){
     return "#"+difficulty[0].toUpperCase()+"-"+game.date.replaceAll("-","")+"-"+String(game.serial).padStart(2,"0");
   }
@@ -731,12 +732,12 @@
     }
     save();
     selected=null;closeReport();render();resetMapView();clockTick();
-    if(isRush())rushCountryFeatures().catch(()=>{});
+    if(isCountryGame())rushCountryFeatures().catch(()=>{});
   }
   function startFree(){
     rushCountryRequest++;game=newGame("free",chooseFree());
     selected=null;closeReport();render();resetMapView();clockTick();
-    if(isRush())rushCountryFeatures().catch(()=>{});
+    if(isCountryGame())rushCountryFeatures().catch(()=>{});
   }
   function setDifficulty(level){
     if(!DIFFICULTIES[level]||level===difficulty)return;
@@ -757,7 +758,7 @@
     updateMapLanguage();
     syncMapFiltersUI();
     document.querySelectorAll("[data-i18n]").forEach(element=>{element.textContent=t(element.dataset.i18n)});
-    $("citySearch").placeholder=t(isRush()?"rushSearchPlaceholder":"searchPlaceholder");
+    $("citySearch").placeholder=t(isCountryGame()?"rushSearchPlaceholder":"searchPlaceholder");
     $("helpBtn").setAttribute("aria-label",t("help"));
     syncAtlasLanguage();
     $("resetViewBtn").title=t("reset");
@@ -874,7 +875,7 @@
     $("revealBtn").classList.toggle("hidden",game.finished||isRush());
   }
   function guessMetricText(g){
-    if(isRush())return g.countryCode===COUNTRY_CODES[game.index]?"✓":"×";
+    if(isCountryGame())return g.countryCode===COUNTRY_CODES[game.index]?"✓":"×";
     // Hide both distance and bearing if the displayed result rounds to 0 km.
     if(Math.round(g.distance)===0)return "";
     return number(g.distance)+" km"+(difficulty==="hard"?"":" · "+direction(g.bearing));
@@ -909,7 +910,7 @@
     }
   }
   function bestGuess(){
-    if(isRush())return game.guesses.find(g=>g.countryCode===COUNTRY_CODES[game.index])||null;
+    if(isCountryGame())return game.guesses.find(g=>g.countryCode===COUNTRY_CODES[game.index])||null;
     if(!game.guesses.length)return null;
     let best=game.guesses[0];
     for(let i=1;i<game.guesses.length;i++){
@@ -1206,7 +1207,7 @@
     const place=cityAt(game.index);
     $("reportCode").textContent=caseCode();
     $("reportVerdict").textContent=t(game.won?"caseSolved":"caseClosed");
-    $("reportHeading").textContent=isRush()?countryName(game.index):cityName(place);
+    $("reportHeading").textContent=isCountryGame()?countryName(game.index):cityName(place);
     $("reportCountry").textContent=countryName(game.index);
     const iso=COUNTRY_CODES[game.index],details=COUNTRY_INSIGHTS[iso];
     const flagImage=$("reportFlag"),flagFallback=$("reportFlagFallback");
@@ -1230,14 +1231,14 @@
     $("reportMode").textContent=t(game.mode==="daily"?"daily":"free");
     $("reportDifficulty").textContent=t(difficulty);
     $("reportAttempts").textContent=isRush()?String(game.guesses.length):game.guesses.length+" / "+maximum();
-    $("reportBest").textContent=isRush()?"—":best?number(best.distance)+" km":"—";
+    $("reportBest").textContent=isCountryGame()?"—":best?number(best.distance)+" km":"—";
     $("reportHints").textContent=number(Number.isInteger(game.paidHints)
       ?game.paidHints:Math.round(game.penalty/HINT_COST));
     $("reportScore").textContent=number(game.score)+" / 5,000";
-    $("reportCoordinates").textContent=place[3].toFixed(4)+"°, "+place[4].toFixed(4)+"°";
+    $("reportCoordinates").textContent=isCountryGame()?"—":place[3].toFixed(4)+"°, "+place[4].toFixed(4)+"°";
     $("reportContinent").textContent=continentName(game.index);
     renderCountryProfile(details,iso,place);
-    $("reportFact").textContent=factFor(game.index);
+    $("reportFact").textContent=isCountryGame()?t("countryCaseContext",{country:countryName(game.index)}):factFor(game.index);
     const log=$("reportTimeline");log.replaceChildren();
     for(const [i,g] of game.guesses.entries()){
       const row=document.createElement("li");row.className="report-log-row";
@@ -1292,12 +1293,14 @@
     renderCaseNavigation();
     $("resultCard").classList.toggle("hidden",!game.finished);
     if(!game.finished)return;
-    const name=isRush()?countryName(game.index):cityName(cityAt(game.index))+", "+countryName(game.index);
+    const name=isCountryGame()?countryName(game.index):cityName(cityAt(game.index))+", "+countryName(game.index);
     $("resultKicker").textContent=t(game.won?"solved":"closed");
     $("resultTitle").textContent=name;
     $("resultDetail").textContent=isRush()
       ?t(game.won?"rushFound":"rushLost",{country:name,count:game.guesses.length,
         time:formatElapsed(game.durationMs??elapsedMs())})
+      :isCountryGame()?t(game.won?"countryFound":"countryLost",
+        {country:name,count:game.guesses.length})
       :game.won?t("foundText",{city:name,count:game.guesses.length,
         km:number(bestGuess().distance)}):t("lostText",{city:name});
     $("finalScore").textContent=number(game.score);
@@ -1307,7 +1310,7 @@
     const el=$("feedback");
     if(!game.guesses.length||game.finished){el.classList.add("hidden");return}
     const last=game.guesses.at(-1);
-    el.textContent=isRush()?t("rushWrong"):
+    el.textContent=isCountryGame()?t("rushWrong"):
       difficulty==="hard"?t("hardDistance",{km:number(last.distance)}) :
       t("feedback",{km:number(last.distance),dir:direction(last.bearing)});
     el.className="feedback";
@@ -1326,7 +1329,7 @@
     $("caseCode").textContent=code;
     $("caseNumber").textContent=t("caseWord")+" "+code;
     $("modeCaption").textContent=t(daily?"modeDaily":"modeFree");
-    $("caseTitle").textContent=game.finished?(isRush()?countryName(game.index):cityName(cityAt(game.index))):t("unknown");
+    $("caseTitle").textContent=game.finished?(isCountryGame()?countryName(game.index):cityName(cityAt(game.index))):t("unknown");
     $("caseStatus").textContent=t(game.finished?(game.won?"solved":"closed"):"active");
     $("caseStatus").classList.toggle("closed",game.finished);
     $("attemptCount").textContent=isRush()?t("rushUnlimited"):remaining+" / "+max;
@@ -1338,14 +1341,14 @@
     renderClues();renderHistory();renderResult();feedback();
     $("guessBtn").disabled=game.finished||!selected||(isRush()&&!game.started);
     $("citySearch").disabled=game.finished||(isRush()&&!game.started);
-    $("citySearch").placeholder=t(isRush()?"rushSearchPlaceholder":"searchPlaceholder");
-    $("searchLabel").textContent=t(isRush()?"rushSearchLabel":"searchLabel");
+    $("citySearch").placeholder=t(isCountryGame()?"rushSearchPlaceholder":"searchPlaceholder");
+    $("searchLabel").textContent=t(isCountryGame()?"rushSearchLabel":"searchLabel");
     $("citySearch").value="";
     $("suggestions").classList.add("hidden");
     $("selection").classList.toggle("hidden",game.finished);
     $("selectedText").textContent=selected?(selected.label||selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°"):t("noSelection");
     $("mapHint").textContent=t(game.finished?"mapRevealed":
-      isRush()&&!game.started?"rushIntroHint":isRush()?"rushMapHint":"mapHint");
+      isRush()&&!game.started?"rushIntroHint":isCountryGame()?"rushMapHint":"mapHint");
     $("rushIntro").classList.toggle("hidden",!isRush()||game.started||game.finished);
     $("rushIntro").setAttribute("aria-hidden",String(!isRush()||game.started||game.finished));
     $("rushIntroTitle").textContent=t("rushIntroTitle");
