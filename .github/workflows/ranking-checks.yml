@@ -1,0 +1,50 @@
+name: Ranking API checks
+on:
+  push:
+    branches: ["feature/ranking"]
+    paths:
+      - "backend/**"
+      - "ranking-client.js"
+      - "ranking-panel.html"
+      - "ranking.css"
+      - ".github/workflows/ranking-checks.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "ranking-client.js"
+      - "ranking-panel.html"
+      - "ranking.css"
+      - "app.js"
+      - "index.html"
+      - ".github/workflows/ranking-checks.yml"
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate source syntax
+        run: |
+          node --check ranking-client.js
+          node --check app.js
+          for source in backend/src/*.js; do node --check "$source"; done
+      - name: Run ranking unit tests
+        run: node --test backend/tests/*.test.mjs
+      - name: Validate D1 schema and triggers
+        run: |
+          python3 - <<'PY'
+          import sqlite3
+          db = sqlite3.connect(":memory:")
+          db.executescript(open("backend/schema.sql").read())
+          db.execute("INSERT INTO users(id,username,email,password_hash,password_salt,created_at) VALUES('u','tester','test@example.com','hash','salt',1)")
+          db.execute("INSERT INTO game_sessions(id,play_hash,day,difficulty,target_code,created_at,guesses_json,revealed) VALUES('g','hash','2026-11-17','normal','BR',1,'[]',2)")
+          db.execute("INSERT INTO game_results(game_id,user_id,challenge_day,difficulty,week_key,month_key,score,won,guesses,hints,duration_ms,created_at) VALUES('g','u','2026-11-17','normal','2026-11-16','2026-11',4200,1,2,0,1000,1)")
+          results=db.execute("SELECT period_type,points,wins,games FROM player_stats ORDER BY period_type").fetchall()
+          assert results==[('month',4200,1,1),('total',4200,1,1),('week',4200,1,1)],results
+          print("D1 schema and result rollups OK")
+          PY
