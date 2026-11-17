@@ -731,10 +731,13 @@ test("Mobile Rush reveals no clues before Start and shows evidence popup after S
   const g=boot({mobile:true,clock:Clock,map:true}),$=g.get;
   g.difficulty("rush");
   assert.equal($("mobileEvidenceBtn").disabled,true);
+  assert.equal($("mobileGuessBtn").disabled,true);
   assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),false);
   assert.equal($("mobileEvidencePreview").textContent,"0 / 10");
   $("mobileEvidenceBtn").click();
+  $("mobileGuessBtn").click();
   assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),false);
+  assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),false);
   $("rushStartBtn").click();
   assert.equal($("mobileEvidenceBtn").disabled,false);
   assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),true);
