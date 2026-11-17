@@ -70,13 +70,14 @@
   let lang = typeof savedLang === "string" && TRANSLATIONS[savedLang] ? savedLang : "en";
   const savedDifficulty = store.get("geodetective-difficulty");
   let difficulty = DIFFICULTIES[savedDifficulty] ? savedDifficulty : "normal";
-  let game=null,selected=null,map=null,marker=null,guessMarkers=[];
+  let game=null,selected=null,map=null,marker=null,guessMarkers=[],resultMarker=null;
   let markerCase=null,markerMap=null;
   let activeLine=false, mapStyleReady=false, lastDragAt=0, pointerDown=null, pointerMoved=false;
   let fallbackSwitching=false, mapStyleTimeout=null, mapSwitching=false, mapPointerController=null;
   let activeMapStyle=window.maplibregl?.isFallback?"osm":"vector";
   let controller = null, debounce = null, toastTimer = null;
   let rushCountryRequest=0, countryShapesPromise=null;
+  let suggestionOptions=[],activeSuggestionIndex=0;
   const regionFormatters = new Map();
   const currencyFormatters = new Map();
   const clueCache = new Map();
@@ -990,7 +991,7 @@
     $("countrySearch").placeholder=t(isCountryGame()?"rushSearchPlaceholder":"searchPlaceholder");
     $("searchLabel").textContent=t(isCountryGame()?"rushSearchLabel":"searchLabel");
     $("countrySearch").value="";
-    $("suggestions").classList.add("hidden");
+    hideSuggestions();
     $("selection").classList.toggle("hidden",game.finished);
     $("selectedText").textContent=selected?(selected.label||selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°"):t("noSelection");
     $("mapHint").textContent=t(game.finished?"mapRevealed":
@@ -1022,6 +1023,8 @@
     guessMarkers=[];
     marker?.remove();
     marker=null;
+    resultMarker?.remove();
+    resultMarker=null;
     markerCase=null;
     markerMap=null;
   }
@@ -1329,6 +1332,15 @@
         guess===best?"best":"past",guess.label||"");
       guessMarkers.push(pin);
     }
+    // Reveal the actual answer as a star pin only after Rush has ended.
+    // Keep it separate from numbered guesses across redraws and style changes.
+    if(isRush()&&game.finished&&!resultMarker){
+      const answer=COUNTRIES[game.index];
+      resultMarker=addMarker(answer.lat,answer.lng,"★","target",countryName(game.index));
+    }else if((!isRush()||!game.finished)&&resultMarker){
+      resultMarker.remove();
+      resultMarker=null;
+    }
     // The + pin is temporary. Submitted numbered pins are never removed here.
     marker?.remove();
     marker=null;
@@ -1426,7 +1438,7 @@
       selected={lat,lng,label:displayRegion(countryCode),countryCode};
       $("selectedText").textContent=selected.label;
       $("countrySearch").value=selected.label;
-      $("suggestions").classList.add("hidden");
+      hideSuggestions();
       $("guessBtn").disabled=false;
       renderMap();
     }catch(error){
@@ -1447,7 +1459,7 @@
     if(map&&label)map.easeTo({center:[selected.lng,selected.lat],zoom:Math.max(map.getZoom(),4),duration:350});
     $("guessBtn").disabled=false;
     $("selectedText").textContent=selected.label||selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°";
-    $("suggestions").classList.add("hidden");
+    hideSuggestions();
     renderMap();
   }
   function reveal(){
@@ -1501,28 +1513,65 @@
     }
     return results;
   }
+  function hideSuggestions(){
+    $("suggestions").classList.add("hidden");
+    $("countrySearch").setAttribute("aria-expanded","false");
+    $("countrySearch").setAttribute("aria-activedescendant","");
+  }
+  function setActiveSuggestion(index){
+    if(!suggestionOptions.length)return;
+    activeSuggestionIndex=(index+suggestionOptions.length)%suggestionOptions.length;
+    suggestionOptions.forEach(({button},i)=>{
+      const active=i===activeSuggestionIndex;
+      button.classList.toggle("active",active);
+      button.setAttribute("aria-selected",String(active));
+    });
+    const button=suggestionOptions[activeSuggestionIndex].button;
+    $("countrySearch").setAttribute("aria-activedescendant",button.id);
+    button.scrollIntoView?.({block:"nearest"});
+  }
+  function chooseSuggestion(item,confirm=false){
+    if(game.finished||(isRush()&&!game.started))return;
+    selected={lat:item.lat,lng:item.lon,label:item.name,countryCode:item.countryCode};
+    $("guessBtn").disabled=false;
+    $("selectedText").textContent=item.name;
+    $("countrySearch").value=item.name;
+    hideSuggestions();
+    // Pressing Enter is the equivalent of clicking Confirm guess, while
+    // clicking a suggestion only selects it and displays its + map pin.
+    if(confirm)guess();
+    else renderMap();
+  }
   function suggestions(items){
-    const list=$("suggestions");list.replaceChildren();
+    const list=$("suggestions");
+    list.replaceChildren();
+    suggestionOptions=[];
+    activeSuggestionIndex=0;
     if(!items.length){
-      const empty=document.createElement("div");empty.className="suggestion-empty";empty.textContent=t("noResults");list.append(empty);
+      const empty=document.createElement("div");
+      empty.className="suggestion-empty";
+      empty.textContent=t("noResults");
+      list.append(empty);
     }
     for(let i=0;i<items.length&&i<7;i++){
       const item=items[i];
-      const button=document.createElement("button");button.type="button";button.className="suggestion";button.setAttribute("role","option");
+      const button=document.createElement("button");
+      button.type="button";button.className="suggestion";
+      button.id="country-suggestion-"+i;
+      button.setAttribute("role","option");
+      button.setAttribute("aria-selected","false");
       button.textContent=item.name;
-      const desc=document.createElement("small");desc.textContent=item.description;button.append(desc);
-      button.addEventListener("click",()=>{
-        if(item.countryCode){
-          selected={lat:item.lat,lng:item.lon,label:item.name,countryCode:item.countryCode};
-          $("guessBtn").disabled=false;$("selectedText").textContent=item.name;
-          $("suggestions").classList.add("hidden");
-          renderMap();
-        }else selectPoint(item.lat,item.lon,item.name);
-        $("countrySearch").value=item.name;
-      });
+      const desc=document.createElement("small");
+      desc.textContent=item.description;
+      button.append(desc);
+      button.addEventListener("click",()=>chooseSuggestion(item));
       list.append(button);
+      suggestionOptions.push({item,button});
     }
     list.classList.remove("hidden");
+    $("countrySearch").setAttribute("aria-expanded","true");
+    if(suggestionOptions.length)setActiveSuggestion(0);
+    else $("countrySearch").setAttribute("aria-activedescendant","");
   }
   async function share(){
     const symbols=game.guesses.map(g=>isCountryGame()?(g.countryCode===COUNTRY_CODES[game.index]?"✓":"×"):g.distance<=WIN_RADIUS?"🟨":g.distance<500?"🟧":"⬛").join("");
@@ -1845,7 +1894,15 @@
     $("reportOpenBtn").addEventListener("click",showReport);
     $("newCaseBtn").addEventListener("click",startFree);
     $("reportCloseBtn").addEventListener("click",closeReport);
-    $("reportMapBtn").addEventListener("click",closeReport);
+    $("reportMapBtn").addEventListener("click",()=>{
+      closeReport();
+      // The map button in the dossier goes to the answer pin in Rush.
+      if(isRush()&&game.finished&&map){
+        const answer=COUNTRIES[game.index];
+        map.easeTo({center:[answer.lng,answer.lat],
+          zoom:Math.max(3,Math.min(map.getZoom(),5)),duration:450});
+      }
+    });
     $("reportNextBtn").addEventListener("click",()=>{closeReport();startFree()});
     $("reportAlternateBtn").addEventListener("click",()=>{
       if(game?.mode!=="daily"||!game.finished)return;
@@ -1864,18 +1921,42 @@
       const term=e.target.value.trim();
       if(controller)controller.abort();
       clearTimeout(debounce);
-      if(term.length<1){$("suggestions").classList.add("hidden");return}
+      if(term.length<1){hideSuggestions();suggestionOptions=[];return}
       suggestions(searchLocal(term));
       // Local country catalogue only; no city geocoder or network search.
     });
     $("countrySearch").addEventListener("keydown",e=>{
-      if(e.key==="Escape")$("suggestions").classList.add("hidden");
-      if(e.key==="Enter"){
-        const option=$("suggestions").querySelector("button.suggestion");
-        if(option&&!$("suggestions").classList.contains("hidden")){e.preventDefault();option.click()}
+      if(e.isComposing||e.keyCode===229||game.finished||
+        (isRush()&&!game.started))return;
+      if(e.key==="Escape"){
+        hideSuggestions();
+        return;
       }
+      if(e.key==="ArrowDown"||e.key==="ArrowUp"){
+        const term=$("countrySearch").value.trim();
+        if(!term)return;
+        e.preventDefault();
+        const wasHidden=$("suggestions").classList.contains("hidden");
+        if(wasHidden)suggestions(searchLocal(term));
+        if(!suggestionOptions.length)return;
+        setActiveSuggestion(wasHidden?(e.key==="ArrowDown"?0:suggestionOptions.length-1):
+          activeSuggestionIndex+(e.key==="ArrowDown"?1:-1));
+        return;
+      }
+      if(e.key!=="Enter")return;
+      const term=$("countrySearch").value.trim();
+      if(!term)return;
+      e.preventDefault();
+      const closed=$("suggestions").classList.contains("hidden");
+      const options=closed?searchLocal(term).map(item=>({item})):suggestionOptions;
+      // Enter without arrow navigation confirms the first country.
+      // After using the arrows, it confirms the highlighted country.
+      const match=options[closed?0:activeSuggestionIndex];
+      if(match)chooseSuggestion(match.item,true);
     });
-    document.addEventListener("click",e=>{if(!e.target.closest(".search-wrap"))$("suggestions").classList.add("hidden")});
+    document.addEventListener("click",e=>{
+      if(!e.target.closest(".search-wrap"))hideSuggestions();
+    });
     startDaily();
     setLanguage(lang);
     if(typeof setInterval==="function")setInterval(clockTick,250);

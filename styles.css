@@ -94,7 +94,7 @@ main{flex:1;min-height:0;display:flex;flex-direction:column}
 .search-icon{position:absolute;top:2px;left:8px;color:var(--accent);font:23px var(--font);pointer-events:none}
 .suggestions{position:absolute;z-index:1000;top:36px;left:0;right:0;background:#292c25;border:1px solid #656952;box-shadow:0 4px 9px #0006;max-height:180px;overflow:auto}
 .suggestion{width:100%;display:block;text-align:left;padding:7px 9px;background:transparent;color:var(--text);border:0;border-bottom:1px solid var(--border);font:11px var(--font)}
-.suggestion:last-child{border:0}.suggestion:hover,.suggestion:focus-visible{background:#3c4132}
+.suggestion:last-child{border:0}.suggestion:hover,.suggestion:focus-visible,.suggestion.active{background:var(--accent-soft,#3c4132);outline-offset:-2px}.suggestion.active{box-shadow:inset 3px 0 var(--accent);color:var(--text)}
 .suggestion small{display:block;font-size:10px;color:var(--muted)}
 .suggestion-empty{padding:9px;color:var(--muted);font-size:11px}
 .selection{display:flex;align-items:center;gap:7px;min-height:30px;color:var(--muted);font:11px var(--font)}

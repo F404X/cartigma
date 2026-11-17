@@ -472,3 +472,128 @@ test("Other difficulties also retain numbered pins across consecutive guesses",(
   assert.ok(g.mapState.markers.includes(first));
   assert.ok(g.mapState.markers.some(m=>m.element.children[0]?.textContent==="2"));
 });
+
+
+test("Country autocomplete confirms the first result on Enter, without a mouse click",()=>{
+  const g=boot({map:true}),$=g.get;
+  const field=$("countrySearch"),list=$("suggestions");
+  field.value="United";
+  field.handlers.input({target:field});
+  assert.ok(list.children.length>=3);
+  const first=list.children[0].textContent;
+  assert.equal(list.children[0].classList.contains("active"),true);
+  assert.equal(field.attributes["aria-expanded"],"true");
+  assert.equal(field.attributes["aria-activedescendant"],list.children[0].id);
+  let prevented=false;
+  field.handlers.keydown({key:"Enter",preventDefault(){prevented=true}});
+  assert.equal(prevented,true);
+  assert.equal($("guessHistory").children.length,1);
+  const committed=$("guessHistory").children[0].children[0].children[1].textContent;
+  assert.equal(committed,first);
+  assert.equal(list.classList.contains("hidden"),true);
+  assert.equal(field.attributes["aria-expanded"],"false");
+  assert.ok(g.mapState.markers.some(m=>m.element.children[0].textContent==="1"));
+});
+
+test("Arrow keys select the highlighted country and Enter submits that country",()=>{
+  const g=boot(),$=g.get;
+  const field=$("countrySearch"),list=$("suggestions");
+  field.value="United";
+  field.handlers.input({target:field});
+  assert.ok(list.children.length>=3);
+  const first=list.children[0].textContent;
+  const second=list.children[1].textContent;
+  let prevented=0;
+  const press=(key,extra={})=>field.handlers.keydown({
+    key,preventDefault(){prevented++},...extra
+  });
+  press("ArrowDown");
+  assert.equal(list.children[1].classList.contains("active"),true);
+  assert.equal(list.children[0].classList.contains("active"),false);
+  assert.equal(field.attributes["aria-activedescendant"],list.children[1].id);
+  press("ArrowUp");
+  assert.equal(list.children[0].classList.contains("active"),true);
+  press("ArrowDown");
+  const active=list.children[1].textContent;
+  assert.equal(active,second);
+  assert.notEqual(active,first);
+  press("Enter",{isComposing:true});
+  assert.equal($("guessHistory").children.length,1); // empty-history placeholder
+  press("Enter");
+  const committed=$("guessHistory").children[0].children[0].children[1].textContent;
+  assert.equal(committed,second);
+  assert.equal(prevented,4);
+});
+
+test("Autocomplete with no matches cannot submit a guess; clicking suggestion only selects",()=>{
+  const g=boot({map:true}),$=g.get;
+  const field=$("countrySearch");
+  field.value="not-a-real-country-xyz";
+  field.handlers.input({target:field});
+  let prevented=false;
+  field.handlers.keydown({key:"Enter",preventDefault(){prevented=true}});
+  assert.equal(prevented,true);
+  assert.equal($("guessHistory").children[0].className,"empty-history");
+  field.value="United";
+  field.handlers.input({target:field});
+  const first=$("suggestions").children[0];
+  first.click();
+  assert.equal($("guessHistory").children[0].className,"empty-history");
+  assert.equal($("guessBtn").disabled,false);
+  assert.ok(g.mapState.markers.some(m=>m.element.children[0].textContent==="+"));
+});
+
+test("Rush reveals a distinct result pin only after victory or time limit",()=>{
+  const Clock=fakeClock();
+  const g=boot({clock:Clock,map:true}),$=g.get;
+  g.difficulty("rush");
+  const marker=label=>g.mapState.markers.find(m=>
+    m.element.children[0]?.textContent===label);
+  assert.equal(marker("★"),undefined);
+  $("rushStartBtn").click();
+  const saved=JSON.parse(g.storage.get(CATALOG_KEY+"2026-11-17-rush"));
+  const target=g.window.CartigmaCountries[saved.index];
+  const wrong=g.window.CartigmaCountries.find(c=>c.code!==target.code);
+  g.select(wrong.name);
+  $("guessBtn").click();
+  const guessPin=marker("1");
+  assert.ok(guessPin);
+  assert.equal(marker("★"),undefined,"Answer must stay hidden during Rush");
+  // Timeout reveals the correct country's reference position and leaves
+  // numbered guess markers intact, even after the map's style reloads.
+  Clock.ms+=60001;
+  g.tick();
+  const resultPin=marker("★");
+  assert.ok(resultPin,"A correct-country result pin must appear after timeout");
+  assert.deepEqual(Array.from(resultPin.coordinate),[target.lng,target.lat]);
+  assert.equal(marker("1"),guessPin);
+  g.mapState.events["style.load"]();
+  assert.equal(marker("★"),resultPin);
+  assert.equal(marker("1"),guessPin);
+  $("reportMapBtn").click();
+  assert.equal($("reportDialog").open,false);
+  assert.deepEqual(Array.from(g.mapState.eases.at(-1).center),[target.lng,target.lat]);
+  $("freeBtn").click();
+  assert.equal(marker("★"),undefined,"New games must remove old answer pins");
+  assert.equal(marker("1"),undefined,"New games must remove old guess pins");
+});
+
+test("Rush success shows the answer pin and preserves the winning guess pin",()=>{
+  const Clock=fakeClock();
+  const g=boot({clock:Clock,map:true}),$=g.get;
+  g.difficulty("rush");
+  $("rushStartBtn").click();
+  const saved=JSON.parse(g.storage.get(CATALOG_KEY+"2026-11-17-rush"));
+  const target=g.window.CartigmaCountries[saved.index];
+  g.select(target.name);
+  $("guessBtn").click();
+  assert.equal($("reportDialog").open,true);
+  assert.ok(g.mapState.markers.some(m=>m.element.children[0]?.textContent==="1"));
+  const result=g.mapState.markers.find(m=>m.element.children[0]?.textContent==="★");
+  assert.ok(result);
+  assert.deepEqual(Array.from(result.coordinate),[target.lng,target.lat]);
+  const markerCount=g.mapState.markers.length;
+  g.tick();g.mapState.events["style.load"]();
+  assert.equal(g.mapState.markers.length,markerCount,
+    "Repeated renders must not duplicate result markers");
+});
