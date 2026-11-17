@@ -80,3 +80,19 @@ BEGIN
   ON CONFLICT(user_id,period_type,period_key,difficulty) DO UPDATE SET
     points=points+excluded.points,wins=wins+excluded.wins,games=games+1;
 END;
+
+-- One verified competitive attempt per account, UTC day and difficulty,
+-- irrespective of whether the map mode was daily or free play.
+CREATE TABLE IF NOT EXISTS ranked_reservations (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  game_id TEXT NOT NULL UNIQUE REFERENCES game_sessions(id) ON DELETE CASCADE,
+  challenge_day TEXT NOT NULL,
+  difficulty TEXT NOT NULL,
+  mode TEXT NOT NULL CHECK(mode IN ('daily','free')),
+  PRIMARY KEY(user_id, challenge_day, difficulty)
+);
+CREATE TABLE IF NOT EXISTS leaderboard_cooldowns (
+  ip_hash TEXT PRIMARY KEY,
+  next_allowed INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_leaderboard_cooldown_expiry ON leaderboard_cooldowns(next_allowed);
