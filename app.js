@@ -1504,7 +1504,8 @@
   }
   function suggestionButtons(){
     return [...$("suggestions").children].filter(button=>
-      button.className==="suggestion");
+      typeof button.className==="string"&&
+      button.className.split(/\s+/).includes("suggestion"));
   }
   function closeSuggestions(){
     $("suggestions").classList.add("hidden");
@@ -1901,6 +1902,14 @@
       const term=e.target.value.trim();
       if(controller)controller.abort();
       clearTimeout(debounce);
+      // A new search invalidates an earlier selected country: Enter must
+      // never accidentally submit the previous selection for a new query.
+      if(selected&&norm(term)!==norm(selected.label)){
+        selected=null;
+        $("guessBtn").disabled=true;
+        $("selectedText").textContent=t("noSelection");
+        renderMap();
+      }
       if(term.length<1){closeSuggestions();return}
       suggestions(searchLocal(term));
       // Local country catalogue only; no city geocoder or network search.
