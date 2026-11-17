@@ -20,7 +20,7 @@
   const DIFFICULTIES = {normal:{attempts:6,initial:2},hard:{attempts:4,initial:1},rush:{attempts:Infinity,initial:1}};
   const SERIAL_PREFIX = "geodetective-case-counter-";
   const EVIDENCE_COUNT = 10;
-  const WIN_RADIUS = 100, HINT_COST = 300, DAILY_KEY = "cartigma-country-daily-v5-";
+  const WIN_RADIUS = 100, HINT_COST = 300, DAILY_KEY = "cartigma-country-daily-v6-";
   // 300 is preserved only for loading older saved games. New charges reflect
   // information gain; the price for the NEXT clue is always shown before purchase.
   const HINT_PRICES=Object.freeze({
@@ -195,7 +195,8 @@
     const {primary,zones}=countryBelts(index);
     const name=CLUE_I18N[lang]?.zones?.[primary]||
       CLUE_I18N.en?.zones?.[primary]||primary;
-    return name+(zones.length>1?" (+"+(zones.length-1)+")":"");
+    return name+(zones.length>1?
+      " "+t(zones.length===2?"latitudeOtherOne":"latitudeOtherMany"):"");
   }
   // Latitude belts describe angular position, not meteorological climate.
   // All non-equatorial belts occur in both hemispheres. Keep both visible,
@@ -254,27 +255,27 @@
       add("countryArea",{...numericBoundary(data.area,code+":area:"+level)});
     if(typeof data.landlocked==="boolean")
       add("countryLandlocked",{landlocked:data.landlocked});
+    if(Number.isInteger(COUNTRIES[index]?.borders)&&COUNTRIES[index].borders>=0)
+      add("countryBorders",{value:COUNTRIES[index].borders});
     return candidates;
   }
   // New country cases use country-wide facts and a reference point for grids.
   // No landscape, city population, capital-distance or coastal-distance clues.
   function cluesFor(index,level){
-    const cacheKey=index+":"+level+":"+lang+":country5";
+    const cacheKey=index+":"+level+":"+lang+":country6";
     if(clueCache.has(cacheKey))return clueCache.get(cacheKey);
     const geo=[
       {key:"continent",value:continentName(index)},
       {key:"zone",value:countryLatitudeZone(index)},
       coordinateClue(index,level),
-      latitudeGridClue(index,level)
+      {key:"utmBand",band:utmLatitudeBand(COUNTRIES[index].lat)}
     ];
     const extras=extraCountryClues(index,level);
     const reference=COUNTRIES[index];
     const from=Math.floor(reference.lng/30)*30;
-    const bottom=Math.floor(reference.lat/15)*15;
     const fallback=[
       {key:"hemisphere",value:tc(reference.lat>=0?"north":"south")},
       {key:"longitude",from,to:from+30},
-      {key:"latitude",from:bottom,to:bottom+15},
       {key:"utmZone",zone:utmZone(reference.lat,reference.lng)},
       {key:"utmBand",band:utmLatitudeBand(reference.lat)}
     ];
@@ -290,7 +291,7 @@
       if(initial.length===EVIDENCE_COUNT)break;
     }
     if(initial.length!==EVIDENCE_COUNT||
-      initial.some(clue=>["terrain","capital","cityCapitalDistance","cityCoastDistance"].includes(clue.key)))
+      initial.some(clue=>["terrain","capital","latitude","cityCapitalDistance","cityCoastDistance"].includes(clue.key)))
       throw Error("Invalid country clue set for "+reference.code);
     clueCache.set(cacheKey,initial);
     return initial;
@@ -306,18 +307,10 @@
     return tc(clue.key,clue);
   }
   function maximum(){return DIFFICULTIES[difficulty].attempts}
-  // The same seeded permutation repeats after all 195 states are used.
-  // A fixed permutation prevents duplicates in ANY rolling 195-day window,
-  // including the date a new player starts or a 195-day boundary.
-  const DAY_MS=86400000;
+  // Each UTC date is independently seeded: the same country may reappear
+  // on subsequent dates. No elimination-style daily cycle is exposed.
   function dailyIndex(level=difficulty){
-    const day=Math.floor(Date.parse(today()+"T00:00:00Z")/DAY_MS);
-    const offset=((day%COUNTRIES.length)+COUNTRIES.length)%COUNTRIES.length;
-    const seed="cartigma-country-daily-v5:"+level;
-    const order=COUNTRY_CODES.map((code,index)=>({code,index}))
-      .sort((a,b)=>hash(seed+":"+a.code)-hash(seed+":"+b.code)||
-        a.code.localeCompare(b.code));
-    return order[offset].index;
+    return hash("cartigma-country-daily-v6:"+today()+":"+level)%COUNTRIES.length;
   }
   function dailyStorageKey(level=difficulty){return DAILY_KEY+today()+"-"+level}
   // Finished daily cases cannot be replayed, whether solved or closed after
@@ -339,7 +332,7 @@
       started:difficulty!=="rush",
       startedAt:difficulty==="rush"?null:Date.now(),endedAt:null,durationMs:null,
       revealed:difficulty==="rush"?0:DIFFICULTIES[difficulty].initial,penalty:0,paidHints:0,
-      sectorMapPenalty:0,sectorReveals:[],evidenceVersion:5,targetKind:"country",
+      sectorMapPenalty:0,sectorReveals:[],evidenceVersion:6,targetKind:"country",
       finished:false,won:false,score:0};
   }
   function isRush(){return difficulty==="rush"}
@@ -411,7 +404,7 @@
     const saved=store.get(dailyStorageKey());
     if(!saved||saved.mode!=="daily"||saved.date!==today()||
        saved.difficulty!==difficulty||saved.index!==dailyIndex()||
-       saved.targetKind!=="country"||saved.evidenceVersion!==5||
+       saved.targetKind!=="country"||saved.evidenceVersion!==6||
        !Array.isArray(saved.guesses)||saved.guesses.length>maximum()||
        !Number.isFinite(saved.revealed))return null;
     if(isRush()&&!saved.started){
@@ -420,38 +413,13 @@
     return saved;
   }
   function save(){if(game?.mode==="daily")store.set(dailyStorageKey(),game)}
-  // A persistent, shared, fully shuffled bag prevents repetition until all
-  // 195 countries have appeared in Freeplay (across all difficulties).
-  const FREE_BAG_KEY="cartigma-freeplay-country-bag-v1";
-  function randomIndex(max){
-    const bytes=typeof window.crypto?.getRandomValues==="function"?
-      window.crypto.getRandomValues(new Uint32Array(1))[0]/4294967296:
-      Math.random();
-    return Math.floor(bytes*max);
-  }
+  // Every Freeplay roll independently samples all 195 countries with an
+  // equal chance. Never remember used countries or exclude recent answers.
   function chooseFree(){
-    let bag=store.get(FREE_BAG_KEY);
-    const possible=new Set(COUNTRY_CODES);
-    if(!bag||!Array.isArray(bag.remaining)||
-      bag.remaining.length===0||new Set(bag.remaining).size!==bag.remaining.length||
-      bag.remaining.some(code=>!possible.has(code))){
-      const previous=bag?.last;
-      const remaining=[...COUNTRY_CODES];
-      for(let i=remaining.length-1;i>0;i--){
-        const j=randomIndex(i+1);
-        [remaining[i],remaining[j]]=[remaining[j],remaining[i]];
-      }
-      if(remaining.length>1&&remaining.at(-1)===previous){
-        const j=randomIndex(remaining.length-1);
-        [remaining[j],remaining[remaining.length-1]]=
-          [remaining[remaining.length-1],remaining[j]];
-      }
-      bag={remaining,last:previous||null};
-    }
-    const code=bag.remaining.pop();
-    bag.last=code;
-    store.set(FREE_BAG_KEY,bag);
-    return COUNTRY_CODES.indexOf(code);
+    const entropy=typeof window.crypto?.getRandomValues==="function"
+      ?window.crypto.getRandomValues(new Uint32Array(1))[0]/4294967296
+      :Math.random();
+    return Math.floor(entropy*COUNTRIES.length);
   }
   function startDaily(){
     rushCountryRequest++;
@@ -506,7 +474,8 @@
     utmBand:"clueRegion",countryCurrency:"clueCivic",
     countryLanguageFamily:"clueCivic",countryFlagColor:"clueCivic",
     countryPopulation:"clueCivic",countryGDP:"clueCivic",
-    countryArea:"clueRegion",countryLandlocked:"clueRegion"
+    countryArea:"clueRegion",countryLandlocked:"clueRegion",
+    countryBorders:"clueRegion"
   });
   function revealGeographyOnMap(clue){
     const cost=overlayCost(clue.key);
@@ -1344,10 +1313,13 @@
     drawHemisphereOverlay();
     drawContinentOutline();
     const best=game.finished?bestGuess():null;
-    if(!isRush())game.guesses.forEach((g,i)=>
-      addMarker(g.lat,g.lng,i+1,g===best?"best":"past"));
+    // All modes must show numbered markers for guesses already submitted.
+    // Rush previously suppressed these markers entirely after confirmation.
+    game.guesses.forEach((guess,i)=>
+      addMarker(guess.lat,guess.lng,i+1,guess===best?"best":"past",guess.label||""));
+    // An unconfirmed country chosen by map click or search gets its own pin.
     if(!game.finished&&selected)
-      marker=addMarker(selected.lat,selected.lng,isRush()?"✓":"+","current");
+      marker=addMarker(selected.lat,selected.lng,"+","current",selected.label||"");
     $("coordinates").textContent=game.finished?countryName(game.index):
       selected?selected.label||selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°":
       t("noSelection");
