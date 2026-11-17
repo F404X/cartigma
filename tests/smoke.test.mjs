@@ -814,3 +814,22 @@ test("the full-sized desktop evidence list never auto-scrolls on new clues",()=>
   assert.equal($("hintCount").textContent,"3 / 10");
   assert.equal(list.scrollTop,42);
 });
+
+
+test("mobile clue scrolling keeps the entire most recent card above its footer",()=>{
+  const g=boot({mobile:true,map:true}),$=g.get;
+  const list=$("clueList");
+  list.getBoundingClientRect=()=>({top:100,bottom:200,height:100});
+  $("freeBtn").click();
+  const latest=list.children.find(row=>row.classList.contains("latest"));
+  assert.ok(latest,"Newest clue must be marked for scrolling");
+  latest.getBoundingClientRect=()=>({
+    top:260-list.scrollTop,bottom:316-list.scrollTop,height:56
+  });
+  list.scrollTop=0;
+  $("mobileEvidenceBtn").click(); // close
+  $("mobileEvidenceBtn").click(); // open and scroll
+  assert.equal(list.scrollTop,128,"Last card should have a 12px gap below it");
+  assert.equal(latest.getBoundingClientRect().bottom,188);
+  assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),true);
+});
