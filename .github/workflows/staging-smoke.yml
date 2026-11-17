@@ -31,7 +31,7 @@ jobs:
             if(c?.startsWith('__Host-cartigma_session='))cookie=c.split(';')[0];
             const data=(r.headers.get('content-type')||'').includes('application/json')?
               await r.json():await r.text();
-            return {status:r.status,data};
+            return {status:r.status,data,retryAfter:r.headers.get('retry-after')};
           }
           async function ok(path,body,status=200){
             const x=await req(path,body);
@@ -44,6 +44,8 @@ jobs:
             assert.match(home,/Cartigma/);
             assert.match(home,/ranking-client.js/);
             const stamp=Date.now().toString().slice(-11);
+            assert.match(home,/rushStartBtn/);
+            assert.match(home,/ranking-panel.html|ranking-client.js/);
             const username='stage'+stamp;
             const email=username+'@example.invalid';
             const password='CartigmaSmoke-Long-Passphrase-'+stamp;
@@ -53,21 +55,34 @@ jobs:
               created=true;
               assert.equal(reg.user.username,username);
               assert.equal((await ok('/v1/auth/me')).user.username,username);
-              const start=await ok('/v1/games/start',{difficulty:'normal'},201);
+              const start=await ok('/v1/games/start',{difficulty:'normal',mode:'free'},201);
+              assert.equal(start.mode,'free');
               assert.equal(start.finished,false);
               assert.equal(start.clues.length,2);
               assert.equal('target' in start,false);
+              const state=await ok('/v1/games/state',{id:start.id,playToken:start.playToken});
+              assert.equal(state.finished,false);
+              assert.equal('target' in state,false);
+              assert.equal((await req('/v1/games/start',{difficulty:'normal',mode:'daily'})).status,409);
               const finish=await ok('/v1/games/finish',{id:start.id,playToken:start.playToken});
               assert.equal(finish.finished,true);
               assert.equal(finish.score,0);
               const saved=await ok('/v1/games/save',{id:start.id,playToken:start.playToken});
               assert.equal(saved.saved,true);
-              const board=await ok('/v1/leaderboards');
-              assert.ok(board.boards.normal.week);
+              const board=await req('/v1/leaderboards');
+              assert.ok([200,429].includes(board.status),'Unexpected leaderboard status '+board.status);
+              if(board.status===200){
+                assert.ok(board.data.boards.normal.week);
+                const repeated=await req('/v1/leaderboards');
+                assert.equal(repeated.status,429);
+                assert.equal(repeated.retryAfter,'180');
+              }else{
+                assert.equal(board.retryAfter,'180');
+              }
               await ok('/v1/auth/logout',{});
               const login=await ok('/v1/auth/login',{email,password});
               assert.equal(login.user.username,username);
-              console.log("PASS: preview, register, login, verified match, save, leaderboard");
+              console.log("PASS: preview, register/login, reserved free match, private target, save, 180s leaderboard cooldown");
             }finally{
               if(created){
                 const deletion=await req('/v1/auth/delete',{password});
