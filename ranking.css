@@ -1,0 +1,62 @@
+/* Optional ranked layer, visually aligned with Cartigma's charcoal/yellow UI. */
+#rank-launch{white-space:nowrap}
+.rank-panel{
+  position:fixed;z-index:6000;right:14px;top:74px;width:min(365px,calc(100vw - 28px));
+  max-height:min(790px,calc(100dvh - 88px));display:flex;flex-direction:column;
+  background:#101821;color:#edf0f4;border:1px solid #38404b;
+  box-shadow:0 16px 55px #0009;border-radius:9px;font:14px/1.45 "IBM Plex Sans",sans-serif;
+}
+.rank-panel [hidden],.rank-panel[hidden]{display:none!important}
+.rank-panel button,.rank-panel input,.rank-panel select{font:inherit}
+.rank-panel button{cursor:pointer}
+.rank-panel button:disabled{opacity:.5;cursor:not-allowed}
+.rank-panel button:focus-visible,.rank-panel input:focus-visible,.rank-panel select:focus-visible{
+  outline:2px solid #f5cf56;outline-offset:2px}
+.rank-top{padding:14px 16px 12px;display:flex;justify-content:space-between;align-items:center;
+  border-bottom:1px solid #343c48;color:#fff;font-weight:700;letter-spacing:.015em}
+.rank-top button{background:transparent;color:#cad0d5;border:0;font-size:24px;line-height:1}
+.rank-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:9px 12px;
+  border-bottom:1px solid #343c48}
+.rank-tabs button,.rank-auth-tabs button{padding:8px 5px;background:transparent;color:#b5becb;
+  border:1px solid transparent;border-radius:5px;font-size:13px}
+.rank-tabs button.active,.rank-auth-tabs button.active{background:#272b26;color:#ffdf72;border-color:#66582f}
+.rank-body{padding:14px 16px 6px;overflow:auto;overscroll-behavior:contain;min-height:0}
+.rank-field{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.rank-panel label{display:block;color:#cbd3da;font-size:12px;margin:9px 0 5px}
+.rank-field label{margin:0}
+.rank-panel input,.rank-panel select{background:#18232d;color:#f0f3f5;
+  border:1px solid #3f4b58;border-radius:5px;padding:9px 10px;max-width:100%;min-width:0}
+.rank-panel select{min-width:145px}
+.rank-panel input{width:100%;display:block;margin-bottom:10px}
+.rank-panel .rank-primary,.rank-panel .rank-secondary{width:100%;border-radius:5px;
+  border:1px solid #71602d;padding:9px 12px;margin:8px 0 2px;font-weight:600}
+.rank-panel .rank-primary{background:#f5cf56;color:#1b1d20;border-color:#f5cf56}
+.rank-panel .rank-secondary{background:#262e36;color:#e3e6e9;border-color:#4c5660}
+.rank-list{list-style:none;margin:8px 0 6px;padding:0;display:grid;gap:2px}
+.rank-list li{display:flex;justify-content:space-between;gap:10px;align-items:center;
+  padding:9px 8px;background:#1a232b;border-radius:4px;min-width:0}
+.rank-list li:first-child{color:#ffe18b;background:#272a25}
+.rank-list li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rank-list li strong{font:600 12px "IBM Plex Mono",monospace;white-space:nowrap}
+.rank-note{color:#aeb9c3;font-size:12px;margin:5px 0 13px}
+.rank-status{margin:6px 16px 14px;font-size:12px;min-height:1em;color:#e0ca7c}
+.rank-status.rank-error{color:#ff9e9e}
+.rank-gameinfo{display:flex;justify-content:space-between;margin:12px 0;
+  font:600 14px "IBM Plex Mono",monospace}
+.rank-clues{margin:7px 0 11px;border:1px solid #38434c;border-radius:6px;
+  max-height:210px;overflow:auto;padding:7px 9px;background:#151d25}
+.rank-clues p{margin:7px 0;font-size:12px}
+.rank-panel #rank-country{width:100%;margin:6px 0}
+.rank-panel #rank-result{margin:12px 0;padding:12px;background:#243027;
+  border:1px solid #536347;border-radius:5px;font-weight:600}
+.rank-auth-tabs{display:flex;gap:8px;margin-bottom:12px}
+.rank-auth-tabs button{flex:1}
+.rank-panel #rank-turnstile{margin:8px 0}
+.rank-panel .rank-link{padding:8px 0;border:0;color:#f1ce66;background:none;text-decoration:underline}
+@media(max-width:760px){
+  #rank-launch{font-size:0}
+  #rank-launch::after{content:"🏆";font-size:18px}
+  .rank-panel{right:8px;left:8px;top:auto;bottom:8px;width:auto;max-height:78dvh}
+  .rank-clues{max-height:18dvh}
+  .rank-panel select{min-width:120px}
+}
