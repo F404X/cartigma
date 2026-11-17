@@ -36,7 +36,7 @@ class Element {
 }
 const hash=input=>{let h=2166136261;for(const c of input){h ^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0};
 function boot({storage=new Map(),map=false,randomValue=0,mobile=false,clock=Date}={}){
-  const nodes=new Map(),window={},mobileCase=new Element("mobile-case"),mapState={fits:[],eases:[],styles:[],zoomRanges:[],markers:[],layers:new Map(),sources:new Map(),events:{},canvas:new Element("canvas")};
+  const clockCallbacks=[],nodes=new Map(),window={},mobileCase=new Element("mobile-case"),mapState={fits:[],eases:[],styles:[],zoomRanges:[],markers:[],layers:new Map(),sources:new Map(),events:{},canvas:new Element("canvas")};
   const document={
     readyState:"complete",documentElement:{lang:"en",dir:"ltr"},hidden:false,
     getElementById(id){if(!nodes.has(id))nodes.set(id,new Element(id));return nodes.get(id)},
@@ -105,6 +105,7 @@ function boot({storage=new Map(),map=false,randomValue=0,mobile=false,clock=Date
   const context={
     window,document,localStorage,navigator:{},Math:math,Number,String,Array,Set,Map,JSON,Date:clock,Intl,
     AbortController,console,setTimeout(){return 0},clearTimeout(){},
+    setInterval(fn){clockCallbacks.push(fn);return clockCallbacks.length},clearInterval(){},
     fetch:async()=>({ok:true,json:async()=>({results:[]})})
   };
   for(const n of names.filter(n=>n.endsWith(".js")&&n!=="map-bootstrap.js"))
@@ -119,7 +120,8 @@ function boot({storage=new Map(),map=false,randomValue=0,mobile=false,clock=Date
   }
   const difficulty=value=>get("difficultySelect").handlers.change({target:{value}});
   const language=value=>get("langSelect").handlers.change({target:{value}});
-  return {get,window,document,storage,select,difficulty,language,mapState,mobileCase,perf};
+  return {get,window,document,storage,select,difficulty,language,mapState,mobileCase,perf,
+    tick(){for(const callback of clockCallbacks)callback()}};
 }
 function normalIndexForDay(date,window){
   const places=window.GEODETECTIVE_PLACES,extra=window.GeoExtendedPlaceMetadata;
@@ -530,7 +532,7 @@ test("sea-access cards never render the raw 'Região: Não' state",()=>{
     assert.ok(pack.countryLandlockedYes&&pack.countryLandlockedNo,language);
   }
   assert.ok(files["app.js"].includes("const authoritative=COUNTRY_INSIGHTS[COUNTRY_CODES[referenceIndex]]?.landlocked"));
-  assert.ok(files["index.html"].includes('src="country-clues-i18n.js?v=20261116-currency-names"'));
+  assert.ok(files["index.html"].includes('src="country-clues-i18n.js?v=20261117-numeric-bounds"'));
 });
 test("obsolete hemisphere map purchases in northern-only daily cases are refunded",()=>{
   const world=boot().window,places=world.GEODETECTIVE_PLACES;
@@ -759,7 +761,7 @@ test("country-area metrics always identify the country or territory in all local
   assert.equal(profile.pt.area,"Área do país ou território");
   assert.ok(clue.en.countryArea.includes("Country / territory area:"));
   assert.equal(profile.en.area,"Country / territory area");
-  assert.ok(files["index.html"].includes('src="country-clues-i18n.js?v=20261116-currency-names"'));
+  assert.ok(files["index.html"].includes('src="country-clues-i18n.js?v=20261117-numeric-bounds"'));
   assert.ok(files["index.html"].includes('src="country-profile-i18n.js?v=20261116-area-scope"'));
 });
 test("daily case file offers the other unfinished difficulty and a clear Free Play action",()=>{
@@ -966,7 +968,7 @@ test("capital and coastal distances omit names and years in every supported lang
   }
   assert.equal(locales.pt.templates.cityCapitalDistance,"≈ {value} km da capital");
   assert.equal(locales.pt.templates.cityCoastDistance,"≈ {value} km do litoral");
-  assert.ok(files["index.html"].includes('src="city-clues-i18n.js?v=20261116-short-distances"'));
+  assert.ok(files["index.html"].includes('src="city-clues-i18n.js?v=20261117-numeric-bounds"'));
 });
 test("five city-specific evidence types are sourced, dated, and conditional",()=>{
   const g=boot(),w=g.window,geo=w.CartigmaCityIndicators,urban=w.CartigmaUrban2025;
@@ -979,8 +981,8 @@ test("five city-specific evidence types are sourced, dated, and conditional",()=
     return {play,clues:revealAll(play)};
   };
   const sao=full(places.findIndex(p=>p[0]==="São Paulo"));
-  assert.ok(sao.clues.some(x=>x.includes("inhabitants (est. 2025)")&&
-    x.includes("18,950,000")),"São Paulo: verified 2025 UN agglomeration population");
+  assert.ok(sao.clues.some(x=>/^[<>] [\\d,]+ inhabitants \\(est\\. 2025\\)$/.test(x)),
+    "São Paulo: verified 2025 population must appear as a bounded inequality");
   assert.ok(sao.clues.some(x=>x==="≈ 875 km from the capital"),
     "São Paulo: capital distance without the city's name or calculation year");
   assert.ok(sao.clues.some(x=>/^UTC-3 \(2026\)$/.test(x)),
@@ -991,9 +993,9 @@ test("five city-specific evidence types are sourced, dated, and conditional",()=
   assert.ok(!goiania.clues.some(x=>x.includes("inhabitants (est. 2025)")),
     "No city census may be invented from country or old metropolitan figures");
   const mumbai=full(places.findIndex(p=>p[0]==="Mumbai"));
-  assert.ok(mumbai.clues.some(x=>x.includes("20,203,000")&&x.includes("2025")));
-  assert.ok(mumbai.clues.some(x=>x.includes("27,000")&&x.includes("2025")),
-    "UN 2025 urban density must be available for Mumbai");
+  assert.ok(mumbai.clues.some(x=>/^[<>] [\\d,]+ inhabitants \\(est\\. 2025\\)$/.test(x)));
+  assert.ok(files["app.js"].includes("numericBoundary(urban.density"),
+    "UN 2025 urban density must use the same truthful inequality system");
   const papeete=full(places.findIndex(p=>p[0]==="Papeete"));
   assert.equal(papeete.clues.length,10);
   assert.ok(!papeete.clues.some(x=>x.includes("inhabitants (est. 2025)")||
