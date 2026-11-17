@@ -917,3 +917,94 @@ test("result marker appears for every country, not just Lesotho or Rush",()=>{
     assert.deepEqual(Array.from(pin.coordinate),[target.lng,target.lat]);
   }
 });
+
+
+test("Mobile Normal can return from View map to guesses, clues and the case file",()=>{
+  const g=boot({mobile:true,map:true}),$=g.get;
+  $("freeBtn").click();
+  const target=g.window.CartigmaCountries[Math.floor(.42*195)];
+  g.select(target.name);$("guessBtn").click();
+  assert.equal($("reportDialog").open,true);
+  assert.equal($("mobilePanelTabs").classList.contains("finished"),true);
+  assert.equal($("mobileReportBtn").hidden,false);
+  assert.equal($("mobileReportBtn").disabled,false);
+  assert.equal($("mobileEvidenceBtn").disabled,false);
+  assert.equal($("mobileGuessBtn").disabled,false);
+  assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),false);
+  $("reportMapBtn").click();
+  assert.equal($("reportDialog").open,false);
+  assert.deepEqual(Array.from(g.mapState.eases.at(-1).center),[target.lng,target.lat]);
+  assert.equal($("mobileReportBtn").hidden,false);
+  $("mobileGuessBtn").click();
+  assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),true);
+  assert.equal($("mobileGuessBtn").attributes["aria-expanded"],"true");
+  assert.equal($("mobileGuessPanel").attributes["aria-hidden"],"false");
+  assert.equal($("mobileGuessPanel").classList.contains("mobile-case-finished"),true);
+  assert.equal($("guessHistory").children.length,1);
+  assert.equal($("resultCard").classList.contains("hidden"),false);
+  $("mobileEvidenceBtn").click();
+  assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),false);
+  assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),true);
+  assert.equal($("clueList").children.length,10);
+  $("mobileReportBtn").click();
+  assert.equal($("reportDialog").open,true);
+  assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),false);
+  $("reportCloseBtn").click();
+  assert.equal($("reportDialog").open,false);
+  $("mobileGuessBtn").click();
+  assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),true);
+  $("newCaseBtn").click();
+  assert.equal($("mobileReportBtn").hidden,true);
+  assert.equal($("mobilePanelTabs").classList.contains("finished"),false);
+  assert.equal($("mobileGuessPanel").classList.contains("mobile-case-finished"),false);
+});
+
+test("Mobile failed Hard case also keeps history and Case-file navigation",()=>{
+  const g=boot({mobile:true,map:true}),$=g.get;
+  g.difficulty("hard");
+  $("freeBtn").click();
+  const target=g.window.CartigmaCountries[Math.floor(.42*195)];
+  const other=g.window.CartigmaCountries.find(c=>c.code!==target.code);
+  for(let i=0;i<4;i++){g.select(other.name);$("guessBtn").click()}
+  assert.equal($("reportDialog").open,true);
+  $("reportMapBtn").click();
+  assert.equal($("reportDialog").open,false);
+  $("mobileGuessBtn").click();
+  assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),true);
+  assert.equal($("guessHistory").children.length,4);
+  $("mobileReportBtn").click();
+  assert.equal($("reportDialog").open,true);
+});
+
+test("Mobile Rush after timeout can reopen its guesses and result dossier",()=>{
+  const Clock=fakeClock();
+  const g=boot({mobile:true,map:true,clock:Clock}),$=g.get;
+  g.difficulty("rush");$("rushStartBtn").click();
+  const stored=JSON.parse(g.storage.get(CATALOG_KEY+"2026-11-17-rush"));
+  const target=g.window.CartigmaCountries[stored.index];
+  const wrong=g.window.CartigmaCountries.find(c=>c.code!==target.code);
+  g.select(wrong.name);$("guessBtn").click();
+  Clock.ms+=60001;g.tick();
+  assert.equal($("reportDialog").open,true);
+  $("reportMapBtn").click();
+  assert.equal($("reportDialog").open,false);
+  assert.ok(g.mapState.markers.some(m=>
+    m.element.children[0]?.textContent==="★"));
+  $("mobileGuessBtn").click();
+  assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),true);
+  assert.equal($("guessHistory").children.length,1);
+  assert.equal($("mobileGuessPreview").textContent,"1 / ∞");
+  $("mobileReportBtn").click();
+  assert.equal($("reportDialog").open,true);
+});
+
+test("Mobile postgame button is not offered while a case is active",()=>{
+  const g=boot({mobile:true,map:true}),$=g.get;
+  assert.equal($("mobileReportBtn").hidden,true);
+  assert.equal($("mobileReportBtn").disabled,true);
+  assert.equal($("mobilePanelTabs").classList.contains("finished"),false);
+  $("mobileReportBtn").click();
+  assert.equal($("reportDialog").open,false);
+  $("mobileGuessBtn").click();
+  assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),true);
+});
