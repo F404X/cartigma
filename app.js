@@ -516,7 +516,9 @@
     const current=game;
     current.pending=true;
     try{
-      const response=await window.CartigmaRanking.gameAction(action,payload);
+      const response=await window.CartigmaRanking.gameAction(action,{
+        ...payload,mode:current.mode,difficulty:current.difficulty
+      });
       if(game!==current)return;
       applyRankedState(response);
       selected=null;
@@ -622,11 +624,13 @@
   function maybeRestoreRanked(snapshot){
     const api=window.CartigmaRanking;
     if(!api?.mayRank?.())return;
-    api.resumeRanked(difficulty).then(response=>{
-      // Do not switch the current map when another game was selected.
-      if(!response||game!==snapshot||snapshot.started)return;
+    const mode=snapshot.mode,level=snapshot.difficulty;
+    api.resumeRanked(mode,level).then(response=>{
+      // Never overwrite the selected mode with a round from another mode.
+      // Completed free-play sessions are not restored for a new free case.
+      if(!response||response.mode!==mode||game!==snapshot||snapshot.started||
+         (mode==="free"&&response.finished))return;
       snapshot.ranked=true;
-      snapshot.mode=response.mode||snapshot.mode;
       applyRankedState(response);
       render();
     }).catch(()=>{});
