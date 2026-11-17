@@ -64,5 +64,34 @@
     if(values.length!==RUSH_KEYS.length||!PACKS[lang])throw Error("Rush translation mismatch: "+lang);
     Object.assign(PACKS[lang],Object.fromEntries(RUSH_KEYS.map((key,i)=>[key,values[i]])));
   }
+
+  const RUSH_EXTRA_KEYS="rushReady|rushIntroTitle|rushIntroText|rushStart|rushIntroHint|rushCheckingMap|rushNoCountry|rushMapUnavailable|rushMapHint".split("|");
+  const RUSH_EXTRA_DATA={
+    en:"Ready to start|Rush mode|Find the country in 60 seconds. A new clue unlocks every 6 seconds.|Start|Press Start to begin|Identifying country...|No playable country at this point. Click on land or use search.|Country boundaries unavailable. Use country search.|Click a country on the map or search its name",
+    pt:"Pronto para começar|Modo Rush|Encontre o país em 60 segundos. Uma nova evidência aparece a cada 6 segundos.|Começar|Clique em Começar para iniciar|Identificando país...|Nenhum país disponível nesse ponto. Clique em terra firme ou use a busca.|Não foi possível carregar os limites dos países. Use a busca.|Clique em um país no mapa ou pesquise seu nome",
+    es:"Listo para comenzar|Modo Rush|Encuentra el país en 60 segundos. Se desbloquea una pista cada 6 segundos.|Comenzar|Pulsa Comenzar para iniciar|Identificando país...|No se reconoce un país aquí. Pulsa en tierra o usa la búsqueda.|No se pudieron cargar las fronteras. Usa la búsqueda.|Pulsa un país en el mapa o busca su nombre",
+    zh:"准备开始|极速模式|60 秒内找出国家。每 6 秒解锁一条线索。|开始|点击开始进行游戏|正在识别国家...|此处没有可选国家。请点击陆地或使用搜索。|无法加载国家边界，请使用搜索。|点击地图上的国家或搜索名称",
+    ja:"開始準備完了|ラッシュモード|60秒以内に国を当てよう。6秒ごとにヒントを解放。|開始|開始ボタンを押してください|国を確認中...|ここに対象国はありません。陸地を押すか検索してください。|国境データを読み込めません。検索を使ってください。|地図の国を押すか名前で検索",
+    ru:"Готовы начать|Режим Rush|Угадайте страну за 60 секунд. Каждые 6 секунд открывается подсказка.|Начать|Нажмите Начать|Определяем страну...|Здесь нет доступной страны. Нажмите на сушу или воспользуйтесь поиском.|Не удалось загрузить границы. Используйте поиск.|Выберите страну на карте или в поиске",
+    fr:"Prêt à commencer|Mode Rush|Trouvez le pays en 60 secondes. Un indice se débloque toutes les 6 secondes.|Commencer|Appuyez sur Commencer|Identification du pays...|Aucun pays disponible ici. Touchez la terre ferme ou utilisez la recherche.|Limites des pays indisponibles. Utilisez la recherche.|Cliquez sur un pays ou recherchez son nom",
+    de:"Bereit zum Start|Rush-Modus|Finde das Land in 60 Sekunden. Alle 6 Sekunden wird ein Hinweis frei.|Starten|Zum Starten klicken|Land wird ermittelt...|Hier ist kein Land auswählbar. Klicke auf Landfläche oder nutze die Suche.|Landesgrenzen nicht verfügbar. Nutze die Suche.|Land auf der Karte wählen oder suchen",
+    it:"Pronto a iniziare|Modalità Rush|Trova il paese in 60 secondi. Un indizio si sblocca ogni 6 secondi.|Inizia|Premi Inizia|Identificazione paese...|Nessun paese disponibile qui. Clicca sulla terraferma o cerca.|Confini non disponibili. Usa la ricerca.|Seleziona un paese sulla mappa o cercalo",
+    nl:"Klaar om te starten|Rush-modus|Raad het land binnen 60 seconden. Elke 6 seconden verschijnt een hint.|Starten|Klik op Starten|Land bepalen...|Hier is geen land beschikbaar. Klik op land of gebruik de zoekfunctie.|Landsgrenzen niet beschikbaar. Gebruik zoeken.|Klik een land op de kaart of zoek op naam",
+    pl:"Gotowy do startu|Tryb Rush|Odgadnij kraj w 60 sekund. Co 6 sekund pojawia się wskazówka.|Rozpocznij|Kliknij Rozpocznij|Rozpoznawanie kraju...|Tutaj nie ma dostępnego kraju. Kliknij ląd lub użyj wyszukiwarki.|Nie można wczytać granic. Użyj wyszukiwarki.|Wybierz kraj na mapie lub wpisz jego nazwę",
+    sv:"Redo att börja|Rush-läge|Gissa landet inom 60 sekunder. En ledtråd öppnas var sjätte sekund.|Starta|Tryck Starta för att börja|Identifierar land...|Inget valbart land här. Klicka på land eller sök.|Landsgränser kunde inte laddas. Använd sökningen.|Klicka på ett land på kartan eller sök på namnet",
+    tr:"Başlamaya hazır|Rush modu|Ülkeyi 60 saniyede bul. Her 6 saniyede bir ipucu açılır.|Başla|Başlamak için tıkla|Ülke belirleniyor...|Burada seçilebilir ülke yok. Karaya tıkla veya arama yap.|Ülke sınırları yüklenemedi. Aramayı kullan.|Haritada ülkeye tıkla veya adını ara",
+    ar:"جاهز للبدء|وضع Rush|حدد الدولة خلال 60 ثانية. يظهر دليل جديد كل 6 ثوانٍ.|ابدأ|اضغط ابدأ للعب|جارٍ تحديد الدولة...|لا توجد دولة متاحة هنا. اضغط على اليابسة أو استخدم البحث.|تعذر تحميل حدود الدول. استخدم البحث.|اختر دولة من الخريطة أو ابحث عن اسمها",
+    he:"מוכן להתחיל|מצב Rush|מצא את המדינה תוך 60 שניות. רמז חדש נחשף כל 6 שניות.|התחל|לחץ התחל למשחק|מזהה מדינה...|אין מדינה זמינה בנקודה זו. לחץ על יבשה או חפש.|לא ניתן לטעון גבולות. השתמש בחיפוש.|לחץ על מדינה במפה או חפש את שמה",
+    ko:"시작 준비 완료|러시 모드|60초 안에 국가를 찾으세요. 6초마다 단서가 공개됩니다.|시작|시작 버튼을 누르세요|국가 확인 중...|이 위치에는 선택 가능한 국가가 없습니다. 육지를 누르거나 검색하세요.|국경 데이터를 불러올 수 없습니다. 검색을 이용하세요.|지도에서 국가를 누르거나 이름을 검색하세요",
+    th:"พร้อมเริ่ม|โหมด Rush|ค้นหาประเทศใน 60 วินาที เบาะแสใหม่เปิดทุก 6 วินาที|เริ่ม|กดเริ่มเพื่อเล่น|กำลังระบุประเทศ...|ไม่มีประเทศที่เลือกได้ตรงนี้ แตะบนแผ่นดินหรือใช้การค้นหา|โหลดขอบเขตประเทศไม่ได้ ใช้การค้นหา|แตะประเทศบนแผนที่หรือค้นหาชื่อ",
+    vi:"Sẵn sàng bắt đầu|Chế độ Rush|Tìm quốc gia trong 60 giây. Mỗi 6 giây mở thêm gợi ý.|Bắt đầu|Nhấn Bắt đầu để chơi|Đang xác định quốc gia...|Không có quốc gia phù hợp tại đây. Nhấn vào đất liền hoặc tìm kiếm.|Không thể tải biên giới. Hãy tìm kiếm.|Chọn quốc gia trên bản đồ hoặc tìm theo tên",
+    id:"Siap memulai|Mode Rush|Temukan negara dalam 60 detik. Petunjuk baru muncul setiap 6 detik.|Mulai|Tekan Mulai untuk bermain|Mencari negara...|Tidak ada negara yang tersedia di titik ini. Klik daratan atau gunakan pencarian.|Batas negara gagal dimuat. Gunakan pencarian.|Klik negara di peta atau cari namanya"
+  };
+  for(const [code,raw] of Object.entries(RUSH_EXTRA_DATA)){
+    const values=raw.split("|");
+    if(values.length!==RUSH_EXTRA_KEYS.length||!PACKS[code])
+      throw Error("Missing Rush ready translation: "+code);
+    Object.assign(PACKS[code],Object.fromEntries(RUSH_EXTRA_KEYS.map((key,index)=>[key,values[index]])));
+  }
   window.GeoI18n = {PACKS,langNames,keys:KEYS};
 })();
