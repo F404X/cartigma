@@ -35,7 +35,7 @@ class Element {
   closest(){return null}
 }
 const hash=input=>{let h=2166136261;for(const c of input){h ^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0};
-function boot({storage=new Map(),map=false,randomValue=0,mobile=false,clock=Date}={}){
+function boot({storage=new Map(),map=false,randomValue=0,mobile=false,clock=Date,countryData=null}={}){
   const clockCallbacks=[],nodes=new Map(),window={},mobileCase=new Element("mobile-case"),mapState={fits:[],eases:[],styles:[],zoomRanges:[],markers:[],layers:new Map(),sources:new Map(),events:{},canvas:new Element("canvas")};
   const document={
     readyState:"complete",documentElement:{lang:"en",dir:"ltr"},hidden:false,
@@ -106,7 +106,9 @@ function boot({storage=new Map(),map=false,randomValue=0,mobile=false,clock=Date
     window,document,localStorage,navigator:{},Math:math,Number,String,Array,Set,Map,JSON,Date:clock,Intl,
     AbortController,console,setTimeout(){return 0},clearTimeout(){},
     setInterval(fn){clockCallbacks.push(fn);return clockCallbacks.length},clearInterval(){},
-    fetch:async()=>({ok:true,json:async()=>({results:[]})})
+    fetch:async url=>String(url).includes("admin_0_countries.geojson")
+      ?{ok:true,json:async()=>countryData||{features:[]}}
+      :{ok:true,json:async()=>({results:[]})}
   };
   for(const n of names.filter(n=>n.endsWith(".js")&&n!=="map-bootstrap.js"))
     runInNewContext(files[n],context,{filename:n});
@@ -2244,6 +2246,13 @@ test("Rush targets countries, unlocks hints every six seconds and timestamps gue
   assert.equal($("mapTitle").textContent,"World map - Rush");
   assert.equal($("mapToolbar").classList.contains("is-rush"),true);
   assert.match($("timerScore").textContent,/5,000/);
+  assert.equal($("rushIntro").classList.contains("hidden"),false);
+  assert.equal($("guessBtn").disabled,true);
+  Clock.ms+=30000;g.tick();
+  assert.equal($("gameTimer").textContent,"01:00");
+  assert.equal($("hintCount").textContent,"1 / 10");
+  $("rushStartBtn").click();
+  assert.equal($("rushIntro").classList.contains("hidden"),true);
   Clock.ms+=30000;g.tick();
   assert.equal($("gameTimer").textContent,"00:30");
   assert.equal($("hintCount").textContent,"6 / 10");
@@ -2274,6 +2283,11 @@ test("Rush daily has a separate saved case and expires after sixty wall-clock se
   const before=JSON.parse(storage.get(key));
   assert.equal(before.difficulty,"rush");
   assert.equal(before.guesses.length,0);
+  assert.equal(before.started,false);
+  Clock.ms+=60000;g.tick();
+  assert.equal($("reportDialog").open,false);
+  assert.equal($("gameTimer").textContent,"01:00");
+  $("rushStartBtn").click();
   Clock.ms+=60000;g.tick();
   assert.equal($("gameTimer").textContent,"01:00");
   // The finished timer switches to elapsed time.
