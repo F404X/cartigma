@@ -70,7 +70,7 @@
   let lang = typeof savedLang === "string" && TRANSLATIONS[savedLang] ? savedLang : "en";
   const savedDifficulty = store.get("geodetective-difficulty");
   let difficulty = DIFFICULTIES[savedDifficulty] ? savedDifficulty : "normal";
-  let game=null,selected=null,map=null,marker=null,guessMarkers=[];
+  let game=null,selected=null,map=null,marker=null,guessMarkers=[],resultMarker=null;
   let markerCase=null,markerMap=null;
   let activeLine=false, mapStyleReady=false, lastDragAt=0, pointerDown=null, pointerMoved=false;
   let fallbackSwitching=false, mapStyleTimeout=null, mapSwitching=false, mapPointerController=null;
@@ -1022,6 +1022,8 @@
     guessMarkers=[];
     marker?.remove();
     marker=null;
+    resultMarker?.remove();
+    resultMarker=null;
     markerCase=null;
     markerMap=null;
   }
@@ -1328,6 +1330,15 @@
       const pin=addMarker(guess.lat,guess.lng,i+1,
         guess===best?"best":"past",guess.label||"");
       guessMarkers.push(pin);
+    }
+    // Reveal the actual answer as a star pin only after Rush has ended.
+    // Keep it separate from numbered guesses across redraws and style changes.
+    if(isRush()&&game.finished&&!resultMarker){
+      const answer=COUNTRIES[game.index];
+      resultMarker=addMarker(answer.lat,answer.lng,"★","target",countryName(game.index));
+    }else if((!isRush()||!game.finished)&&resultMarker){
+      resultMarker.remove();
+      resultMarker=null;
     }
     // The + pin is temporary. Submitted numbered pins are never removed here.
     marker?.remove();
@@ -1845,7 +1856,15 @@
     $("reportOpenBtn").addEventListener("click",showReport);
     $("newCaseBtn").addEventListener("click",startFree);
     $("reportCloseBtn").addEventListener("click",closeReport);
-    $("reportMapBtn").addEventListener("click",closeReport);
+    $("reportMapBtn").addEventListener("click",()=>{
+      closeReport();
+      // The map button in the dossier goes to the answer pin in Rush.
+      if(isRush()&&game.finished&&map){
+        const answer=COUNTRIES[game.index];
+        map.easeTo({center:[answer.lng,answer.lat],
+          zoom:Math.max(3,Math.min(map.getZoom(),5)),duration:450});
+      }
+    });
     $("reportNextBtn").addEventListener("click",()=>{closeReport();startFree()});
     $("reportAlternateBtn").addEventListener("click",()=>{
       if(game?.mode!=="daily"||!game.finished)return;
