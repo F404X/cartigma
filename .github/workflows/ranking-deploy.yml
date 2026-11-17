@@ -38,20 +38,27 @@ jobs:
       - name: Provision dedicated staging D1 only if absent
         run: |
           set -euo pipefail
-          npx wrangler d1 list --json > /tmp/cartigma-d1-list.json
+          curl --silent --show-error --fail --max-time 30 \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database?per_page=100" > /tmp/cartigma-d1-list.json
           node --input-type=module - <<'JS'
           import fs from "node:fs";
           const list=JSON.parse(fs.readFileSync("/tmp/cartigma-d1-list.json","utf8"));
-          const rows=Array.isArray(list)?list:(list.result||[]);
-          const db=rows.find(d=>d.name==="cartigma-ranking-staging");
+          if(!list.success)throw Error("D1 API list failed");
+          const db=(list.result||[]).find(d=>d.name==="cartigma-ranking-staging");
           fs.writeFileSync("/tmp/cartigma-d1-id",db?(db.uuid||db.id||""):"");
           JS
           if [ ! -s /tmp/cartigma-d1-id ]; then
-            npx wrangler d1 create cartigma-ranking-staging --json > /tmp/cartigma-d1-new.json
+            curl --silent --show-error --fail --max-time 30 \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{"name":"cartigma-ranking-staging"}' \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database" > /tmp/cartigma-d1-new.json
             node --input-type=module - <<'JS'
           import fs from "node:fs";
           const data=JSON.parse(fs.readFileSync("/tmp/cartigma-d1-new.json","utf8"));
-          fs.writeFileSync("/tmp/cartigma-d1-id",data.uuid||data.id||data.result?.uuid||"");
+          if(!data.success)throw Error("D1 creation rejected");
+          fs.writeFileSync("/tmp/cartigma-d1-id",data.result?.uuid||data.result?.id||"");
           JS
           fi
           node --input-type=module - <<'JS'
