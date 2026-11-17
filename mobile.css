@@ -646,6 +646,11 @@
   }
   .case-columns>.clue-panel.mobile-open,
   .case-columns>.guess-panel.mobile-open{display:flex}
+  /* Evidence is a small bottom sheet, not a half-screen wall over the map.
+     Only the clue list scrolls; the heading and hint action remain visible. */
+  .case-columns>.clue-panel.mobile-open{
+    max-height:min(30dvh,230px);
+  }
   .case-columns>.guess-panel.mobile-open{
     max-height:min(62dvh,480px);
     overflow-y:auto;overscroll-behavior-y:contain;
@@ -666,6 +671,10 @@
     padding:0 2px;
   }
   .case-columns .clue-list .clue.locked{display:none}
+  .case-columns .clue-list .clue.latest{
+    background:var(--accent-soft);
+    border-left-color:var(--accent);
+  }
   .case-columns .clue{
     flex:0 0 auto;min-height:0;display:grid;
     grid-template-columns:20px minmax(0,1fr);
@@ -783,6 +792,7 @@
     padding:8px 10px;
   }
   .case-columns>.guess-panel.mobile-open{max-height:min(57dvh,330px)}
+  .case-columns>.clue-panel.mobile-open{max-height:min(32dvh,190px)}
   .map-card{padding-bottom:calc(109px + env(safe-area-inset-bottom))}
   .compass-rose{bottom:calc(145px + env(safe-area-inset-bottom))}
   .rush-intro{inset:72px 0 calc(137px + env(safe-area-inset-bottom))}
@@ -812,6 +822,9 @@
     padding:7px 8px;
   }
   .case-columns>.guess-panel.mobile-open{max-height:calc(100% - 104px)}
+  .case-columns>.clue-panel.mobile-open{
+    max-height:min(42dvh,195px,calc(100% - 104px));
+  }
   .case-columns .clue-list{max-height:100%}
   .map-bottom{flex-basis:28px}
   .compass-rose{bottom:57px}
