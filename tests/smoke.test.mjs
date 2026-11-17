@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {runInNewContext} from "node:vm";
 
-const names=["places.js","continent-borders.js","references.js","i18n.js","map-filters-i18n.js","clues-i18n.js","report-i18n.js","facts.js","cities-extended.js","city-indicators.js","urban-2025.js","city-clues-i18n.js","atlas-i18n.js","country-insights.js","country-clues-i18n.js","country-profile-i18n.js","compass-i18n.js","app.js","index.html","styles.css","map-bootstrap.js","map-fallback.js"];
+const names=["places.js","continent-borders.js","references.js","i18n.js","map-filters-i18n.js","clues-i18n.js","report-i18n.js","facts.js","cities-extended.js","city-indicators.js","urban-2025.js","city-clues-i18n.js","atlas-i18n.js","country-insights.js","country-clues-i18n.js","currency-denominations.js","country-profile-i18n.js","compass-i18n.js","app.js","index.html","styles.css","map-bootstrap.js","map-fallback.js"];
 const files=Object.fromEntries(names.map(n=>[n,readFileSync(new URL("../"+n,import.meta.url),"utf8")]));
 
 class Element {
@@ -654,12 +654,12 @@ test("a solved dossier shows the flag and a historical paragraph for every count
   }
 });
 
-test("currency evidence and case dossier use translated currency names instead of codes",()=>{
+test("currency evidence uses broad denomination names but dossier preserves precise localized names",()=>{
   const places=boot().window.GEODETECTIVE_PLACES;
   const sample=[
-    ["São Paulo","BRL","Moeda: Real brasileiro","Currency: Brazilian Real"],
-    ["Ōsaka","JPY","Moeda: Iene japonês","Currency: Japanese Yen"],
-    ["Paris","EUR","Moeda: Euro","Currency: Euro"]
+    ["São Paulo","BRL","Moeda: real","Currency: real"],
+    ["Ōsaka","JPY","Moeda: iene","Currency: yen"],
+    ["Paris","EUR","Moeda: euro","Currency: euro"]
   ];
   for(const [city,code,portuguese,english] of sample){
     const index=places.findIndex(p=>p[0]===city);
@@ -682,7 +682,28 @@ test("currency evidence and case dossier use translated currency names instead o
   assert.equal(field.children[1].textContent,"Real brasileiro");
   assert.notEqual(field.children[1].textContent,"BRL");
   const db=g.window.GeoCountryInsights;
+  const denominations=g.window.GeoCurrencyDenominations;
   assert.equal(Object.keys(db).length,165);
+  assert.equal(Object.keys(denominations.labels).length,19);
+  const isoCodes=new Set(Object.values(db).map(record=>record.currency));
+  assert.equal(isoCodes.size,131);
+  for(const iso of isoCodes){
+    const family=denominations.codes[iso];
+    assert.ok(family,"No denomination classification for "+iso);
+    for(const [language,labels] of Object.entries(denominations.labels)){
+      const value=labels[family]||denominations.labels.en[family];
+      assert.ok(value&&typeof value==="string",language+" lacks "+family);
+      assert.ok(!/^(USD|BRL|JPY|CAD|AUD|MXN|ARS)$/.test(value));
+    }
+  }
+  assert.equal(denominations.labels.pt[denominations.codes.USD],"dólar");
+  assert.equal(denominations.labels.pt[denominations.codes.CAD],"dólar");
+  assert.equal(denominations.labels.pt[denominations.codes.AUD],"dólar");
+  assert.equal(denominations.labels.pt[denominations.codes.MXN],"peso");
+  assert.equal(denominations.labels.pt[denominations.codes.ARS],"peso");
+  assert.equal(denominations.labels.pt[denominations.codes.JPY],"iene");
+  assert.equal(denominations.labels.pt[denominations.codes.BRL],"real");
+  assert.equal(denominations.labels.pt[denominations.codes.XAF],"franco");
   for(const [iso,record] of Object.entries(db))
     assert.ok(record.currencyName&&record.currencyName!==record.currency,
       iso+" needs a descriptive currency-name fallback");
@@ -707,6 +728,7 @@ test("all 19 country clue templates keep required values and annual provenance",
   assert.ok(files["index.html"].includes('id="reportFlag"'));
   assert.ok(files["index.html"].includes('id="reportHistory"'));
   assert.ok(files["index.html"].includes('src="country-insights.js?v=20261116-currency-names"'));
+  assert.ok(files["index.html"].includes('src="currency-denominations.js?v=20261116-short-currency"'));
 });
 test("national-capital metadata remains correct even with shuffled evidence",()=>{
   const places=boot().window.GEODETECTIVE_PLACES;
@@ -1395,7 +1417,7 @@ test("a correct fifth guess in Cape Town has no distance or bearing in history o
 });
 
 test("fresh deployments fingerprint both game engine and translated clues",()=>{
-  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-latitude-overlay"'));
+  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-short-currency"'));
   assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-profile-diversity"'));
   assert.ok(files["map-bootstrap.js"].includes('new URL(import.meta.url).searchParams.get("v")'));
   assert.ok(files["app.js"].includes("function guessMetricText(g)"));

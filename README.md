@@ -117,7 +117,7 @@ Ten evidence slots retain the original first seven clues in their established or
 
 - **Sea-access clue repair:** it has its own localized label ("Acesso ao mar"), rather than the generic "Região". The visible text comes directly from the country's landlocked boolean: "Sem acesso ao mar." or "Tem acesso ao mar." It never displays only "Sim" or "Não"; source assets are freshly fingerprinted on deployment.
 
-- **Currency names:** clues and the completed case dossier now display the full, localized currency name (e.g. Brazilian real / real brasileiro, Japanese yen / iene japonês) instead of the three-letter ISO code. CLDR currency names are displayed in all 19 supported languages through `Intl.DisplayNames`, with descriptive English names sourced from mledoze/countries as a browser compatibility fallback. Internal ISO currency identifiers are preserved for correctness.
+- **Currency names:** currency evidence now uses a **short, generic denomination** (e.g. “dólar”, “peso”, “real”, “iene”, “rupia”) rather than revealing the origin through “dólar americano” or “iene japonês”. An explicit ISO-to-denomination mapping covers the catalog's 131 currency codes; widely used denominations have translations in all 19 UI languages, while less common denominations use their short international names when a localized short name is not available. The completed case dossier and city archive retain full, localized CLDR currency names (e.g. “real brasileiro” or “iene japonês”) and the original ISO codes. The classification of country/territory currency and all other country indicators is unchanged.
 
 ### Ten clues, independent guesses
 

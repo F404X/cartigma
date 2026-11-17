@@ -9,6 +9,7 @@
   const CLUE_I18N = window.GeoCluesI18n || {};
   const COUNTRY_INSIGHTS = window.GeoCountryInsights || {};
   const COUNTRY_CLUE_I18N = window.GeoCountryClueI18n || {};
+  const CURRENCY_DENOMINATIONS = window.GeoCurrencyDenominations || {};
   const CITY_INDICATORS = window.CartigmaCityIndicators || [];
   const CITY_URBAN_2025 = window.CartigmaUrban2025 || {};
   const CITY_CLUES_I18N = window.CartigmaCityClueI18n || {};
@@ -166,6 +167,15 @@
         return localized;
     }catch(error){/* Currency display names are not supported everywhere. */}
     return fallbackName||code;
+  }
+  function currencyClueName(code,fallbackName=""){
+    // Currency hints intentionally reveal only the monetary denomination:
+    // USD/CAD/AUD -> dollar, ARS/MXN -> peso, BRL -> real, etc.
+    // The country profile still uses currencyName() for precise CLDR names.
+    const family=CURRENCY_DENOMINATIONS.codes?.[code];
+    return (family&&(CURRENCY_DENOMINATIONS.labels?.[lang]?.[family]||
+      CURRENCY_DENOMINATIONS.labels?.en?.[family]))||
+      currencyName(code,fallbackName);
   }
   function cityName(p) {
     return lang==="pt"?(PT_EXTRA_NAMES[p[0]]||p[0]):(EN_CITY[p[0]]||p[0]);
@@ -337,7 +347,7 @@
     const candidates=[];
     const add=(key,props)=>candidates.push({key,...props});
     if(data.currency)add("countryCurrency",{
-      name:currencyName(data.currency,data.currencyName)
+      name:currencyClueName(data.currency,data.currencyName)
     });
     if(data.languageFamily){
       const family=lang==="pt"?(COUNTRY_FAMILIES_PT[data.languageFamily]||data.languageFamily):data.languageFamily;
