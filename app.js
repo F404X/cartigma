@@ -435,35 +435,45 @@
   }
   // All three modes use the existing Rush map start gate. A signed-in
   // player's first attempt is automatically verified and saved by the API.
-  async function startCase(){
+  function startCase(){
     if(!game||game.finished||game.started||game.pending)return;
     const current=game;
-    current.pending=true;
-    $("rushStartBtn").disabled=true;
-    try{
-      const ranked=await window.CartigmaRanking?.beginRanked?.({
-        mode:game.mode,difficulty
-      });
-      if(game!==current)return;
-      if(ranked){
-        current.ranked=true;
-        applyRankedState(ranked);
-      }else{
-        current.started=true;
-        current.startedAt=Date.now();
-        current.revealed=DIFFICULTIES[difficulty].initial;
-      }
+    const startOffline=()=>{
+      current.started=true;
+      current.startedAt=Date.now();
+      current.revealed=DIFFICULTIES[difficulty].initial;
       mobilePanel="clues";
       rushCountryRequest++;
       save();render();clockTick();
-    }catch(error){
-      if(game===current){
-        $("rushIntroText").textContent=error.message||"Não foi possível iniciar.";
-        toast(error.message||"Não foi possível iniciar.");
-      }
-    }finally{
-      if(game===current){current.pending=false;$("rushStartBtn").disabled=false;}
+    };
+    // Preserve instant offline play and existing Rush behavior; only a
+    // remembered signed-in account needs a network round-trip.
+    if(!window.CartigmaRanking?.mayRank?.()){
+      startOffline();
+      return;
     }
+    current.pending=true;
+    $("rushStartBtn").disabled=true;
+    window.CartigmaRanking.beginRanked({mode:game.mode,difficulty}).then(ranked=>{
+      if(game!==current)return;
+      if(!ranked){startOffline();return;}
+      current.ranked=true;
+      current.mode=ranked.mode||current.mode;
+      applyRankedState(ranked);
+      mobilePanel="clues";
+      rushCountryRequest++;
+      save();render();clockTick();
+    }).catch(error=>{
+      if(game===current){
+        toast(error.message||"Não foi possível iniciar.");
+        $("rushIntroText").textContent=error.message||"Não foi possível iniciar.";
+      }
+    }).finally(()=>{
+      if(game===current){
+        current.pending=false;
+        $("rushStartBtn").disabled=false;
+      }
+    });
   }
   function applyRankedState(response){
     if(!game||!game.ranked)return;
@@ -490,6 +500,7 @@
         elapsedMs:item.elapsedMs||0
       };
     });
+    if(response.saveError)toast(response.saveError);
     if(game.finished){
       const index=COUNTRY_CODES.indexOf(response.target);
       if(index<0)throw Error("Resposta inválida do servidor");
@@ -588,7 +599,10 @@
   function startDaily(){
     mobilePanel="clues";
     rushCountryRequest++;
-    game=savedDaily()||newGame("daily",dailyIndex());
+    const cached=savedDaily();
+    game=(window.CartigmaRanking?.mayRank?.()?null:cached)||
+      newGame("daily",dailyIndex());
+    maybeRestoreRanked(game);
     if(!Number.isInteger(game.serial)||game.serial<1){
       game.serial=nextCaseNumber(game.date);
       save();
@@ -600,8 +614,21 @@
   function startFree(){
     mobilePanel="clues";
     rushCountryRequest++;game=newGame("free",chooseFree());
+    maybeRestoreRanked(game);
     selected=null;closeReport();render();resetMapView();clockTick();
     if(isCountryGame())rushCountryFeatures().catch(()=>{});
+  }
+  function maybeRestoreRanked(snapshot){
+    const api=window.CartigmaRanking;
+    if(!api?.mayRank?.())return;
+    api.resumeRanked(difficulty).then(response=>{
+      // Do not switch the current map when another game was selected.
+      if(!response||game!==snapshot||snapshot.started)return;
+      snapshot.ranked=true;
+      snapshot.mode=response.mode||snapshot.mode;
+      applyRankedState(response);
+      render();
+    }).catch(()=>{});
   }
   function setDifficulty(level){
     if(!DIFFICULTIES[level]||level===difficulty)return;
@@ -1662,8 +1689,8 @@
     }
   }
   function selectPoint(lat,lng,label){
-    // Ranked sessions use the same interactive map but never mutate casual state.
-    if(window.CartigmaRanking?.isPlaying){
+    // Ranked sessions use the existing map selection and native UI.
+    if(false){
       (async()=>{
         try{
           const features=await rushCountryFeatures();
@@ -1703,7 +1730,7 @@
     save();renderClues();toast(t("hintUsed",{cost:number(cost)}));
   }
   function guess(){
-    if(!game?.started)return;
+    if(!game?.started||game.pending)return;
     if(game.ranked){
       if(!selected?.countryCode)return;
       rankedAction("guess",{code:selected.countryCode});return;
