@@ -274,6 +274,26 @@ test("Signed-in account automatically uses the native map in ranked mode",async(
   assert.equal($("finalScore").textContent,"5,000");
   assert.deepEqual(events,["start:daily","guess:BR"]);
 });
+test("Start card displays actual mode and finite attempts in Normal and Hard",()=>{
+  for(const level of ["normal","hard","rush"]){
+    const g=boot({autoStart:false}),$=g.get;
+    g.difficulty(level);
+    const expected=level==="normal"?"6":level==="hard"?"4":null;
+    assert.ok($("rushIntroEyebrow").textContent.includes(level==="rush"?"RUSH":"DAILY")||
+      $("rushIntroEyebrow").textContent.includes(level==="rush"?"Rush":"DAILY CASE"));
+    assert.equal($("rushIntroTitle").textContent,level==="rush"?"Rush":level==="hard"?"Hard":"Normal");
+    if(expected){
+      assert.equal($("rushIntroText").textContent,"Attempts left: "+expected);
+      assert.equal($("attemptCount").textContent,expected+" / "+expected);
+      assert.doesNotMatch($("rushIntroText").textContent,/unlimited/i);
+      $("freeBtn").click();
+      assert.match($("rushIntroEyebrow").textContent,/FREE PLAY/);
+      assert.equal($("rushIntroText").textContent,"Attempts left: "+expected);
+    }else{
+      assert.match($("rushIntroText").textContent,/60 seconds/i);
+    }
+  }
+});
 test("Normal, Hard, and Rush all require explicit Start before revealing clues",()=>{
   for(const level of ["normal","hard","rush"]){
     const g=boot({autoStart:false}),$=g.get;
