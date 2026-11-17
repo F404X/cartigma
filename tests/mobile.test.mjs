@@ -125,3 +125,15 @@ test("mobile evidence shows at most about two compact cards without obscuring ma
   // Do not alter desktop CSS: the override belongs to mobile.css only.
   assert.match(cockpit,/@media \(max-width:760px\), \(max-height:540px\) and \(pointer:coarse\)/);
 });
+
+
+test("mobile-only icon sizing keeps country list and map settings visible and centered",()=>{
+  const iconRules=mobile.slice(mobile.indexOf("/* Phone icon controls: preserve"));
+  assert.match(iconRules,/@media \(max-width:760px\), \(max-height:540px\) and \(pointer:coarse\)/);
+  assert.match(iconRules,/#atlasBtn svg\{[\s\S]*?width:19px;height:19px/);
+  assert.match(iconRules,/\.map-filter-gear\{[\s\S]*?display:grid;place-items:center/);
+  assert.match(iconRules,/\.map-filter-gear svg\{[\s\S]*?width:19px;height:19px/);
+  // Icon sizing belongs exclusively to mobile.css rather than desktop layout.
+  const baseCss=readFileSync(new URL("styles.css",root),"utf8");
+  assert.match(baseCss,/\.map-filter-gear svg\{display:block;pointer-events:none\}/);
+});
