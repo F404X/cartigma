@@ -472,6 +472,7 @@
       if(game===current){
         current.pending=false;
         $("rushStartBtn").disabled=false;
+        if(current.started)render();
       }
     });
   }
@@ -1689,20 +1690,6 @@
     }
   }
   function selectPoint(lat,lng,label){
-    // Ranked sessions use the existing map selection and native UI.
-    if(false){
-      (async()=>{
-        try{
-          const features=await rushCountryFeatures();
-          const feature=features.find(item=>
-            codeForCountryFeature(item)&&pointInCountry(Number(lng),Number(lat),item.geometry));
-          const code=feature&&codeForCountryFeature(feature);
-          if(code)window.CartigmaRanking.selectCountry(code);
-          else toast(t("rushNoCountry"));
-        }catch{toast(t("rushMapUnavailable"));}
-      })();
-      return;
-    }
     if(game.finished||!game.started)return;
     if(isCountryGame()){
       if(!game.started)return;
