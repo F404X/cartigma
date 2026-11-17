@@ -623,8 +623,18 @@
     return best;
   }
   function factFor(index){
-    const history=COUNTRY_INSIGHTS[COUNTRY_CODES[index]]?.history;
-    return history?.[lang==="pt"?"pt":"en"]||history?.en||"";
+    // Trivia is optional and independent of the country history.
+    // Previously this returned history verbatim, duplicating the report.
+    const trivia=COUNTRY_INSIGHTS[COUNTRY_CODES[index]]?.trivia;
+    const text=typeof trivia==="string"?trivia:
+      trivia?.[lang==="pt"?"pt":"en"]||trivia?.en||"";
+    return String(text).trim();
+  }
+  function sameReportInformation(a,b){
+    // Ignore whitespace, accents, case and punctuation when checking that
+    // independently authored trivia does not repeat the history text.
+    const comparable=text=>norm(text).replace(/[^\p{L}\p{N}]+/gu," ").trim();
+    return comparable(a)===comparable(b);
   }
 
   function renderCountryProfile(info,code,place,targets={
@@ -888,7 +898,11 @@
     $("reportCoordinates").textContent=isCountryGame()?"—":place[3].toFixed(4)+"°, "+place[4].toFixed(4)+"°";
     $("reportContinent").textContent=continentName(game.index);
     renderCountryProfile(details,iso,place);
-    $("reportFact").textContent=factFor(game.index);
+    const trivia=factFor(game.index);
+    const showTrivia=Boolean(trivia)&&
+      !sameReportInformation(trivia,$("reportHistory").textContent);
+    $("reportFactSection").classList.toggle("hidden",!showTrivia);
+    $("reportFact").textContent=showTrivia?trivia:"";
     const log=$("reportTimeline");log.replaceChildren();
     for(const [i,g] of game.guesses.entries()){
       const row=document.createElement("li");row.className="report-log-row";
