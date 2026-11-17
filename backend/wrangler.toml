@@ -1,0 +1,34 @@
+name = "cartigma-ranking-staging"
+main = "src/index.js"
+compatibility_date = "2026-11-17"
+workers_dev = true
+# The placeholder is intentionally not a valid D1 binding. Provision a D1
+# database before deploying, and replace with its real database_id.
+[[d1_databases]]
+binding = "DB"
+database_name = "cartigma-ranking-staging"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[[ratelimits]]
+name = "LEADERBOARD_LIMIT"
+namespace_id = "609101"
+[ratelimits.simple]
+limit = 1
+period = 60
+
+[[ratelimits]]
+name = "AUTH_LIMIT"
+namespace_id = "609102"
+[ratelimits.simple]
+limit = 8
+period = 60
+
+[[ratelimits]]
+name = "GAME_LIMIT"
+namespace_id = "609103"
+[ratelimits.simple]
+limit = 30
+period = 60
+
+[vars]
+APP_ORIGIN = "https://cartigma.f404x.net"
