@@ -1443,7 +1443,13 @@ test("administrative regions and landmarks remain in the archive as reference da
   const g=boot(),$=g.get;$("atlasBtn").handlers.click();
   $("atlasOptions").children.find(b=>b.dataset.index==="74").handlers.click();
   assert.ok($("atlasCityFacts").children.some(x=>
-    x.children[0]?.textContent==="Administrative region"));
+    x.children[0]?.textContent==="Catalogue region"&&x.children[1]?.textContent),
+    "The original administrative region must remain in the archive");
+  $("atlasOptions").children.find(b=>b.dataset.index==="8").handlers.click();
+  assert.ok($("atlasCityFacts").children.some(x=>
+    x.children[0]?.textContent==="Reference landmark"&&
+    x.children[1]?.textContent==="Eiffel Tower"),
+    "Curated landmarks remain informational and outside the clue pool");
   for(const level of ["Normal","Hard"])
     assert.ok(!$("atlas"+level+"Evidence").children.some(x=>
       /^Administrative region:|^Associated landmark:/.test(x.children[1].textContent)));
