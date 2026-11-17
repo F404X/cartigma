@@ -32,6 +32,8 @@ export default {
       }else if(gamePaths.has(path)&&request.method==="POST"){
         csrf(request,env);
         response=await gameRoute(request,env,path);
+      }else if(request.method==="GET"&&!path.startsWith("/v1/")&&env.ASSETS){
+        response=await env.ASSETS.fetch(request);
       }else{
         response=json({error:"not_found"},404);
       }
