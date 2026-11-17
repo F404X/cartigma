@@ -1556,7 +1556,7 @@ test("paid latitude-zone overlays match all six climate belts and highlight both
     assert.equal(layer.paint["fill-opacity"],.1);
     assert.equal($("clueList").children[0].children[1].children[2].disabled,true);
     assert.equal($("attemptCount").textContent,"6 / 6");
-    assert.deepEqual(g.mapState.eases.at(-1).center,[0,0],
+    assert.equal(g.mapState.eases.at(-1).center.join(","),"0,0",
       "Center must not leak the hidden city's hemisphere");
     const savedPenalty=600;
     button.handlers.click();
