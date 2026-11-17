@@ -795,3 +795,5 @@ body.rush-mode #difficultySelect{border-color:#e05a9c}
   .case-timer strong{font-size:14px}
   .map-toolbar .map-hint{display:none}
 }
+
+.timer-score{font:600 9px var(--mono);white-space:nowrap;opacity:.92}
