@@ -595,8 +595,12 @@
   function updateClock(){
     if(!game)return;
     const rush=isRush(),remaining=rush?rushRemaining():0;
-    $("timerLabel").textContent=t(rush?"rushRemaining":"elapsedTime");
-    $("gameTimer").textContent=formatElapsed(rush?Math.ceil(remaining/1000)*1000:elapsedMs());
+    $("timerLabel").textContent=t(rush&&!game.finished?"rushRemaining":"elapsedTime");
+    $("gameTimer").textContent=formatElapsed(rush&&!game.finished?Math.ceil(remaining/1000)*1000:elapsedMs());
+    const potential=Math.max(0,Math.round(5000*remaining/RUSH_DURATION_MS)-
+      (game.sectorMapPenalty||0));
+    $("timerScore").textContent=t("score")+": "+number(potential);
+    $("timerScore").classList.toggle("hidden",!rush||game.finished);
     $("gameTimer").setAttribute("aria-label",$("timerLabel").textContent+" "+$("gameTimer").textContent);
     $("timerTrack").classList.toggle("hidden",!rush);
     $("timerProgress").style.setProperty("width",(rush?100*remaining/RUSH_DURATION_MS:0)+"%");
@@ -960,7 +964,14 @@
         cityCapitalDistance:"capitalDistance",cityCoastDistance:"coastDistance",
         cityPopulation:"cityPopulation",cityDensity:"cityDensity",cityTimezone:"timezone"
       }[clue.key];
-      if(key)add(key,clueText(clue,index));
+      if(key){
+        // The archive keeps exact sourced statistics; only game evidence is bounded.
+        const source=CITY_URBAN_2025[index]||{};
+        const exact=clue.key==="cityPopulation"?source.population:
+          clue.key==="cityDensity"?source.density:null;
+        add(key,exact?tc(clue.key,{...clue,comparison:"≈",value:number(exact)}):
+          clueText(clue,index));
+      }
     }
     if(!list.children.length){
       const p=document.createElement("p");p.textContent=atlasText("notAvailable");list.append(p);
