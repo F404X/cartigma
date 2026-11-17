@@ -1232,8 +1232,13 @@
       !game.started?"rushIntroHint":isCountryGame()?"rushMapHint":"mapHint");
     $("rushIntro").classList.toggle("hidden",game.started||game.finished);
     $("rushIntro").setAttribute("aria-hidden",String(game.started||game.finished));
+    // The start gate is shared by every difficulty. Never leave the
+    // original Rush heading or the "unlimited cases" free-play caption.
+    $("rushIntroEyebrow").textContent="CARTIGMA / "+(
+      isRush()?t("rushIntroTitle"):t(daily?"daily":"free")).toLocaleUpperCase(locale());
     $("rushIntroTitle").textContent=isRush()?t("rushIntroTitle"):t(difficulty);
-    $("rushIntroText").textContent=isRush()?t("rushIntroText"):t(daily?"modeDaily":"modeFree");
+    $("rushIntroText").textContent=isRush()?t("rushIntroText"):
+      t("remaining")+": "+maximum();
     $("rushStartBtn").textContent=t("rushStart");
     updateClock();renderMap();
     syncMobilePanels();
