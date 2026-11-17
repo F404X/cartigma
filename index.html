@@ -19,13 +19,13 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.18.0/dist/maplibre-gl.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=20261117-rush-ready-v2">
+  <link rel="stylesheet" href="styles.css?v=20261117-country-edition">
   <link rel="stylesheet" href="themes.css?v=20261117-rush-ready-v2">
   <link rel="stylesheet" href="mobile.css?v=20261117-rush-ready-v2">
   
   <script defer src="places.js"></script>
   <script defer src="continent-borders.js?v=20261116-profile-diversity"></script>
-  <script defer src="i18n.js?v=20261117-rush-ready-v2"></script>
+  <script defer src="i18n.js?v=20261117-country-edition"></script>
   <script defer src="clues-i18n.js?v=20261116-profile-diversity"></script>
   <script defer src="map-filters-i18n.js?v=20261116-profile-diversity"></script>
   <script defer src="report-i18n.js?v=20261116-daily-navigation"></script>
@@ -44,7 +44,7 @@
   <script defer src="theme.js"></script>
   <script defer src="map-fallback.js?v=20261117-clean-overlays"></script>
   <script defer src="language-picker.js"></script>
-  <script type="module" src="map-bootstrap.js?v=20261117-rush-ready-v2"></script>
+  <script type="module" src="map-bootstrap.js?v=20261117-country-edition"></script>
 </head>
 <body>
 <div class="app">
@@ -312,12 +312,12 @@
 </dialog>
 <dialog id="helpDialog" aria-labelledby="helpTitle">
   <div class="dialog-head"><h2 id="helpTitle" data-i18n="helpTitle">How to play</h2><button id="closeHelpBtn" type="button" aria-label="Close">×</button></div>
-  <p data-i18n="helpIntro">Find the hidden city from a series of geographic clues.</p>
+  <p data-i18n="helpIntro">Find the hidden country from geographic clues.</p>
   <ol>
-    <li data-i18n="rule1">Read the evidence and place a pin on the map or search for a city.</li>
-    <li data-i18n="rule2">Each incorrect guess gives you distance and a new clue. Direction is hidden on Hard.</li>
-    <li data-i18n="rule3">Win by getting within 100 km of the target. Hint prices vary from 150 to 500 points.</li>
-    <li data-i18n="rule4">Normal: 6 guesses with direction. Hard: 4 guesses without direction.</li>
+    <li data-i18n="rule1">Read the clues, then select a country on the map or by name.</li>
+    <li data-i18n="rule2">Wrong countries reveal more clues. Normal allows 6 guesses; Hard allows 4.</li>
+    <li data-i18n="rule3">Guess the correct country. Optional hints cost points.</li>
+    <li data-i18n="rule4">Normal: 6 country guesses. Hard: 4 country guesses and costlier hints.</li>
     <li data-i18n="rule5">Daily cases are shared worldwide per difficulty and reset at 00:00 UTC.</li>
     <li data-i18n="rushRule">Rush: identify the country in 60 seconds. A clue unlocks every 6 seconds; score falls as time passes.</li>
   </ol>

@@ -35,7 +35,7 @@ class Element {
   closest(){return null}
 }
 const hash=input=>{let h=2166136261;for(const c of input){h ^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0};
-function boot({storage=new Map(),map=false,randomValue=0,mobile=false,clock=Date,countryData=null}={}){
+function boot({storage=new Map(),map=false,randomValue=0,mobile=false,clock=Date,countryData=null,legacyCity=false}={}){
   const clockCallbacks=[],nodes=new Map(),window={},mobileCase=new Element("mobile-case"),mapState={fits:[],eases:[],styles:[],zoomRanges:[],markers:[],layers:new Map(),sources:new Map(),events:{},canvas:new Element("canvas")};
   const document={
     readyState:"complete",documentElement:{lang:"en",dir:"ltr"},hidden:false,
@@ -111,7 +111,10 @@ function boot({storage=new Map(),map=false,randomValue=0,mobile=false,clock=Date
       :{ok:true,json:async()=>({results:[]})}
   };
   for(const n of names.filter(n=>n.endsWith(".js")&&n!=="map-bootstrap.js"))
-    runInNewContext(files[n],context,{filename:n});
+    runInNewContext(n==="app.js"&&legacyCity
+      ?files[n].replace('evidenceVersion:4,targetKind:"country"',
+        'evidenceVersion:3,targetKind:"city"')
+      :files[n],context,{filename:n});
   const get=id=>document.getElementById(id);
   function select(name){
     get("citySearch").value=name;
@@ -125,6 +128,9 @@ function boot({storage=new Map(),map=false,randomValue=0,mobile=false,clock=Date
   return {get,window,document,storage,select,difficulty,language,mapState,mobileCase,perf,
     tick(){for(const callback of clockCallbacks)callback()}};
 }
+// Prior tests intentionally exercise the preserved city-based legacy cases.
+ // Fresh-country tests use boot() with the production rules directly.
+function legacyBoot(options={}){return boot({...options,legacyCity:true})}
 function normalIndexForDay(date,window){
   const places=window.GEODETECTIVE_PLACES,extra=window.GeoExtendedPlaceMetadata;
   const preferred=places.map((_,i)=>i).filter(i=>i<74||
@@ -166,7 +172,7 @@ function makeWrong(g,tries,name){
 }
 
 test("city archive opens from the header with 500 accessible searchable entries and does not alter the game",()=>{
-  const g=boot({map:true}),$=g.get;
+  const g=legacyBoot({map:true}),$=g.get;
   const guesses=$("attemptCount").textContent,hints=$("hintCount").textContent;
   const source=clueTexts(g);
   const initialStorage=JSON.stringify([...g.storage.entries()]);
@@ -202,7 +208,7 @@ test("city archive opens from the header with 500 accessible searchable entries 
 });
 
 test("archive search handles accents, city aliases, country, region and empty results",()=>{
-  const g=boot(),$=g.get;
+  const g=legacyBoot(),$=g.get;
   $("atlasBtn").handlers.click();
   const search=$("atlasSearch"),options=$("atlasOptions");
   search.value="sao paulo";search.handlers.input();
@@ -240,7 +246,7 @@ test("archive search handles accents, city aliases, country, region and empty re
 });
 
 test("city archive keeps its selected entry and properly relocalizes all profile labels",()=>{
-  const g=boot(),$=g.get;
+  const g=legacyBoot(),$=g.get;
   $("atlasBtn").handlers.click();
   $("atlasSearch").value="São Paulo";$("atlasSearch").handlers.input();
   $("atlasOptions").children[0].handlers.click();
@@ -277,7 +283,7 @@ test("city archive keeps its selected entry and properly relocalizes all profile
 });
 
 test("atlas shows only known city statistics and never guesses data for unsupported locations",()=>{
-  const g=boot(),$=g.get;
+  const g=legacyBoot(),$=g.get;
   $("atlasBtn").handlers.click();
   const selectName=name=>{
     $("atlasSearch").value=name;$("atlasSearch").handlers.input();
@@ -301,7 +307,7 @@ test("atlas shows only known city statistics and never guesses data for unsuppor
 });
 
 test("500 archive selections preserve both current mode and game score",()=>{
-  const g=boot(),$=g.get;
+  const g=legacyBoot(),$=g.get;
   g.difficulty("hard");
   $("atlasBtn").handlers.click();
   const remaining=$("attemptCount").textContent,clues=$("hintCount").textContent;
@@ -321,7 +327,7 @@ test("500 archive selections preserve both current mode and game score",()=>{
   assert.equal(JSON.stringify([...g.storage.entries()]),saved);
 });
 test("city catalogue, trivia and report translations remain aligned",()=>{
-  const g=boot();
+  const g=legacyBoot();
   assert.equal(g.window.GEODETECTIVE_PLACES.length,500);
   assert.equal(g.window.GEODETECTIVE_FACTS.length,500);
   assert.equal(g.window.GeoExtendedPlaceMetadata.length,426);
@@ -342,7 +348,7 @@ test("city catalogue, trivia and report translations remain aligned",()=>{
 
 
 test("500 locations preserve the original 74 and all aligned catalog metadata",()=>{
-  const g=boot(),places=g.window.GEODETECTIVE_PLACES;
+  const g=legacyBoot(),places=g.window.GEODETECTIVE_PLACES;
   const extras=g.window.GeoExtendedPlaceMetadata;
   assert.equal(places.length,500);
   assert.equal(extras.length,426);
@@ -373,7 +379,7 @@ test("500 locations preserve the original 74 and all aligned catalog metadata",(
 });
 
 test("Eastern Thrace lies in Europe, Anatolia in Asia, and Istanbul is transcontinental",()=>{
-  const g=boot(),p=g.window.GEODETECTIVE_PLACES,borders=g.window.GeoContinentBorders;
+  const g=legacyBoot(),p=g.window.GEODETECTIVE_PLACES,borders=g.window.GeoContinentBorders;
   function inRing(x,y,ring){
     let hit=false;
     for(let i=0,j=ring.length-1;i<ring.length;j=i++){
@@ -399,7 +405,7 @@ test("Eastern Thrace lies in Europe, Anatolia in Asia, and Istanbul is transcont
   }
   const ist=p.findIndex(x=>x[0]==="Istambul");
   assert.equal(ist,12);
-  const forced=boot({randomValue:(ist+.25)/p.length});
+  const forced=legacyBoot({randomValue:(ist+.25)/p.length});
   forced.get("freeBtn").handlers.click();
   assert.equal(clueTexts(forced)[1],"Continent: Europe / Asia");
   forced.language("pt");
@@ -407,7 +413,7 @@ test("Eastern Thrace lies in Europe, Anatolia in Asia, and Istanbul is transcont
 });
 
 test("Normal selection favors capitals and major cities; Hard retains the full catalogue",()=>{
-  const g=boot(),w=g.window,places=w.GEODETECTIVE_PLACES;
+  const g=legacyBoot(),w=g.window,places=w.GEODETECTIVE_PLACES;
   const capitalCities=["Ankara","Moscow","Madrid","Berlin","Manila"];
   for(const name of capitalCities){
     const i=places.findIndex(x=>x[0]===name);
@@ -426,7 +432,7 @@ test("Normal selection favors capitals and major cities; Hard retains the full c
   assert.ok(normalPriority.size<places.length,"Hard mode must retain less-known cities");
   const lesser=places.findIndex((_,i)=>i>=74&&!normalPriority.has(i));
   assert.ok(lesser>=74);
-  const forced=boot({randomValue:(lesser+.25)/places.length});
+  const forced=legacyBoot({randomValue:(lesser+.25)/places.length});
   forced.difficulty("hard");
   forced.get("freeBtn").handlers.click();
   for(let n=0;n<6;n++)forced.get("revealBtn").handlers.click();
@@ -437,11 +443,11 @@ test("Normal selection favors capitals and major cities; Hard retains the full c
 });
 
 test("new cities have ten meaningful clues without a redundant distance comparison",()=>{
-  const places=boot().window.GEODETECTIVE_PLACES;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES;
   for(const city of ["Berlin","Moscow","Manila","Ankara","İzmir","Edirne","Los Angeles","Abidjan","Canberra"]){
     const index=places.findIndex(p=>p[0]===city);
     assert.ok(index>=74,city);
-    const g=boot({randomValue:(index+.25)/places.length});
+    const g=legacyBoot({randomValue:(index+.25)/places.length});
     g.get("freeBtn").handlers.click();
     const clues=revealAll(g);
     assert.equal(clues.length,10);
@@ -457,7 +463,7 @@ test("new cities have ten meaningful clues without a redundant distance comparis
   }
 });
 test("every playable country has sourced metadata, a flag, and its own historical note",()=>{
-  const g=boot(),countries=g.window.GeoCountryInsights;
+  const g=legacyBoot(),countries=g.window.GeoCountryInsights;
   const codes=files["app.js"].match(/const COUNTRY_CODES = "([^"]+)"/)[1].split(" ");
   const extra=g.window.GeoExtendedPlaceMetadata.map(m=>m.countryCode);
   const needed=new Set([...codes,...extra]);
@@ -482,7 +488,7 @@ test("every playable country has sourced metadata, a flag, and its own historica
 });
 
 test("landlocked evidence and case profiles use affirmative sentences in all languages",()=>{
-  const g=boot(),langs=g.window.GeoCountryClueI18n;
+  const g=legacyBoot(),langs=g.window.GeoCountryClueI18n;
   assert.equal(Object.keys(langs).length,19);
   for(const [language,pack] of Object.entries(langs)){
     assert.equal(pack.countryLandlocked,"{value}",language);
@@ -495,7 +501,7 @@ test("landlocked evidence and case profiles use affirmative sentences in all lan
   for(const [city,expected] of [["São Paulo","Tem acesso ao mar."],["Catmandu","Sem acesso ao mar."]]){
     const index=g.window.GEODETECTIVE_PLACES.findIndex(p=>p[0]===city);
     assert.ok(index>=0);
-    const run=boot({randomValue:(index+.25)/g.window.GEODETECTIVE_PLACES.length});
+    const run=legacyBoot({randomValue:(index+.25)/g.window.GEODETECTIVE_PLACES.length});
     run.get("freeBtn").handlers.click();
     run.select(city);run.get("guessBtn").handlers.click();
     run.language("pt");
@@ -508,10 +514,10 @@ test("landlocked evidence and case profiles use affirmative sentences in all lan
 });
 test("sea-access cards never render the raw 'Região: Não' state",()=>{
   for(const [city,want] of [["Lisboa","Tem acesso ao mar."],["Catmandu","Sem acesso ao mar."]]){
-    const places=boot().window.GEODETECTIVE_PLACES;
+    const places=legacyBoot().window.GEODETECTIVE_PLACES;
     const index=places.findIndex(place=>place[0]===city);
     assert.ok(index>=0,city+" missing");
-    const g=boot({randomValue:(index+.25)/places.length});
+    const g=legacyBoot({randomValue:(index+.25)/places.length});
     g.get("freeBtn").handlers.click();
     g.language("pt");
     revealAll(g);
@@ -528,7 +534,7 @@ test("sea-access cards never render the raw 'Região: Não' state",()=>{
     assert.equal(translated[0].children[1].children[1].textContent,
       want==="Tem acesso ao mar."?"Has access to the sea.":"No access to the sea.");
   }
-  const langs=boot().window.GeoCountryClueI18n;
+  const langs=legacyBoot().window.GeoCountryClueI18n;
   for(const [language,pack] of Object.entries(langs)){
     assert.ok(pack.countryLandlockedLabel,language+" needs a specific category");
     assert.ok(pack.countryLandlockedYes&&pack.countryLandlockedNo,language);
@@ -537,7 +543,7 @@ test("sea-access cards never render the raw 'Região: Não' state",()=>{
   assert.ok(files["index.html"].includes('src="country-clues-i18n.js?v=20261117-numeric-bounds"'));
 });
 test("obsolete hemisphere map purchases in northern-only daily cases are refunded",()=>{
-  const world=boot().window,places=world.GEODETECTIVE_PLACES;
+  const world=legacyBoot().window,places=world.GEODETECTIVE_PLACES;
   const day=Array.from({length:200},(_,j)=>
     new Date(Date.UTC(2027,0,1+j)).toISOString().slice(0,10)).find(d=>{
     const idx=normalIndexForDay(d,world);
@@ -554,18 +560,18 @@ test("obsolete hemisphere map purchases in northern-only daily cases are refunde
     revealed:2,penalty:0,sectorMapPenalty:600,sectorReveals:["hemisphere"],
     finished:false,won:false,score:0
   })]]);
-  const g=boot({storage,clock:FakeDate});
+  const g=legacyBoot({storage,clock:FakeDate});
   const saved=JSON.parse(storage.get(key));
   assert.equal(saved.sectorMapPenalty,0);
   assert.deepEqual(saved.sectorReveals,[]);
   assert.ok(!clueTexts(g).some(text=>text.startsWith("Hemisphere:")));
 });
 test("hint costs follow the NEXT clue, are deducted once, and saved hint count remains exact",()=>{
-  const world=boot().window,places=world.GEODETECTIVE_PLACES;
+  const world=legacyBoot().window,places=world.GEODETECTIVE_PLACES;
   const priceTypes=new Set();
   for(const name of ["Reykjavík","Tóquio","São Paulo","Paris","Ankara","Catmandu"]){
     const i=places.findIndex(p=>p[0]===name);
-    const g=boot({randomValue:(i+.25)/places.length}),$=g.get;
+    const g=legacyBoot({randomValue:(i+.25)/places.length}),$=g.get;
     $("freeBtn").handlers.click();
     const cost=Number($("revealCost").textContent.replace(/[^0-9]/g,""));
     assert.ok(cost>=150&&cost<=500,name+" price");
@@ -577,24 +583,24 @@ test("hint costs follow the NEXT clue, are deducted once, and saved hint count r
   }
   assert.ok(priceTypes.size>=3,"Hint pricing should reflect the nature of each clue");
   const storage=new Map(),day=new Date().toISOString().slice(0,10);
-  const daily=boot({storage}),$=daily.get;
+  const daily=legacyBoot({storage}),$=daily.get;
   const cost=Number($("revealCost").textContent.replace(/[^0-9]/g,""));
   $("revealBtn").handlers.click();
   const saved=JSON.parse(storage.get("geodetective-daily-v3-"+day+"-normal"));
   assert.equal(saved.penalty,cost);
   assert.equal(saved.paidHints,1);
-  const loaded=boot({storage});
+  const loaded=legacyBoot({storage});
   loaded.select(loaded.window.GEODETECTIVE_PLACES[normalIndexForDay(day,loaded.window)][0]);
   loaded.get("guessBtn").handlers.click();
   assert.equal(loaded.get("reportHints").textContent,"1");
 });
 test("country-data slots separate numeric and cultural facts through the five remaining positions",()=>{
-  const world=boot().window,places=world.GEODETECTIVE_PLACES;
+  const world=legacyBoot().window,places=world.GEODETECTIVE_PLACES;
   const civic=["Currency:","Language family:","One flag color:","No access to the sea.","Has access to the sea."];
   const numeric=["Population (","GDP per capita (","Country / territory area:"];
   const hit=new Set();
   for(let i=0;i<places.length;i+=11){
-    const g=boot({randomValue:(i+.25)/places.length});
+    const g=legacyBoot({randomValue:(i+.25)/places.length});
     g.get("freeBtn").handlers.click();
     const lines=revealAll(g);
     const positions=[];
@@ -611,10 +617,10 @@ test("country-data slots separate numeric and cultural facts through the five re
   assert.deepEqual([...hit].sort(),[2,3,4,5,6]);
 });
 test("country-data evidence is distributed among positions three to seven",()=>{
-  const places=boot().window.GEODETECTIVE_PLACES;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES;
   const counts={},positions=new Set();
   for(let index=0;index<places.length;index+=17){
-    const g=boot({randomValue:(index+.25)/places.length});
+    const g=legacyBoot({randomValue:(index+.25)/places.length});
     g.get("freeBtn").handlers.click();
     const clues=revealAll(g),country=[];
     assert.equal(clues.length,10);
@@ -633,11 +639,11 @@ test("country-data evidence is distributed among positions three to seven",()=>{
     "Country facts should reach each of the last five positions");
 });
 test("a solved dossier shows the flag and a historical paragraph for every country tested",()=>{
-  const places=boot().window.GEODETECTIVE_PLACES;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES;
   for(const city of ["Reykjavík","Taipé","Papeete","Istambul","Ankara","São Paulo"]){
     const index=places.findIndex(x=>x[0]===city);
     assert.ok(index>=0);
-    const g=boot({randomValue:(index+.25)/places.length}),$=g.get;
+    const g=legacyBoot({randomValue:(index+.25)/places.length}),$=g.get;
     $("freeBtn").handlers.click();
     g.select(city);$("guessBtn").handlers.click();
     assert.equal($("reportDialog").open,true);
@@ -659,7 +665,7 @@ test("a solved dossier shows the flag and a historical paragraph for every count
 });
 
 test("currency evidence uses broad denomination names but dossier preserves precise localized names",()=>{
-  const places=boot().window.GEODETECTIVE_PLACES;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES;
   const sample=[
     ["São Paulo","BRL","Moeda: real","Currency: real"],
     ["Ōsaka","JPY","Moeda: iene","Currency: yen"],
@@ -668,7 +674,7 @@ test("currency evidence uses broad denomination names but dossier preserves prec
   for(const [city,code,portuguese,english] of sample){
     const index=places.findIndex(p=>p[0]===city);
     assert.ok(index>=0,city+" missing");
-    const g=boot({randomValue:(index+.25)/places.length});
+    const g=legacyBoot({randomValue:(index+.25)/places.length});
     g.get("freeBtn").handlers.click();
     g.language("pt");
     assert.ok(revealAll(g).includes(portuguese),city+" needs a localized currency name");
@@ -676,7 +682,7 @@ test("currency evidence uses broad denomination names but dossier preserves prec
     assert.ok(clueTexts(g).includes(english),city+" English currency name missing");
     assert.ok(!clueTexts(g).some(t=>t.includes("Currency code: "+code)));
   }
-  const g=boot({randomValue:(68+.25)/places.length});
+  const g=legacyBoot({randomValue:(68+.25)/places.length});
   g.get("freeBtn").handlers.click();
   g.select("São Paulo");g.get("guessBtn").handlers.click();
   g.language("pt");
@@ -717,7 +723,7 @@ test("currency evidence uses broad denomination names but dossier preserves prec
   }
 });
 test("all 19 country clue templates keep required values and annual provenance",()=>{
-  const g=boot(),packs=g.window.GeoCountryClueI18n;
+  const g=legacyBoot(),packs=g.window.GeoCountryClueI18n;
   const keys=["countryCurrency","countryLanguageFamily","countryFlagColor","countryPopulation",
     "countryGDP","countryArea","countryLandlocked","countryHistory","countryHistorySource"];
   for(const [lang,t] of Object.entries(packs)){
@@ -735,11 +741,11 @@ test("all 19 country clue templates keep required values and annual provenance",
   assert.ok(files["index.html"].includes('src="currency-denominations.js?v=20261116-short-currency"'));
 });
 test("national-capital metadata remains correct even with shuffled evidence",()=>{
-  const places=boot().window.GEODETECTIVE_PLACES;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES;
   for(const [name,expected] of [["Taipé",true],["Brasília",true],["Goiânia",false]]){
     const index=places.findIndex(p=>p[0]===name);
     assert.ok(index>=0);
-    const g=boot({randomValue:(index+.25)/places.length});
+    const g=legacyBoot({randomValue:(index+.25)/places.length});
     g.get("freeBtn").handlers.click();
     g.language("pt");
     g.select(name);g.get("guessBtn").handlers.click();
@@ -750,7 +756,7 @@ test("national-capital metadata remains correct even with shuffled evidence",()=
 });
 
 test("country-area metrics always identify the country or territory in all locales",()=>{
-  const g=boot();
+  const g=legacyBoot();
   const clue=g.window.GeoCountryClueI18n;
   const profile=g.window.GeoCountryProfileI18n;
   assert.equal(Object.keys(clue).length,19);
@@ -767,7 +773,7 @@ test("country-area metrics always identify the country or territory in all local
   assert.ok(files["index.html"].includes('src="country-profile-i18n.js?v=20261116-area-scope"'));
 });
 test("daily case file offers the other unfinished difficulty and a clear Free Play action",()=>{
-  const g=boot(),$=g.get,day=new Date().toISOString().slice(0,10);
+  const g=legacyBoot(),$=g.get,day=new Date().toISOString().slice(0,10);
   const index=normalIndexForDay(day,g.window);
   g.select(g.window.GEODETECTIVE_PLACES[index][0]);
   $("guessBtn").handlers.click();
@@ -793,7 +799,7 @@ test("finished daily alternate is not offered again, even after a lost case",()=
     const storage=new Map([["geodetective-daily-v3-"+day+"-hard",
       JSON.stringify({mode:"daily",date:day,difficulty:"hard",index:hardIndex,
         serial:1,guesses:[],revealed:1,finished:true,won,score:won?5000:0})]]);
-    const g=boot({storage}),$=g.get,normal=normalIndexForDay(day,g.window);
+    const g=legacyBoot({storage}),$=g.get,normal=normalIndexForDay(day,g.window);
     g.select(g.window.GEODETECTIVE_PLACES[normal][0]);
     $("guessBtn").handlers.click();
     assert.equal($("reportAlternateBtn").classList.contains("hidden"),true);
@@ -806,10 +812,10 @@ test("finished daily alternate is not offered again, even after a lost case",()=
   }
 });
 test("the case file displays all country facts including GDP per capita and source year",()=>{
-  const places=boot().window.GEODETECTIVE_PLACES;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES;
   for(const name of ["Reykjavík","Taipé","São Paulo","Istambul","Ankara"]){
     const index=places.findIndex(x=>x[0]===name);
-    const g=boot({randomValue:(index+.25)/places.length}),$=g.get;
+    const g=legacyBoot({randomValue:(index+.25)/places.length}),$=g.get;
     $("freeBtn").handlers.click();g.language("pt");
     g.select(name);$("guessBtn").handlers.click();
     const data=g.window.GeoCountryInsights[(name==="Taipé"?"TW":name==="Reykjavík"?"IS":name==="São Paulo"?"BR":"TR")];
@@ -830,7 +836,7 @@ test("the case file displays all country facts including GDP per capita and sour
   }
   assert.ok(files["styles.css"].includes("border:0;border-radius:0;overflow:visible;background:transparent"));
   assert.ok(files["styles.css"].includes("flex:0 0 82px"));
-  assert.equal(Object.keys(boot().window.GeoCountryProfileI18n).length,19);
+  assert.equal(Object.keys(legacyBoot().window.GeoCountryProfileI18n).length,19);
 });
 test("case file footer aligns two equal actions and full-width follow-up buttons",()=>{
   const css=files["styles.css"];
@@ -843,7 +849,7 @@ test("case file footer aligns two equal actions and full-width follow-up buttons
 });
 
 test("new case replaces Share on the result card while dossier retains Share and New case",()=>{
-  const g=boot(),$=g.get;
+  const g=legacyBoot(),$=g.get;
   assert.ok(!files["index.html"].includes('id="shareBtn"'));
   assert.ok(files["index.html"].includes('id="newCaseBtn"'));
   assert.ok(files["index.html"].includes('id="reportShareBtn"'));
@@ -857,7 +863,7 @@ test("new case replaces Share on the result card while dossier retains Share and
   assert.equal($("freeBtn").classList.contains("active"),true);
 });
 test("touch, mouse and keyboard map rotation are all disabled",()=>{
-  const g=boot({map:true});
+  const g=legacyBoot({map:true});
   assert.equal(g.mapState.options.dragRotate,false);
   assert.equal(g.mapState.options.touchPitch,false);
   assert.equal(g.mapState.options.pitchWithRotate,false);
@@ -868,9 +874,9 @@ test("touch, mouse and keyboard map rotation are all disabled",()=>{
   assert.ok(files["map-fallback.js"].includes("L.map("));
 });
 test("all 10 evidence cards are purchasable before the first guess without consuming attempts",()=>{
-  const base=boot().window.GEODETECTIVE_PLACES;
+  const base=legacyBoot().window.GEODETECTIVE_PLACES;
   for(const [level,initial,attempts] of [["normal",2,6],["hard",1,4]]){
-    const idx=base.findIndex(x=>x[0]==="Lisboa"),g=boot({randomValue:(idx+.25)/base.length}),$=g.get;
+    const idx=base.findIndex(x=>x[0]==="Lisboa"),g=legacyBoot({randomValue:(idx+.25)/base.length}),$=g.get;
     g.difficulty(level);$("freeBtn").handlers.click();
     assert.equal($("hintCount").textContent,initial+" / 10");
     assert.equal($("attemptCount").textContent,attempts+" / "+attempts);
@@ -902,14 +908,14 @@ test("all 10 evidence cards are purchasable before the first guess without consu
 
 test("reloading a seven-clue saved daily case preserves its first seven and unlocks three more",()=>{
   const date=new Date().toISOString().slice(0,10);
-  const world=boot().window,index=normalIndexForDay(date,world);
+  const world=legacyBoot().window,index=normalIndexForDay(date,world);
   const dayKey="geodetective-daily-v3-"+date+"-normal";
   const storage=new Map([[dayKey,JSON.stringify({
     mode:"daily",index,difficulty:"normal",date,serial:1,guesses:[],
     revealed:7,penalty:1100,paidHints:5,sectorMapPenalty:0,sectorReveals:[],
     finished:false,won:false,score:0
   })]]);
-  const g=boot({storage}),$=g.get;
+  const g=legacyBoot({storage}),$=g.get;
   assert.equal($("hintCount").textContent,"7 / 10");
   assert.equal($("attemptCount").textContent,"6 / 6");
   assert.equal(clueTexts(g).length,10);
@@ -921,19 +927,19 @@ test("reloading a seven-clue saved daily case preserves its first seven and unlo
   assert.equal(saved.revealed,10);
   assert.equal(saved.paidHints,8);
   assert.equal(saved.guesses.length,0);
-  const reopened=boot({storage});
+  const reopened=legacyBoot({storage});
   assert.equal(reopened.get("hintCount").textContent,"10 / 10");
   assert.equal(reopened.get("attemptCount").textContent,"6 / 6");
 });
 
 test("ten clue types are unique and complete across representative cities and both difficulties",()=>{
-  const world=boot().window,p=world.GEODETECTIVE_PLACES;
+  const world=legacyBoot().window,p=world.GEODETECTIVE_PLACES;
   const national=["Currency:","Language family:","One flag color:",
     "No access to the sea.","Has access to the sea.","Population (",
     "GDP per capita (","Country / territory area:"];
   for(const level of ["normal","hard"]){
     for(let i=0;i<p.length;i+=17){
-      const g=boot({randomValue:(i+.25)/p.length});
+      const g=legacyBoot({randomValue:(i+.25)/p.length});
       g.difficulty(level);g.get("freeBtn").handlers.click();
       const all=revealAll(g);
       assert.equal(all.length,10,p[i][0]);
@@ -955,7 +961,7 @@ test("ten clue types are unique and complete across representative cities and bo
 });
 
 test("capital and coastal distances omit names and years in every supported language",()=>{
-  const g=boot();
+  const g=legacyBoot();
   const locales=g.window.CartigmaCityClueI18n;
   assert.equal(Object.keys(locales).length,19);
   for(const [locale,data] of Object.entries(locales)){
@@ -973,12 +979,12 @@ test("capital and coastal distances omit names and years in every supported lang
   assert.ok(files["index.html"].includes('src="city-clues-i18n.js?v=20261117-numeric-bounds"'));
 });
 test("five city-specific evidence types are sourced, dated, and conditional",()=>{
-  const g=boot(),w=g.window,geo=w.CartigmaCityIndicators,urban=w.CartigmaUrban2025;
+  const g=legacyBoot(),w=g.window,geo=w.CartigmaCityIndicators,urban=w.CartigmaUrban2025;
   const places=w.GEODETECTIVE_PLACES;
   assert.equal(geo.length,500);
   assert.equal(Object.keys(urban).length,21);
   const full=(index,level="normal")=>{
-    const play=boot({randomValue:(index+.25)/places.length});
+    const play=legacyBoot({randomValue:(index+.25)/places.length});
     play.difficulty(level);play.get("freeBtn").handlers.click();
     return {play,clues:revealAll(play)};
   };
@@ -1029,10 +1035,10 @@ test("five city-specific evidence types are sourced, dated, and conditional",()=
 });
 
 test("city-specific clues remain 10 and translated on Normal and Hard",()=>{
-  const all=boot().window.GEODETECTIVE_PLACES;
+  const all=legacyBoot().window.GEODETECTIVE_PLACES;
   const i=all.findIndex(x=>x[0]==="São Paulo");
   for(const difficulty of ["normal","hard"]){
-    const g=boot({randomValue:(i+.25)/all.length});
+    const g=legacyBoot({randomValue:(i+.25)/all.length});
     g.difficulty(difficulty);g.get("freeBtn").handlers.click();
     g.language("pt");
     const clues=revealAll(g);
@@ -1049,7 +1055,7 @@ test("city-specific clues remain 10 and translated on Normal and Hard",()=>{
 });
 
 test("closest guess is underlined live and in final dossier, not other guesses",()=>{
-  const g=boot(),$=g.get;
+  const g=legacyBoot(),$=g.get;
   $("freeBtn").handlers.click();
   g.select("Tóquio");$("guessBtn").handlers.click();
   assert.equal($("guessHistory").children.length,1);
@@ -1070,14 +1076,14 @@ test("closest guess is underlined live and in final dossier, not other guesses",
 
 test("old eight-hint daily games keep original evidence without new source substitutions",()=>{
   const day=new Date().toISOString().slice(0,10);
-  const tmp=boot().window,idx=normalIndexForDay(day,tmp);
+  const tmp=legacyBoot().window,idx=normalIndexForDay(day,tmp);
   const key="geodetective-daily-v3-"+day+"-normal";
   const storage=new Map([[key,JSON.stringify({
     mode:"daily",index:idx,difficulty:"normal",date:day,serial:1,
     guesses:[],revealed:8,penalty:1500,paidHints:6,
     sectorMapPenalty:0,sectorReveals:[],finished:false,won:false,score:0
   })]]);
-  const g=boot({storage}),$=g.get;
+  const g=legacyBoot({storage}),$=g.get;
   assert.equal($("hintCount").textContent,"8 / 10");
   assert.equal(JSON.parse(storage.get(key)).evidenceVersion,1);
   assert.ok(!clueTexts(g).slice(7).some(x=>
@@ -1085,12 +1091,12 @@ test("old eight-hint daily games keep original evidence without new source subst
   const prior=clueTexts(g).slice(0,8);
   g.get("revealBtn").handlers.click();
   assert.deepEqual(clueTexts(g).slice(0,8),prior);
-  const loaded=boot({storage});
+  const loaded=legacyBoot({storage});
   assert.deepEqual(clueTexts(loaded).slice(0,8),prior);
   assert.equal(JSON.parse(storage.get(key)).evidenceVersion,1);
 });
 test("Normal and Hard have ten translated clues with unchanged guess limits",()=>{
-  const g=boot(),$=g.get;
+  const g=legacyBoot(),$=g.get;
   assert.doesNotMatch(files["index.html"],/value="easy"/);
   assert.equal($("attemptCount").textContent,"6 / 6");
   assert.equal($("hintCount").textContent,"2 / 10");
@@ -1108,7 +1114,7 @@ test("Normal and Hard have ten translated clues with unchanged guess limits",()=
 });
 
 test("case IDs use English difficulty letter, full date and per-day case sequence",()=>{
-  const g=boot(),$=g.get;
+  const g=legacyBoot(),$=g.get;
   const date=new Date().toISOString().slice(0,10).replaceAll("-","");
   assert.equal($("caseCode").textContent,"#N-"+date+"-01");
   $("freeBtn").handlers.click();
@@ -1121,12 +1127,12 @@ test("case IDs use English difficulty letter, full date and per-day case sequenc
   assert.equal($("caseCode").textContent,"#H-"+date+"-05");
   g.difficulty("normal");
   assert.equal($("caseCode").textContent,"#N-"+date+"-01");
-  const again=boot({storage:g.storage});
+  const again=legacyBoot({storage:g.storage});
   assert.equal(again.get("caseCode").textContent,"#N-"+date+"-01");
 });
 
 test("Hard mode never exposes bearing during live play or in the report",()=>{
-  const g=boot(),$=g.get;
+  const g=legacyBoot(),$=g.get;
   g.difficulty("hard");
   const day=new Date().toISOString().slice(0,10),places=g.window.GEODETECTIVE_PLACES;
   const idx=hash("GEODETECTIVE-v3|"+day+"|hard")%places.length;
@@ -1145,7 +1151,7 @@ test("Hard mode never exposes bearing during live play or in the report",()=>{
 });
 
 test("Normal mode shows direction and switches language without losing the dossier",()=>{
-  const g=boot(),$=g.get;
+  const g=legacyBoot(),$=g.get;
   g.select("London");$("guessBtn").handlers.click();
   const day=new Date().toISOString().slice(0,10);
   const index=normalIndexForDay(day,g.window);
@@ -1162,7 +1168,7 @@ test("Normal mode shows direction and switches language without losing the dossi
 });
 
 test("final dossier records all guesses, fact, continent, score and coordinate",()=>{
-  const g=boot({map:true}),$=g.get;
+  const g=legacyBoot({map:true}),$=g.get;
   $("freeBtn").handlers.click(); // seeded RNG picks first location, Reykjavík
   g.select("Reykjavík");$("guessBtn").handlers.click();
   assert.equal($("resultCard").classList.contains("hidden"),false);
@@ -1185,7 +1191,7 @@ test("final dossier records all guesses, fact, continent, score and coordinate",
 });
 
 test("on loss the map frames best guess and the correct target, not the final guess",()=>{
-  const g=boot({map:true}),$=g.get;
+  const g=legacyBoot({map:true}),$=g.get;
   $("freeBtn").handlers.click(); // index 0 -> Reykjavík
   g.select("Oslo");$("guessBtn").handlers.click();
   makeWrong(g,5,"Tokyo");
@@ -1220,7 +1226,7 @@ const distanceKm=(a,b)=>{
   return 6371.0088*2*Math.asin(Math.sqrt(h));
 };
 test("all 74 cities have at least two named reference locations within 1,000 km",()=>{
-  const g=boot(),p=g.window.GEODETECTIVE_PLACES,refs=g.window.GEODETECTIVE_NEARBY_REFERENCES;
+  const g=legacyBoot(),p=g.window.GEODETECTIVE_PLACES,refs=g.window.GEODETECTIVE_NEARBY_REFERENCES;
   assert.equal(p.length,500);
   for(let i=0;i<74;i++){
     const origin=[p[i][3],p[i][4]];
@@ -1237,7 +1243,7 @@ test("all 74 cities have at least two named reference locations within 1,000 km"
   assert.match(files["app.js"],/km<=radius/);
 });
 test("map labels react to all language changes and fall back to native names",()=>{
-  const g=boot({map:true});
+  const g=legacyBoot({map:true});
   assert.ok(g.mapState.styles.some(x=>x.id==="label_city"));
   g.language("ja");
   const field=g.mapState.styles.filter(x=>x.id==="label_city").at(-1).expr;
@@ -1252,7 +1258,7 @@ test("map labels react to all language changes and fall back to native names",()
   assert.match(files["index.html"],/language-globe/);
 });
 test("drag gestures do not create a pin, while a clean click does",()=>{
-  const g=boot({map:true});
+  const g=legacyBoot({map:true});
   assert.equal(g.get("guessBtn").disabled,true);
   const canvas=g.mapState.canvas;
   canvas.handlers.pointerdown({button:0,pointerType:"mouse",clientX:100,clientY:100});
@@ -1266,7 +1272,7 @@ test("drag gestures do not create a pin, while a clean click does",()=>{
   assert.equal(g.get("guessBtn").disabled,false);
 });
 test("report opens in non-modal side panel without blocking the map",()=>{
-  const g=boot({map:true});
+  const g=legacyBoot({map:true});
   g.get("freeBtn").handlers.click();
   g.select("Reykjavík");g.get("guessBtn").handlers.click();
   assert.equal(g.get("reportDialog").open,true);
@@ -1276,7 +1282,7 @@ test("report opens in non-modal side panel without blocking the map",()=>{
 });
 
 test("map labels appear gradually with zoom instead of all at once",()=>{
-  const g=boot({map:true});
+  const g=legacyBoot({map:true});
   const ranges=g.mapState.zoomRanges;
   const country=ranges.find(x=>x.id==="label_country_1");
   const city=ranges.find(x=>x.id==="label_city");
@@ -1295,7 +1301,7 @@ test("map labels appear gradually with zoom instead of all at once",()=>{
 
 
 test("gear opens a localized map layer popover above the map selector",()=>{
-  const g=boot({map:true}),$=g.get;
+  const g=legacyBoot({map:true}),$=g.get;
   assert.ok(files["index.html"].includes('id="mapFiltersButton"'));
   assert.ok(files["index.html"].includes('id="mapFiltersPopover"'));
   assert.ok(files["styles.css"].includes("bottom:calc(100% + 10px)"));
@@ -1312,7 +1318,7 @@ test("gear opens a localized map layer popover above the map selector",()=>{
 });
 
 test("map settings affect only basemap layers, and no longer include continents",()=>{
-  const g=boot({map:true}),$=g.get;
+  const g=legacyBoot({map:true}),$=g.get;
   assert.ok(!files["index.html"].includes('id="mapFilterContinents"'));
   assert.equal(g.get("mapFilterContinents").handlers.change,undefined);
   const change=(id,checked)=>{
@@ -1333,7 +1339,7 @@ test("map settings affect only basemap layers, and no longer include continents"
   assert.equal(g.mapState.styles.filter(x=>x.id==="road_shield"&&x.key==="visibility").at(-1).expr,"visible");
 });
 test("filter settings persist without the old continents toggle",async()=>{
-  const storage=new Map(),g=boot({map:true,storage}),$=g.get;
+  const storage=new Map(),g=legacyBoot({map:true,storage}),$=g.get;
   $("mapFiltersButton").handlers.click();
   const input=$("mapFilterPoi");input.checked=false;input.handlers.change({target:input});
   const saved=JSON.parse(storage.get("cartigma-map-filters-v1"));
@@ -1343,7 +1349,7 @@ test("filter settings persist without the old continents toggle",async()=>{
   assert.equal($("mapFiltersButton").disabled,true);
   await $("mapVectorBtn").handlers.click();
   assert.equal($("mapFiltersButton").disabled,false);
-  const next=boot({map:true,storage});
+  const next=legacyBoot({map:true,storage});
   assert.equal(next.get("mapFilterPoi").checked,false);
   assert.ok(next.mapState.styles.some(x=>x.id==="poi_museum"&&x.expr==="none"));
   next.get("mapFiltersReset").handlers.click();
@@ -1351,10 +1357,10 @@ test("filter settings persist without the old continents toggle",async()=>{
   assert.equal(next.get("clueList").children[1].children[1].children[2].textContent,"Map −500");
 });
 test("longitude stays accurate but moves to different evidence positions",()=>{
-  const places=boot().window.GEODETECTIVE_PLACES,seen=new Set();
+  const places=legacyBoot().window.GEODETECTIVE_PLACES,seen=new Set();
   for(const [name,want] of [["Taipé","120° to 150°"],["Papeete","-150° to -120°"],["Reykjavík","-30° to 0°"]]){
     const i=places.findIndex(x=>x[0]===name);
-    const g=boot({randomValue:(i+.25)/places.length});
+    const g=legacyBoot({randomValue:(i+.25)/places.length});
     g.get("freeBtn").handlers.click();
     const clues=revealAll(g);
     const idx=clues.findIndex(x=>x.startsWith("Longitude sector:"));
@@ -1366,22 +1372,22 @@ test("longitude stays accurate but moves to different evidence positions",()=>{
   assert.ok(seen.size>=2,"Longitude should not be a fixed fourth clue");
 });
 test("normal evidence always has latitude sectors instead of known landmarks",()=>{
-  const places=boot().window.GEODETECTIVE_PLACES;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES;
   for(const name of ["Tóquio","Taipé","Antananarivo","Sydney","Papeete"]){
     const i=places.findIndex(x=>x[0]===name);
-    const g=boot({randomValue:(i+.25)/places.length});
+    const g=legacyBoot({randomValue:(i+.25)/places.length});
     g.get("freeBtn").handlers.click();
     const clues=revealAll(g);
     assert.ok(clues.some(x=>/^Latitude sector: -?\d+° to -?\d+°$/.test(x)),name);
   }
-  const i=places.findIndex(x=>x[0]==="Paris"),g=boot({randomValue:(i+.25)/places.length});
+  const i=places.findIndex(x=>x[0]==="Paris"),g=legacyBoot({randomValue:(i+.25)/places.length});
   g.get("freeBtn").handlers.click();
   const clues=revealAll(g);
   assert.ok(clues.some(text=>text.startsWith("Latitude sector:")));
   assert.ok(!clues.some(text=>/^Associated landmark:|^Administrative region:/.test(text)));
 });
 test("all 500 cities have 10 Normal and Hard clues without the two retired clue types",()=>{
-  const g=boot(),$=g.get,original=JSON.stringify([...g.storage.entries()]);
+  const g=legacyBoot(),$=g.get,original=JSON.stringify([...g.storage.entries()]);
   $("atlasBtn").handlers.click();
   const choices=$("atlasOptions").children;
   assert.equal(choices.length,500);
@@ -1404,7 +1410,7 @@ test("all 500 cities have 10 Normal and Hard clues without the two retired clue 
 });
 
 test("old paid clues stay intact, while never-played daily cases upgrade to the new clue selection",()=>{
-  const world=boot().window,places=world.GEODETECTIVE_PLACES,paris=8;
+  const world=legacyBoot().window,places=world.GEODETECTIVE_PLACES,paris=8;
   assert.equal(places[paris][0],"Paris");
   const day=Array.from({length:3650},(_,i)=>
     new Date(Date.UTC(2027,0,i+1)).toISOString().slice(0,10))
@@ -1418,7 +1424,7 @@ test("old paid clues stay intact, while never-played daily cases upgrade to the 
     guesses:[],revealed:7,penalty:900,paidHints:5,sectorMapPenalty:0,sectorReveals:[],
     evidenceVersion:2,finished:false,won:false,score:0};
   const storage=new Map([[key,JSON.stringify(saved)]]);
-  const g=boot({storage,clock:FixedDate}),$=g.get,previous=clueTexts(g);
+  const g=legacyBoot({storage,clock:FixedDate}),$=g.get,previous=clueTexts(g);
   assert.ok(previous.includes("Associated landmark: Eiffel Tower"));
   assert.equal(JSON.parse(storage.get(key)).evidenceVersion,2);
   $("atlasBtn").handlers.click();
@@ -1433,18 +1439,18 @@ test("old paid clues stay intact, while never-played daily cases upgrade to the 
   $("atlasCloseBtn").handlers.click();
   $("revealBtn").handlers.click();
   assert.deepEqual(clueTexts(g).slice(0,7),previous.slice(0,7));
-  const loaded=boot({storage,clock:FixedDate});
+  const loaded=legacyBoot({storage,clock:FixedDate});
   assert.deepEqual(clueTexts(loaded).slice(0,7),previous.slice(0,7));
   assert.equal(JSON.parse(storage.get(key)).evidenceVersion,2);
 
   const unused=new Map([[key,JSON.stringify({...saved,revealed:2,paidHints:0,penalty:0})]]);
-  const newRun=boot({storage:unused,clock:FixedDate});
+  const newRun=legacyBoot({storage:unused,clock:FixedDate});
   assert.equal(JSON.parse(unused.get(key)).evidenceVersion,3);
   assert.ok(!revealAll(newRun).some(x=>/^Associated landmark:|^Administrative region:/.test(x)));
 });
 
 test("administrative regions and landmarks remain in the archive as reference data",()=>{
-  const g=boot(),$=g.get;$("atlasBtn").handlers.click();
+  const g=legacyBoot(),$=g.get;$("atlasBtn").handlers.click();
   $("atlasOptions").children.find(b=>b.dataset.index==="74").handlers.click();
   assert.ok($("atlasCityFacts").children.some(x=>
     x.children[0]?.textContent==="Catalogue region"&&x.children[1]?.textContent),
@@ -1460,10 +1466,10 @@ test("administrative regions and landmarks remain in the archive as reference da
 });
 
 test("Hard mode still uses UTM zone and latitude bands without city giveaways",()=>{
-  const places=boot().window.GEODETECTIVE_PLACES;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES;
   for(const [name,zone,band] of [["Taipé",51,"R"],["Tóquio",54,"S"],["Longyearbyen",33,"X"]]){
     const i=places.findIndex(x=>x[0]===name);
-    const g=boot({randomValue:(i+.25)/places.length});
+    const g=legacyBoot({randomValue:(i+.25)/places.length});
     g.difficulty("hard");g.get("freeBtn").handlers.click();
     const clues=revealAll(g);
     assert.ok(clues.includes("UTM zone: "+zone),name);
@@ -1473,7 +1479,7 @@ test("Hard mode still uses UTM zone and latitude bands without city giveaways",(
   }
 });
 test("exact guesses omit distance and direction in history and final dossier",()=>{
-  const g=boot({map:true}),$=g.get;
+  const g=legacyBoot({map:true}),$=g.get;
   $("freeBtn").handlers.click(); // Reykjavík is index 0.
   g.select("Reykjavík");
   $("guessBtn").handlers.click();
@@ -1484,10 +1490,10 @@ test("exact guesses omit distance and direction in history and final dossier",()
 });
 
 test("a correct fifth guess in Cape Town has no distance or bearing in history or dossier",()=>{
-  const places=boot().window.GEODETECTIVE_PLACES;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES;
   const target=places.findIndex(p=>p[0]==="Cidade do Cabo");
   assert.ok(target>=0);
-  const g=boot({randomValue:(target+.25)/places.length}),$=g.get;
+  const g=legacyBoot({randomValue:(target+.25)/places.length}),$=g.get;
   $("freeBtn").handlers.click();
   g.language("pt");
   for(let i=0;i<4;i++){g.select("Oslo");$("guessBtn").handlers.click();}
@@ -1501,7 +1507,7 @@ test("a correct fifth guess in Cape Town has no distance or bearing in history o
 });
 
 test("fresh deployments fingerprint both game engine and translated clues",()=>{
-  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261117-rush-ready-v2"'));
+  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261117-country-edition"'));
   assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-profile-diversity"'));
   assert.ok(files["map-bootstrap.js"].includes('new URL(import.meta.url).searchParams.get("v")'));
   assert.ok(files["app.js"].includes("function guessMetricText(g)"));
@@ -1510,13 +1516,13 @@ test("fresh deployments fingerprint both game engine and translated clues",()=>{
 });
 
 test("Hard mode charges 50 percent more for all clue reveals and map overlays",()=>{
-  const places=boot().window.GEODETECTIVE_PLACES;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES;
   const i=places.findIndex(p=>p[0]==="Reykjavík");
-  const normal=boot({map:true,randomValue:(i+.25)/places.length});
+  const normal=legacyBoot({map:true,randomValue:(i+.25)/places.length});
   normal.get("freeBtn").handlers.click();
   const initialNormal=Number(normal.get("revealCost").textContent.replace(/[^0-9]/g,""));
   assert.equal(normal.get("clueList").children[1].children[1].children[2].textContent,"Map −500");
-  const hard=boot({map:true,randomValue:(i+.25)/places.length});
+  const hard=legacyBoot({map:true,randomValue:(i+.25)/places.length});
   hard.difficulty("hard");hard.get("freeBtn").handlers.click();
   const hardCost=Number(hard.get("revealCost").textContent.replace(/[^0-9]/g,""));
   assert.equal(hardCost,Math.ceil(300*1.5/50)*50,"Second clue is the continent");
@@ -1533,12 +1539,12 @@ test("Hard mode charges 50 percent more for all clue reveals and map overlays",(
 });
 
 test("paid UTM zone draws correct Norwegian and Svalbard exceptions with labeled ruler",()=>{
-  const cities=boot().window.GEODETECTIVE_PLACES;
+  const cities=legacyBoot().window.GEODETECTIVE_PLACES;
   for(const [city,expectedZone,west,east,south,north] of [
     ["Oslo",32,3,12,56,64],["Longyearbyen",33,9,21,72,84]
   ]){
     const idx=cities.findIndex(x=>x[0]===city);
-    const g=boot({map:true,randomValue:(idx+.25)/cities.length}),$=g.get;
+    const g=legacyBoot({map:true,randomValue:(idx+.25)/cities.length}),$=g.get;
     g.difficulty("hard");$("freeBtn").handlers.click();
     const {button}=unlockClue(g,/^UTM zone:/);
     assert.equal(button.textContent,"Map −1,800");
@@ -1569,12 +1575,12 @@ test("paid UTM zone draws correct Norwegian and Svalbard exceptions with labeled
 });
 
 test("UTM latitude-band purchase shows the correct 8 and 12 degree ranges",async()=>{
-  const places=boot().window.GEODETECTIVE_PLACES;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES;
   for(const [city,band,south,north] of [
     ["Tóquio","S",32,40],["Longyearbyen","X",72,84]
   ]){
     const index=places.findIndex(p=>p[0]===city);
-    const g=boot({map:true,randomValue:(index+.25)/places.length}),$=g.get;
+    const g=legacyBoot({map:true,randomValue:(index+.25)/places.length}),$=g.get;
     g.difficulty("hard");$("freeBtn").handlers.click();
     const {button}=unlockClue(g,/^UTM latitude band:/);
     assert.equal(button.textContent,"Map −1,950");
@@ -1596,9 +1602,9 @@ test("UTM latitude-band purchase shows the correct 8 and 12 degree ranges",async
 });
 
 test("both UTM overlays persist in daily Hard games without charging twice",()=>{
-  const storage=new Map(),cities=boot().window.GEODETECTIVE_PLACES;
+  const storage=new Map(),cities=legacyBoot().window.GEODETECTIVE_PLACES;
   const date=new Date().toISOString().slice(0,10);
-  const g=boot({map:true,storage}),$=g.get;
+  const g=legacyBoot({map:true,storage}),$=g.get;
   g.difficulty("hard");
   const {button:zone}=unlockClue(g,/^UTM zone:/);
   zone.handlers.click();
@@ -1612,7 +1618,7 @@ test("both UTM overlays persist in daily Hard games without charging twice",()=>
   assert.ok(g.mapState.sources.has("case-utm-zone"));
   assert.ok(g.mapState.sources.has("case-utm-band"));
   assert.equal(g.mapState.sources.get("case-utm-annotations").data.features.length,180);
-  const loaded=boot({map:true,storage});
+  const loaded=legacyBoot({map:true,storage});
   assert.equal(unlockClue(loaded,/^UTM zone:/).button.disabled,true);
   assert.equal(unlockClue(loaded,/^UTM latitude band:/).button.disabled,true);
   assert.ok(loaded.mapState.sources.has("case-utm-zone"));
@@ -1632,9 +1638,9 @@ test("paid latitude-zone overlays match all six climate belts and highlight both
     {index:152,key:"subpolar",bounds:[[-66.5,-55],[55,66.5]]},
     {index:1,key:"polar",bounds:[[-85.05,-66.5],[66.5,85.05]]}
   ];
-  const cities=boot().window.GEODETECTIVE_PLACES;
+  const cities=legacyBoot().window.GEODETECTIVE_PLACES;
   for(const example of examples){
-    const g=boot({map:true,randomValue:(example.index+.25)/cities.length}),$=g.get;
+    const g=legacyBoot({map:true,randomValue:(example.index+.25)/cities.length}),$=g.get;
     $("freeBtn").handlers.click();
     const first=clueTexts(g)[0];
     assert.ok(first.startsWith("Latitude belt:"),cities[example.index][0]);
@@ -1679,9 +1685,9 @@ test("paid latitude-zone overlays match all six climate belts and highlight both
 });
 
 test("latitude-zone overlay is locked until evidence revealed, costs 900 on Hard and needs a map",()=>{
-  const cities=boot().window.GEODETECTIVE_PLACES,index=cities.findIndex(city=>city[0]==="Tóquio");
+  const cities=legacyBoot().window.GEODETECTIVE_PLACES,index=cities.findIndex(city=>city[0]==="Tóquio");
   assert.ok(index>=0);
-  const g=boot({map:true,randomValue:(index+.25)/cities.length}),$=g.get;
+  const g=legacyBoot({map:true,randomValue:(index+.25)/cities.length}),$=g.get;
   g.difficulty("hard");$("freeBtn").handlers.click();
   assert.ok(!clueTexts(g)[0].startsWith("Latitude belt:"),
     "Tokyo must not start with the latitude clue");
@@ -1698,7 +1704,7 @@ test("latitude-zone overlay is locked until evidence revealed, costs 900 on Hard
   assert.equal($("attemptCount").textContent,remaining);
   assert.equal(g.mapState.sources.get("case-latitude-belt").data.properties.belt,"temperate");
   assert.equal($("clueList").children[slot].children[1].children[2].disabled,true);
-  const mapless=boot({map:false,randomValue:(index+.25)/cities.length});
+  const mapless=legacyBoot({map:false,randomValue:(index+.25)/cities.length});
   mapless.difficulty("hard");mapless.get("freeBtn").handlers.click();
   const {button:noMap}=unlockClue(mapless,/^Latitude belt:/);
   assert.equal(noMap.textContent,"Map −900");
@@ -1706,7 +1712,7 @@ test("latitude-zone overlay is locked until evidence revealed, costs 900 on Hard
 });
 
 test("paid latitude-zone overlays persist across daily case reloads and map-style changes",async()=>{
-  const world=boot().window,places=world.GEODETECTIVE_PLACES;
+  const world=legacyBoot().window,places=world.GEODETECTIVE_PLACES;
   const date=Array.from({length:730},(_,i)=>
     new Date(Date.UTC(2027,0,i+1)).toISOString().slice(0,10))
     .find(day=>{
@@ -1717,7 +1723,7 @@ test("paid latitude-zone overlays persist across daily case reloads and map-styl
   class FixedDate extends Date{
     constructor(...args){super(...(args.length?args:[date+"T12:00:00Z"]));}
   }
-  const storage=new Map(),g=boot({map:true,storage,clock:FixedDate}),$=g.get;
+  const storage=new Map(),g=legacyBoot({map:true,storage,clock:FixedDate}),$=g.get;
   assert.ok(clueTexts(g)[0].startsWith("Latitude belt:"));
   $("clueList").children[0].children[1].children[2].handlers.click();
   const key="geodetective-daily-v3-"+date+"-normal";
@@ -1732,7 +1738,7 @@ test("paid latitude-zone overlays persist across daily case reloads and map-styl
   await $("mapVectorBtn").handlers.click();
   assert.ok(g.mapState.sources.has("case-latitude-belt"));
   assert.equal($("clueList").children[0].children[1].children[2].disabled,true);
-  const reopened=boot({map:true,storage,clock:FixedDate});
+  const reopened=legacyBoot({map:true,storage,clock:FixedDate});
   assert.equal(reopened.get("clueList").children[0].children[1].children[2].disabled,true);
   assert.ok(reopened.mapState.sources.has("case-latitude-belt"));
   const savedAgain=JSON.parse(storage.get(key));
@@ -1744,7 +1750,7 @@ test("paid latitude-zone overlays persist across daily case reloads and map-styl
 });
 
 test("all purchased region fills have no internal outlines or edge seams",()=>{
-  const places=boot().window.GEODETECTIVE_PLACES;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES;
   const cases=[
     {name:"Taipé",level:"normal",clues:[
       ["Longitude sector:","case-sector-longitude"],
@@ -1762,7 +1768,7 @@ test("all purchased region fills have no internal outlines or edge seams",()=>{
   for(const item of cases){
     const index=places.findIndex(p=>p[0]===item.name);
     assert.ok(index>=0,item.name+" missing");
-    const g=boot({map:true,randomValue:(index+.25)/places.length});
+    const g=legacyBoot({map:true,randomValue:(index+.25)/places.length});
     g.difficulty(item.level);g.get("freeBtn").handlers.click();
     for(const [prefix,layerId] of item.clues){
       const {button}=unlockClue(g,new RegExp("^"+prefix));
@@ -1786,9 +1792,9 @@ test("all purchased region fills have no internal outlines or edge seams",()=>{
   assert.equal(checked.length,5);
 });
 test("paid longitude sector remains available regardless of shuffled evidence order",()=>{
-  const places=boot().window.GEODETECTIVE_PLACES;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES;
   const index=places.findIndex(p=>p[0]==="Taipé");
-  const g=boot({map:true,randomValue:(index+.25)/places.length}),$=g.get;
+  const g=legacyBoot({map:true,randomValue:(index+.25)/places.length}),$=g.get;
   $("freeBtn").handlers.click();
   let spentHintCost=0;
   while(!clueTexts(g).some(text=>/^Longitude sector:/.test(text))){
@@ -1816,8 +1822,8 @@ test("paid longitude sector remains available regardless of shuffled evidence or
   assert.equal($("reportHints").textContent,String(revealed-2));
 });
 test("paid latitude band survives map changes even after evidence shuffling",async()=>{
-  const places=boot().window.GEODETECTIVE_PLACES,index=places.findIndex(p=>p[0]==="Tóquio");
-  const g=boot({map:true,randomValue:(index+.25)/places.length}),$=g.get;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES,index=places.findIndex(p=>p[0]==="Tóquio");
+  const g=legacyBoot({map:true,randomValue:(index+.25)/places.length}),$=g.get;
   $("freeBtn").handlers.click();
   const {button}=unlockClue(g,/^Latitude sector:/);
   assert.ok(button&&!button.disabled);button.handlers.click();
@@ -1833,7 +1839,7 @@ test("paid latitude band survives map changes even after evidence shuffling",asy
   assert.ok(g.mapState.sources.has("case-sector-latitude"));
 });
 test("late map initialization enables a shuffled paid-sector action",()=>{
-  const g=boot({map:true}),$=g.get;
+  const g=legacyBoot({map:true}),$=g.get;
   const {index}=unlockClue(g,/^(Longitude sector|Latitude sector):/);
   let button=$("clueList").children[index].children[1].children[2];
   assert.ok(button&&!button.disabled);
@@ -1843,14 +1849,14 @@ test("late map initialization enables a shuffled paid-sector action",()=>{
   assert.equal(button.disabled,false);
 });
 test("daily paid sectors are saved and do not charge twice",()=>{
-  const storage=new Map(),g=boot({map:true,storage}),$=g.get;
+  const storage=new Map(),g=legacyBoot({map:true,storage}),$=g.get;
   const {button}=unlockClue(g,/^Longitude sector:/);
   button.handlers.click();
   const day=new Date().toISOString().slice(0,10);
   const saved=JSON.parse(storage.get("geodetective-daily-v3-"+day+"-normal"));
   assert.equal(saved.sectorMapPenalty,1000);
   assert.deepEqual(saved.sectorReveals,["longitude"]);
-  const next=boot({map:true,storage});
+  const next=legacyBoot({map:true,storage});
   assert.ok(next.mapState.sources.has("case-sector-longitude"));
   assert.equal(unlockClue(next,/^Longitude sector:/).button.disabled,true);
   assert.equal(JSON.parse(storage.get("geodetective-daily-v3-"+day+"-normal")).sectorMapPenalty,1000);
@@ -1858,14 +1864,14 @@ test("daily paid sectors are saved and do not charge twice",()=>{
   assert.ok(!clueTexts(next).some(x=>/^Longitude sector:/.test(x)));
 });
 test("paid hemisphere guidance draws the Equator dashed with arrows pointing to north or south",()=>{
-  const places=boot().window.GEODETECTIVE_PLACES;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES;
   for(const north of [true,false]){
-    const world=boot().window;
+    const world=legacyBoot().window;
     const index=places.findIndex((p,i)=>![7,8,10,35].includes(i)
       &&equatorRegions.has(continentForTest(i,world))
       &&hash("opening:"+p[0])%3===2&&(p[3]>=0)===north);
     assert.ok(index>=0,"Missing northern/southern hemisphere example");
-    const g=boot({map:true,randomValue:(index+.25)/places.length}),$=g.get;
+    const g=legacyBoot({map:true,randomValue:(index+.25)/places.length}),$=g.get;
     $("freeBtn").handlers.click();
     assert.match(clueTexts(g)[0],/hemisphere/i);
     const button=$("clueList").children[0].children[1].children[2];
@@ -1903,20 +1909,20 @@ test("paid hemisphere guidance draws the Equator dashed with arrows pointing to 
 });
 
 test("hemisphere purchase survives daily reloading and map engine switching",async()=>{
-  const places=boot().window.GEODETECTIVE_PLACES;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES;
   const day=Array.from({length:120},(_,i)=>new Date(Date.UTC(2027,0,i+1)).toISOString().slice(0,10))
     .find(d=>{
       const index=normalIndexForDay(d,{GEODETECTIVE_PLACES:places,
-        GeoExtendedPlaceMetadata:boot().window.GeoExtendedPlaceMetadata});
+        GeoExtendedPlaceMetadata:legacyBoot().window.GeoExtendedPlaceMetadata});
       return ![7,8,10,35].includes(index)
-        &&equatorRegions.has(continentForTest(index,boot().window))
+        &&equatorRegions.has(continentForTest(index,legacyBoot().window))
         &&hash("opening:"+places[index][0])%3===2;
     });
   assert.ok(day);
   class FakeDate extends Date{
     constructor(...args){super(...(args.length?args:[day+"T12:00:00Z"]));}
   }
-  const storage=new Map(),g=boot({map:true,storage,clock:FakeDate}),$=g.get;
+  const storage=new Map(),g=legacyBoot({map:true,storage,clock:FakeDate}),$=g.get;
   assert.match(clueTexts(g)[0],/hemisphere/i);
   $("clueList").children[0].children[1].children[2].handlers.click();
   const saved=JSON.parse(storage.get("geodetective-daily-v3-"+day+"-normal"));
@@ -1928,24 +1934,24 @@ test("hemisphere purchase survives daily reloading and map engine switching",asy
   await $("mapVectorBtn").handlers.click();
   assert.equal(g.mapState.layers.get("case-hemisphere-arrows").type,"symbol");
   assert.equal(g.mapState.layers.get("case-hemisphere-arrows").layout["symbol-spacing"],88);
-  const reopened=boot({map:true,storage,clock:FakeDate});
+  const reopened=legacyBoot({map:true,storage,clock:FakeDate});
   assert.ok(reopened.mapState.sources.has("case-hemisphere-line"));
   assert.equal(reopened.get("clueList").children[0].children[1].children[2].disabled,true);
   assert.equal(JSON.parse(storage.get("geodetective-daily-v3-"+day+"-normal")).sectorMapPenalty,250);
 });
 
 test("hemisphere guide requires a revealed hemisphere clue and working map, including Hard",()=>{
-  const places=boot().window.GEODETECTIVE_PLACES;
-  const world=boot().window;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES;
+  const world=legacyBoot().window;
   const index=places.findIndex((p,i)=>![7,8,10,35].includes(i)
     &&equatorRegions.has(continentForTest(i,world))&&hash("opening:"+p[0])%3===2);
   assert.ok(index>=0);
-  const g=boot({map:false,randomValue:(index+.25)/places.length});
+  const g=legacyBoot({map:false,randomValue:(index+.25)/places.length});
   g.get("freeBtn").handlers.click();
   const button=g.get("clueList").children[0].children[1].children[2];
   assert.equal(button.disabled,true);
   assert.match(button.textContent,/250/);
-  const hard=boot({map:true,randomValue:(index+.25)/places.length});
+  const hard=legacyBoot({map:true,randomValue:(index+.25)/places.length});
   hard.difficulty("hard");
   hard.get("freeBtn").handlers.click();
   assert.equal(hard.get("clueList").children[0].children[1].children[2].disabled,false);
@@ -1956,13 +1962,13 @@ test("hemisphere guide requires a revealed hemisphere clue and working map, incl
 });
 
 test("continent outline is a low-opacity line with NO fill, costs 500 once",()=>{
-  const places=boot().window.GEODETECTIVE_PLACES;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES;
   const cases=[["Paris","europe"],["Marrakech","africa"],["Tóquio","asia"],
     ["Sydney","oceania"],["Nova York","northAmerica"],["São Paulo","southAmerica"]];
   for(const [city,region] of cases){
     const index=places.findIndex(p=>p[0]===city);
     assert.ok(index>=0,city+" missing");
-    const g=boot({map:true,randomValue:(index+.25)/places.length}),$=g.get;
+    const g=legacyBoot({map:true,randomValue:(index+.25)/places.length}),$=g.get;
     $("freeBtn").handlers.click();
     const btn=$("clueList").children[1].children[1].children[2];
     assert.ok(btn&&!btn.disabled,city);
@@ -1989,7 +1995,7 @@ test("continent outline is a low-opacity line with NO fill, costs 500 once",()=>
 });
 
 test("continent shape is available only after its second clue, survives daily reload and map styles",async()=>{
-  const storage=new Map(),g=boot({map:true,storage}),$=g.get;
+  const storage=new Map(),g=legacyBoot({map:true,storage}),$=g.get;
   const btn=$("clueList").children[1].children[1].children[2];
   assert.ok(btn&&!btn.disabled);
   assert.equal(g.mapState.sources.has("case-continent-outline"),false);
@@ -2002,11 +2008,11 @@ test("continent shape is available only after its second clue, survives daily re
   assert.ok(g.mapState.layers.has("case-continent-outline"));
   await $("mapVectorBtn").handlers.click();
   assert.equal(g.mapState.layers.get("case-continent-outline").type,"line");
-  const reopened=boot({map:true,storage});
+  const reopened=legacyBoot({map:true,storage});
   assert.equal(reopened.get("clueList").children[1].children[1].children[2].disabled,true);
   assert.ok(reopened.mapState.sources.has("case-continent-outline"));
   assert.equal(JSON.parse(storage.get("geodetective-daily-v3-"+day+"-normal")).sectorMapPenalty,500);
-  const hard=boot({map:true});
+  const hard=legacyBoot({map:true});
   hard.difficulty("hard");
   assert.equal(hard.get("clueList").children[1].children[1].children[2],undefined);
   hard.get("revealBtn").handlers.click();
@@ -2016,7 +2022,7 @@ test("continent shape is available only after its second clue, survives daily re
 });
 
 test("Equator arrows pop in and out without fade animations",()=>{
-  const g=boot({map:true}),$=g.get;
+  const g=legacyBoot({map:true}),$=g.get;
   assert.equal(g.mapState.options.fadeDuration,0);
   assert.match(files["styles.css"],/\.hemisphere-direction-arrow\{[^}]*transition:none!important/);
   assert.match(files["app.js"],/"text-opacity-transition":\{duration:0,delay:0\}/);
@@ -2026,10 +2032,10 @@ test("Equator arrows pop in and out without fade animations",()=>{
 });
 
 test("hemisphere evidence never follows the continent and no generic river-valley clue remains",()=>{
-  const places=boot().window.GEODETECTIVE_PLACES;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES;
   let hemisphereUsed=0;
   for(let i=0;i<places.length;i++){
-    const g=boot({randomValue:i/places.length});
+    const g=legacyBoot({randomValue:i/places.length});
     g.get("freeBtn").handlers.click();
     for(let j=0;j<6;j++)g.get("revealBtn").handlers.click();
     const entries=clueTexts(g);
@@ -2048,13 +2054,13 @@ test("hemisphere evidence never follows the continent and no generic river-valle
   }
   assert.ok(hemisphereUsed>5,"Some cases should still have hemisphere evidence before continent");
   for(const [i,river] of [[7,"Thames"],[8,"Seine"],[10,"Tiber"],[35,"Han"]]){
-    const g=boot({randomValue:i/places.length});g.get("freeBtn").handlers.click();
+    const g=legacyBoot({randomValue:i/places.length});g.get("freeBtn").handlers.click();
     for(let j=0;j<6;j++)g.get("revealBtn").handlers.click();
     assert.ok(clueTexts(g).join(" ").includes(river),"Named river "+river+" missing");
   }
 });
 test("Normal mode renders full localized direction with pointing arrow; Hard never shows it",()=>{
-  const normal=boot({randomValue:0});normal.get("freeBtn").handlers.click();
+  const normal=legacyBoot({randomValue:0});normal.get("freeBtn").handlers.click();
   normal.select("Oslo");normal.get("guessBtn").handlers.click();
   const english=normal.get("feedback").textContent;
   assert.match(english,/(North|South|East|West)/);
@@ -2065,13 +2071,13 @@ test("Normal mode renders full localized direction with pointing arrow; Hard nev
   assert.match(portuguese,/[↑↗→↘↓↙←↖]/);
   assert.equal(normal.get("compassE").textContent,"L");
   assert.equal(normal.get("compassW").textContent,"O");
-  const hard=boot({randomValue:0});hard.difficulty("hard");hard.get("freeBtn").handlers.click();
+  const hard=legacyBoot({randomValue:0});hard.difficulty("hard");hard.get("freeBtn").handlers.click();
   hard.select("Oslo");hard.get("guessBtn").handlers.click();
   assert.doesNotMatch(hard.get("feedback").textContent,/[↑↗→↘↓↙←↖]/);
   assert.equal(hard.get("guessHistory").children[0].children[1].textContent.includes(" · "),false);
 });
 test("map buttons change engine without discarding the current investigation",async()=>{
-  const g=boot({map:true}),$=g.get;
+  const g=legacyBoot({map:true}),$=g.get;
   g.get("freeBtn").handlers.click();
   g.select("Oslo");g.get("guessBtn").handlers.click();
   const originalCase=$("caseCode").textContent;
@@ -2092,7 +2098,7 @@ test("map buttons change engine without discarding the current investigation",as
 
 
 test("map title bar reflects Normal and Hard difficulty",()=>{
-  const g=boot(),bar=g.get("mapToolbar");
+  const g=legacyBoot(),bar=g.get("mapToolbar");
   assert.equal(bar.classList.contains("is-hard"),false);
   g.difficulty("hard");
   assert.equal(bar.classList.contains("is-hard"),true);
@@ -2106,7 +2112,7 @@ test("map title bar reflects Normal and Hard difficulty",()=>{
 
 
 test("Cartigma map title includes localized difficulty and has a globe at its left",()=>{
-  const g=boot(),bar=g.get("mapToolbar");
+  const g=legacyBoot(),bar=g.get("mapToolbar");
   assert.equal(g.get("mapTitle").textContent,"World map - Normal");
   assert.equal(bar.classList.contains("is-hard"),false);
   g.difficulty("hard");
@@ -2125,7 +2131,7 @@ test("Cartigma map title includes localized difficulty and has a globe at its le
 });
 
 test("mobile completed-case dossier moves into lower scroller without covering map",()=>{
-  const g=boot({map:true,mobile:true});
+  const g=legacyBoot({map:true,mobile:true});
   g.get("freeBtn").handlers.click();
   g.select("Reykjavík");
   g.get("guessBtn").handlers.click();
@@ -2143,7 +2149,7 @@ test("mobile completed-case dossier moves into lower scroller without covering m
 
 
 test("repeatable country evidence is cached per language without distance computations",()=>{
-  const g=boot(),$=g.get;
+  const g=legacyBoot(),$=g.get;
   const before=g.perf.distanceCalls;
   assert.equal(before,0,"Generating evidence no longer needs reference distances");
   $("revealBtn").handlers.click();
@@ -2163,7 +2169,7 @@ test("repeatable country evidence is cached per language without distance comput
 });
 
 test("indexed city search handles accents and English aliases without changing result limits",()=>{
-  const g=boot(),$=g.get,search=$("citySearch");
+  const g=legacyBoot(),$=g.get,search=$("citySearch");
   function results(query){
     search.value=query;
     search.handlers.input({target:search});
@@ -2184,7 +2190,7 @@ test("indexed city search handles accents and English aliases without changing r
 
 
 test("five statistical clue types render valid rounded lower or upper bounds",()=>{
-  const g=boot(),$=g.get,w=g.window;
+  const g=legacyBoot(),$=g.get,w=g.window;
   const base=files["app.js"].match(/const COUNTRY_CODES = "([^"]+)"/)[1].split(" ");
   const seen=new Set();
   $("atlasBtn").handlers.click();
@@ -2234,9 +2240,9 @@ test("Rush targets countries, unlocks hints every six seconds and timestamps gue
     static now(){return Clock.ms}
     constructor(...args){super(...(args.length?args:[Clock.ms]))}
   }
-  const places=boot().window.GEODETECTIVE_PLACES;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES;
   const index=places.findIndex(x=>x[0]==="São Paulo");
-  const g=boot({clock:Clock,randomValue:(index+.25)/places.length}),$=g.get;
+  const g=legacyBoot({clock:Clock,randomValue:(index+.25)/places.length}),$=g.get;
   g.difficulty("rush");
   $("freeBtn").handlers.click();
   assert.equal($("gameTimer").textContent,"01:00");
@@ -2277,7 +2283,7 @@ test("Rush daily has a separate saved case and expires after sixty wall-clock se
     static now(){return Clock.ms}
     constructor(...args){super(...(args.length?args:[Clock.ms]))}
   }
-  const storage=new Map(),g=boot({clock:Clock,storage}),$=g.get;
+  const storage=new Map(),g=legacyBoot({clock:Clock,storage}),$=g.get;
   g.difficulty("rush");
   const key="geodetective-daily-v3-2026-11-17-rush";
   const before=JSON.parse(storage.get(key));
@@ -2298,7 +2304,7 @@ test("Rush daily has a separate saved case and expires after sixty wall-clock se
   assert.equal(expired.score,0);
   assert.equal(expired.durationMs,60000);
   assert.equal(expired.revealed,10);
-  const reopened=boot({clock:Clock,storage});
+  const reopened=legacyBoot({clock:Clock,storage});
   assert.equal(reopened.get("difficultySelect").value,"rush");
   assert.equal(reopened.get("resultCard").classList.contains("hidden"),false);
   assert.equal(JSON.parse(storage.get(key)).finished,true);
@@ -2324,9 +2330,9 @@ test("Rush map clicks select the country containing the click, not the nearest c
     {properties:{ISO_A2:"BR"},geometry:rectangle(-74,-34,-34,6)},
     {properties:{ISO_A2:"MX"},geometry:rectangle(-118,14,-86,33)}
   ]};
-  const places=boot().window.GEODETECTIVE_PLACES;
+  const places=legacyBoot().window.GEODETECTIVE_PLACES;
   const index=places.findIndex(p=>p[0]==="São Paulo");
-  const g=boot({clock:Clock,map:true,countryData,
+  const g=legacyBoot({clock:Clock,map:true,countryData,
     randomValue:(index+.25)/places.length}),$=g.get;
   g.difficulty("rush");$("freeBtn").click();
   assert.equal($("rushIntro").classList.contains("hidden"),false);
@@ -2357,10 +2363,10 @@ test("Rush start screen survives reload and timer layout stays in its own row",(
     static now(){return Clock.ms}
     constructor(...args){super(...(args.length?args:[Clock.ms]))}
   }
-  const storage=new Map(),g=boot({storage,clock:Clock});
+  const storage=new Map(),g=legacyBoot({storage,clock:Clock});
   g.difficulty("rush");
   Clock.ms+=90000;g.tick();
-  const reopened=boot({storage,clock:Clock});
+  const reopened=legacyBoot({storage,clock:Clock});
   assert.equal(reopened.get("gameTimer").textContent,"01:00");
   assert.equal(reopened.get("rushIntro").classList.contains("hidden"),false);
   assert.equal(reopened.get("reportDialog").open,false);
@@ -2384,7 +2390,7 @@ test("An untouched older Rush daily is reset to the new Start gate",()=>{
     static now(){return Clock.ms}
     constructor(...args){super(...(args.length?args:[Clock.ms]))}
   }
-  const preliminary=boot({clock:Clock});
+  const preliminary=legacyBoot({clock:Clock});
   preliminary.difficulty("rush");
   const idx=preliminary.window.GEODETECTIVE_PLACES.length;
   assert.equal(idx,500);
@@ -2395,9 +2401,101 @@ test("An untouched older Rush daily is reset to the new Start gate",()=>{
   old.revealed=10;old.score=0;
   const storage=new Map([["geodetective-difficulty",JSON.stringify("rush")],
     ["geodetective-daily-v3-2026-11-17-rush",JSON.stringify(old)]]);
-  const g=boot({clock:Clock,storage});
+  const g=legacyBoot({clock:Clock,storage});
   assert.equal(g.get("rushIntro").classList.contains("hidden"),false);
   assert.equal(g.get("gameTimer").textContent,"01:00");
   assert.equal(g.get("hintCount").textContent,"1 / 10");
   assert.equal(JSON.parse(storage.get("geodetective-daily-v3-2026-11-17-rush")).started,false);
+});
+
+test("New Normal/Hard cases accept countries, not city locations, preserving 6/4 guesses",()=>{
+  const places=boot().window.GEODETECTIVE_PLACES;
+  const mexico=places.findIndex(p=>p[0]==="Cidade do México");
+  assert.ok(mexico>=0);
+  for(const level of ["normal","hard"]){
+    const g=boot({randomValue:(mexico+.25)/places.length}),$=g.get;
+    g.difficulty(level);$("freeBtn").click();
+    assert.equal($("attemptCount").textContent,level==="normal"?"6 / 6":"4 / 4");
+    assert.match($("citySearch").placeholder,/Country name/);
+    assert.equal($("searchLabel").textContent,"Search for a country");
+    $("citySearch").value="São Paulo";$("citySearch").handlers.input({target:$("citySearch")});
+    assert.ok(!$("suggestions").children.some(item=>item.textContent==="São Paulo"),
+      "City names must not be playable options");
+    g.select("Canada");
+    $("guessBtn").click();
+    assert.equal($("guessHistory").children.length,1);
+    assert.equal($("guessHistory").children[0].children.at(-1).textContent,"×");
+    assert.equal($("feedback").textContent,"Wrong country. Try another.");
+    assert.ok(!/km|[↗↘↙↖]/.test($("feedback").textContent),"No reference-city feedback");
+    g.select("Mexico");
+    $("guessBtn").click();
+    assert.equal($("reportDialog").open,true);
+    assert.equal($("reportHeading").textContent,"Mexico");
+    assert.equal($("reportCoordinates").textContent,"—");
+    assert.equal($("reportBest").textContent,"—");
+    assert.equal($("reportTimeline").children.length,2);
+    assert.equal($("guessHistory").children[0].children.at(-1).textContent,"✓");
+    assert.equal($("finalScore").textContent,"3,900");
+    assert.match($("resultDetail").textContent,/Mexico/);
+  }
+});
+
+test("New country evidence never includes capital status, coast or capital-distance clues",()=>{
+  const g=boot(),$=g.get;
+  $("atlasBtn").click();
+  const options=$("atlasOptions").children;
+  const denied=/^(National capital:|≈ .* (?:from the coast|from the capital)|National capital distance:)/;
+  for(let i=0;i<500;i++){
+    options.find(row=>row.dataset.index===String(i)).click();
+    for(const level of ["Normal","Hard"]){
+      const lines=$("atlas"+level+"Evidence").children.map(row=>row.children[1].textContent);
+      assert.equal(lines.length,10,"City "+i+" "+level);
+      assert.ok(!lines.some(text=>denied.test(text)),
+        "Retired evidence present for "+i+": "+lines.join(" | "));
+    }
+  }
+  const index=options.find(x=>x.children[1].children[0].textContent==="Mexico City");
+  // The atlas can keep historic source distances in its informational profile.
+  assert.ok($("atlasCityFacts").children.length>0);
+});
+
+test("Country latitude-zone clues count other bands: Mexico +1 and Brazil +2",()=>{
+  const g=boot(),$=g.get,places=g.window.GEODETECTIVE_PLACES;
+  $("atlasBtn").click();
+  const options=$("atlasOptions").children;
+  const check=(name,expected)=>{
+    const i=places.findIndex(p=>p[0]===name);
+    assert.ok(i>=0,name);
+    options.find(b=>b.dataset.index===String(i)).click();
+    for(const level of ["Normal","Hard"]){
+      const clues=$("atlas"+level+"Evidence").children.map(row=>row.children[1].textContent);
+      assert.ok(clues.some(text=>text===expected),name+" "+level+" "+clues.join(" | "));
+    }
+  };
+  check("Cidade do México","Latitude belt: Subtropical (+1)");
+  check("São Paulo","Latitude belt: Tropical (+2)");
+  check("Ottawa","Latitude belt: Subpolar (+2)");
+});
+
+test("Normal map clicks select the containing country and cannot reveal the hidden city",async()=>{
+  const rectangle=(west,south,east,north)=>({
+    type:"Polygon",coordinates:[[[west,south],[east,south],[east,north],[west,north],[west,south]]]
+  });
+  const data={features:[
+    ...Array.from({length:101},()=>({
+      properties:{ISO_A2:"ZZ"},geometry:rectangle(0,0,1,1)
+    })),
+    {properties:{ISO_A2:"BR"},geometry:rectangle(-74,-34,-34,6)},
+    {properties:{ISO_A2:"MX"},geometry:rectangle(-118,14,-86,33)}
+  ]};
+  const g=boot({map:true,countryData:data}),$=g.get;
+  g.mapState.events.click({lngLat:{lat:-15,lng:-50}});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal($("selectedText").textContent,"Brazil");
+  assert.equal($("guessBtn").disabled,false);
+  assert.ok(g.mapState.markers.some(pin=>pin.coordinate?.[0]===-50));
+  $("guessBtn").click();
+  assert.ok(g.get("guessHistory").children.length>0);
+  assert.ok(!g.mapState.markers.some(pin=>pin.element?.textContent==="★"),
+    "A country game must not reveal a secret city's target pin");
 });

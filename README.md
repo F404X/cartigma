@@ -1,6 +1,6 @@
 # Cartigma
 
-A browser-based geographic detective game. Read the evidence, place pins on a world map, and identify a hidden city in a limited number of attempts.
+A browser-based geographic detective game. Read the evidence, place pins on a world map, and identify a hidden country in a limited number of attempts.
 
 **Play:** https://cartigma.f404x.net/
 
@@ -8,10 +8,10 @@ A browser-based geographic detective game. Read the evidence, place pins on a wo
 
 - **Daily case:** one shared location for each difficulty on each UTC date. The daily progress and case ID are saved locally.
 - **Free play:** new random investigations without an account. Normal mode favors capitals and widely recognizable destinations through a bounded preference system; Hard mode can choose from all 500 cities.
-- **Normal:** 6 guesses, 2 starting clues, distance and a **localized full cardinal direction with matching arrow** after an incorrect guess (for example, *Nordeste ↗* in Portuguese).
-- **Hard:** 4 guesses, 1 starting clue, **only the distance** after an incorrect guess. Direction remains hidden even in the final case report.
+- **Normal:** 6 country guesses, 2 starting clues. Select the country on the map (territory polygons) or search by country name. Each wrong country unlocks another clue.
+- **Hard:** 4 country guesses, 1 starting clue. The same country-selection controls, with higher hint and overlay prices.
 - **Rush:** pink map difficulty bar, an explicit **Start** gate (no countdown before the button is pressed), and **country guesses by clicking a country on the map or searching its name**. Once started, you get **60 wall-clock seconds**, unlimited guesses, and **one opening clue plus another unlocked every 6 seconds** (all ten clues by 54 seconds). The clock stays paused on the start screen even after a daily-case reload. The map resolves clicked coordinates against Natural Earth admin-0 country polygons, not the nearest registered city; unsupported ocean/territory clicks prompt the player to use the search. The boundaries are loaded as a cached static GeoJSON resource; country-name search remains available if that resource is unavailable. There is no paid Reveal button. The potential score starts at 5,000 and decreases linearly to zero by 60 seconds; purchased map aids still deduct points. The mode has its own shared daily case and unlimited Free Play investigations.
-- Normal/Hard: win when a guess falls within **100 km straight-line distance** of the city's approximate coordinates. Rush: win by naming the correct **country** before time expires.
+- **All difficulties:** win by naming or clicking the correct country. Rush must be solved within 60 seconds. Normal and Hard do not require pinpointing a city.
 - **Ten evidence cards:** an opening landscape/latitude-zone/hemisphere clue, the continent, five balanced geographic/civic/country clues, and three optional additional clues. The longitude sector covers 30° in Normal or becomes a UTM zone in Hard. A landmark that reveals the city's name is replaced with a 15° latitude sector; Hard instead uses UTM latitude bands. Cultural and numerical country facts are interleaved in nonadjacent positions among slots 3–7. Hemisphere clues only appear for Asia, Africa, South America, and Oceania, not Europe or North America. No distance-reference clue is shown, because the guess feedback already provides distance.
 - **Vector map filters:** a gear beside **Vector** opens a compact, scrollable panel above the map selector. Toggle national borders, state/region boundaries, country/city labels, roads, natural areas, rivers/lakes, and points of interest. Preferences persist locally across basemap and theme changes. These filters only change presentation: the paid clue that identifies the target continent still costs points. OpenStreetMap raster tiles cannot hide individual map layers, so the gear is disabled in that mode.
 - **Ten evidence slots**, including four or five distinct country-data facts plus geographic clues. The two original facts remain distributed among slots 3–7; the additional three clues appear in slots 8–10. Extra evidence can be purchased before any guess without consuming attempts.
@@ -123,6 +123,14 @@ Ten evidence slots retain the original first seven clues in their established or
 - **Sea-access clue repair:** it has its own localized label ("Acesso ao mar"), rather than the generic "Região". The visible text comes directly from the country's landlocked boolean: "Sem acesso ao mar." or "Tem acesso ao mar." It never displays only "Sim" or "Não"; source assets are freshly fingerprinted on deployment.
 
 - **Currency names:** currency evidence now uses a **short, generic denomination** (e.g. “dólar”, “peso”, “real”, “iene”, “rupia”) rather than revealing the origin through “dólar americano” or “iene japonês”. An explicit ISO-to-denomination mapping covers the catalog's 131 currency codes; widely used denominations have translations in all 19 UI languages, while less common denominations use their short international names when a localized short name is not available. The completed case dossier and city archive retain full, localized CLDR currency names (e.g. “real brasileiro” or “iene japonês”) and the original ISO codes. The classification of country/territory currency and all other country indicators is unchanged.
+
+### Country-only gameplay and country-spanning latitude bands
+
+Normal, Hard, and Rush all target a country (ISO alpha-2), never a hidden city's exact coordinates. Normal allows 6 country guesses; Hard allows 4. A click is matched against country territory polygons, and the country name search offers the same answers. Failed country guesses are marked incorrect, unlock the next clue, and do not display misleading distances to a hidden reference city. Country-case dossiers do not expose that reference city's coordinates; historical city-based saved investigations retain their original recorded attempts and rules.
+
+Three **evidence types have been retired from new investigations**: national-capital status, distance to the national capital, and distance to the coast. The 500-city atlas retains previously sourced city facts as informational reference data.
+
+Latitude belts reflect the territorial latitude range of each country, rather than just one source city. For countries spanning several belts, the clue displays a representative belt and the number of other verified belts: for example, **Mexico: Subtropical (+1)** and **Brazil: Tropical (+2)**. The map overlay highlights *all* intersected belts. The metadata is derived from the Natural Earth low-resolution administrative boundary geometry with supplementary island coverage for Singapore and French Polynesia. Some geographically extensive countries intersect four or more belts and correctly display +3 or +4.
 
 ### Statistical evidence as inequalities
 
