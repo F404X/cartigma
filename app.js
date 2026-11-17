@@ -121,6 +121,7 @@
   let fallbackSwitching=false, mapStyleTimeout=null, mapSwitching=false, mapPointerController=null;
   let activeMapStyle=window.maplibregl?.isFallback?"osm":"vector";
   let controller = null, debounce = null, toastTimer = null;
+  let rushCountryRequest=0, countryShapesPromise=null;
   const regionFormatters = new Map();
   const currencyFormatters = new Map();
   const clueCache = new Map();
@@ -564,7 +565,8 @@
   }
   function newGame(mode,index) {
     return {mode,index,difficulty,date:today(),serial:nextCaseNumber(),guesses:[],
-      startedAt:Date.now(),endedAt:null,durationMs:null,
+      started:difficulty!=="rush",
+      startedAt:difficulty==="rush"?null:Date.now(),endedAt:null,durationMs:null,
       revealed:DIFFICULTIES[difficulty].initial,penalty:0,paidHints:0,
       sectorMapPenalty:0,sectorReveals:[],evidenceVersion:3,
       finished:false,won:false,score:0};
@@ -577,6 +579,7 @@
   function elapsedMs(){
     if(!game)return 0;
     if(game.finished&&Number.isFinite(game.durationMs))return game.durationMs;
+    if(isRush()&&!game.started)return 0;
     return Math.max(0,Date.now()-(Number.isFinite(game.startedAt)?game.startedAt:Date.now()));
   }
   function formatElapsed(ms){
@@ -591,12 +594,24 @@
       hour:"2-digit",minute:"2-digit",second:"2-digit"}):"";
     return clock+(Number.isFinite(g.elapsedMs)?" · +"+formatElapsed(g.elapsedMs):"");
   }
-  function rushRemaining(){return Math.max(0,RUSH_DURATION_MS-elapsedMs())}
+  function rushRemaining(){
+    return !game?.started?RUSH_DURATION_MS:Math.max(0,RUSH_DURATION_MS-elapsedMs());
+  }
+  function startRush(){
+    if(!game||!isRush()||game.finished||game.started)return;
+    game.started=true;
+    game.startedAt=Date.now();
+    rushCountryRequest++;
+    save();render();clockTick();
+  }
   function updateClock(){
     if(!game)return;
-    const rush=isRush(),remaining=rush?rushRemaining():0;
-    $("timerLabel").textContent=t(rush&&!game.finished?"rushRemaining":"elapsedTime");
-    $("gameTimer").textContent=formatElapsed(rush&&!game.finished?Math.ceil(remaining/1000)*1000:elapsedMs());
+    const rush=isRush(),waiting=rush&&!game.started&&!game.finished;
+    const remaining=rush?rushRemaining():0;
+    $("timerLabel").textContent=t(waiting?"rushReady":
+      rush&&!game.finished?"rushRemaining":"elapsedTime");
+    $("gameTimer").textContent=formatElapsed(rush&&!game.finished?
+      Math.ceil(remaining/1000)*1000:elapsedMs());
     const potential=Math.max(0,Math.round(5000*remaining/RUSH_DURATION_MS)-
       (game.sectorMapPenalty||0));
     $("timerScore").textContent=t("score")+": "+number(potential);
@@ -608,7 +623,7 @@
   function clockTick(){
     if(!game)return;
     updateClock();
-    if(!isRush()||game.finished)return;
+    if(!isRush()||game.finished||!game.started)return;
     if(rushRemaining()===0){
       game.finished=true;game.won=false;game.revealed=EVIDENCE_COUNT;
       game.endedAt=new Date(game.startedAt+RUSH_DURATION_MS).toISOString();
@@ -632,7 +647,12 @@
       s.evidenceVersion=s.revealed>7?1:2;
       store.set(dailyStorageKey(),s);
     }
-    if(!Number.isFinite(s.startedAt)){
+    if(s.difficulty==="rush"&&typeof s.started!=="boolean"){
+      // Rush cases from the previous release already had a running clock.
+      s.started=Number.isFinite(s.startedAt);
+      store.set(dailyStorageKey(),s);
+    }
+    if(!Number.isFinite(s.startedAt)&&s.difficulty!=="rush"){
       s.startedAt=s.finished?(Date.parse(s.guesses[0]?.at)||Date.now()):Date.now();
       store.set(dailyStorageKey(),s);
     }
@@ -668,6 +688,7 @@
     return freeIndex;
   }
   function startDaily(){
+    rushCountryRequest++;
     game=savedDaily()||newGame("daily",dailyIndex());
     if(!Number.isInteger(game.serial)||game.serial<1){
       game.serial=nextCaseNumber(game.date);
@@ -676,7 +697,7 @@
     save();
     selected=null;closeReport();render();resetMapView();clockTick();
   }
-  function startFree(){game=newGame("free",chooseFree());selected=null;closeReport();render();resetMapView();clockTick()}
+  function startFree(){rushCountryRequest++;game=newGame("free",chooseFree());selected=null;closeReport();render();resetMapView();clockTick()}
   function setDifficulty(level){
     if(!DIFFICULTIES[level]||level===difficulty)return;
     difficulty=level;store.set("geodetective-difficulty",level);
@@ -1275,15 +1296,21 @@
     if(!isRush())for(let i=0;i<max;i++){const dot=document.createElement("i");dot.classList.toggle("live",i<remaining);dots.append(dot)}
     $("placeCount").textContent=String(PLACES.length);
     renderClues();renderHistory();renderResult();feedback();
-    $("guessBtn").disabled=game.finished||!selected;
-    $("citySearch").disabled=game.finished;
+    $("guessBtn").disabled=game.finished||!selected||(isRush()&&!game.started);
+    $("citySearch").disabled=game.finished||(isRush()&&!game.started);
     $("citySearch").placeholder=t(isRush()?"rushSearchPlaceholder":"searchPlaceholder");
     $("searchLabel").textContent=t(isRush()?"rushSearchLabel":"searchLabel");
     $("citySearch").value="";
     $("suggestions").classList.add("hidden");
     $("selection").classList.toggle("hidden",game.finished);
     $("selectedText").textContent=selected?(selected.label||selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°"):t("noSelection");
-    $("mapHint").textContent=t(game.finished?"mapRevealed":isRush()?"rushMapHint":"mapHint");
+    $("mapHint").textContent=t(game.finished?"mapRevealed":
+      isRush()&&!game.started?"rushIntroHint":isRush()?"rushMapHint":"mapHint");
+    $("rushIntro").classList.toggle("hidden",!isRush()||game.started||game.finished);
+    $("rushIntro").setAttribute("aria-hidden",String(!isRush()||game.started||game.finished));
+    $("rushIntroTitle").textContent=t("rushIntroTitle");
+    $("rushIntroText").textContent=t("rushIntroText");
+    $("rushStartBtn").textContent=t("rushStart");
     updateClock();renderMap();
   }
   function makeMarker(text,style){
@@ -1600,8 +1627,8 @@
       addMarker(target[0],adjustedLng,"★","target",cityName(cityAt(game.index))+" · "+countryName(game.index));
       if(best&&!isRush())addResultLine([best.lng,best.lat],[adjustedLng,target[0]]);
       frameResult(isRush()?null:best,target);
-    }else if(selected&&!isRush()){
-      marker=addMarker(selected.lat,selected.lng,"+","current");
+    }else if(selected){
+      marker=addMarker(selected.lat,selected.lng,isRush()?"✓":"+","current");
     }
     $("coordinates").textContent=game.finished
       ?target[0].toFixed(3)+"°, "+target[1].toFixed(3)+"°"
@@ -1611,7 +1638,12 @@
     if(map&&!game.finished)map.easeTo({center:[8,15],zoom:1.7,duration:350});
   }
   function selectPoint(lat,lng,label){
-    if(game.finished||isRush())return;
+    if(game.finished)return;
+    if(isRush()){
+      if(!game.started)return;
+      selectRushPoint(Number(lat),Number(lng));
+      return;
+    }
     selected={lat:Number(lat),lng:Number(lng),label:label||""};
     // A map click only places the pin; city search may recenter without forcing zoom during a drag.
     if(map&&label)map.easeTo({center:[selected.lng,selected.lat],zoom:Math.max(map.getZoom(),4),duration:350});
@@ -1632,6 +1664,7 @@
     save();renderClues();toast(t("hintUsed",{cost:number(cost)}));
   }
   function guess(){
+    if(isRush()&&!game?.started)return;
     clockTick();
     if(!selected||game.finished)return;
     const pos=[selected.lat,selected.lng],to=cityCoords(game.index),distance=dist(pos,to);
@@ -2032,6 +2065,7 @@
     window.addEventListener?.("geodetective:themechange",updateMapTheme);
     $("revealBtn").addEventListener("click",reveal);
     $("guessBtn").addEventListener("click",guess);
+    $("rushStartBtn").addEventListener("click",startRush);
     $("resetViewBtn").addEventListener("click",resetMapView);
     $("mapVectorBtn").addEventListener("click",()=>setMapStyle("vector"));
     $("mapOsmBtn").addEventListener("click",()=>setMapStyle("osm"));
