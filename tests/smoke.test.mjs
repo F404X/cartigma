@@ -131,7 +131,7 @@ function boot({storage=new Map(),map=false,randomValue=0.42,mobile=false,clock=D
 }
 
 
-const CATALOG_KEY="cartigma-country-daily-v5-";
+const CATALOG_KEY="cartigma-country-daily-v6-";
 const FREE_BAG_KEY="cartigma-freeplay-country-bag-v1";
 function clueTexts(g){
   return g.get("clueList").children.map(row=>row.children[1].children[1].textContent);
@@ -199,7 +199,7 @@ test("Each country and difficulty always gets ten sourced non-landscape clues",(
       assert.equal(rows.length,10,"Missing evidence at country "+i+" / "+level);
       const text=rows.map(x=>x.children[1].textContent);
       assert.equal(new Set(text).size,10,"Duplicate clue at "+i+" / "+level);
-      assert.ok(text.every(x=>!/(landscape|paisagem|national capital:|distance to coast|distance to capital)/i.test(x)),
+      assert.ok(text.every(x=>!/(landscape|paisagem|national capital:|distance to coast|distance to capital|latitude sector:)/i.test(x)),
         "Forbidden city/landscape clue "+i+" / "+text.join(" | "));
     }
   }
@@ -211,9 +211,17 @@ test("Country-spanning latitude hints show a representative band plus more",()=>
     $("atlasOptions").children.find(b=>b.children[1].children[1].textContent===code).click();
     return $("atlasNormalEvidence").children.map(x=>x.children[1].textContent);
   };
-  assert.ok(values("MX").some(t=>t==="Latitude belt: Subtropical (+1)"));
-  assert.ok(values("BR").some(t=>t==="Latitude belt: Tropical (+2)"));
-  assert.ok(values("CA").some(t=>t==="Latitude belt: Subpolar (+2)"));
+  assert.ok(values("MX").some(t=>t==="Latitude belt: Subtropical +another"));
+  assert.ok(values("BR").some(t=>t==="Latitude belt: Tropical +others"));
+  assert.ok(values("CA").some(t=>t==="Latitude belt: Subpolar +others"));
+  g.language("pt");
+  const br=$("atlasOptions").children.find(b=>
+    b.children[1].children[1].textContent==="BR");
+  br.click();
+  assert.ok($("atlasNormalEvidence").children.some(row=>
+    row.children[1].textContent.includes(" +outras")));
+  assert.ok(!$("atlasNormalEvidence").children.some(row=>
+    /\(\+\d+\)/.test(row.children[1].textContent)));
 });
 test("Normal and Hard accept country names, with correct attempts and results",()=>{
   for(const level of ["normal","hard"]){
@@ -221,18 +229,19 @@ test("Normal and Hard accept country names, with correct attempts and results",(
     assert.equal($("attemptCount").textContent,level==="normal"?"6 / 6":"4 / 4");
     const daily=g.window.CartigmaCountries.length;
     assert.equal(daily,195);
-    const targetIndex=JSON.parse(g.storage.get(FREE_BAG_KEY)).last;
-    assert.ok(targetIndex);
-    const wrong=g.window.CartigmaCountries.find(x=>x.code!==targetIndex).name;
+    const targetIndex=Math.floor(0.42*195);
+    const target=g.window.CartigmaCountries[targetIndex];
+    assert.ok(target);
+    const wrong=g.window.CartigmaCountries.find(x=>x.code!==target.code).name;
     g.select(wrong);$("guessBtn").click();
     assert.equal($("guessHistory").children.length,1);
     assert.equal($("feedback").textContent,"Wrong country. Try another.");
-    g.select(g.window.CartigmaCountries.find(x=>x.code===targetIndex).name);
+    g.select(target.name);
     $("guessBtn").click();
     assert.equal($("reportDialog").open,true);
     assert.equal($("reportCoordinates").textContent,"—");
     assert.equal($("reportBest").textContent,"—");
-    assert.equal($("reportHeading").textContent,g.window.CartigmaCountries.find(x=>x.code===targetIndex).name);
+    assert.equal($("reportHeading").textContent,target.name);
     assert.equal($("finalScore").textContent,"3,900");
   }
 });
@@ -275,36 +284,34 @@ test("Rush daily waiting state survives reload without hint leaks",()=>{
   assert.equal(g("hintCount").textContent,"1 / 10");
   assert.equal(JSON.parse(storage.get(key)).revealed,1);
 });
-test("Freeplay uses a complete shuffled bag before repeating a country",()=>{
-  const g=boot(),$=g.get,seen=new Set();
-  for(let i=0;i<195;i++){
-    $("freeBtn").click();
-    const saved=JSON.parse(g.storage.get(FREE_BAG_KEY));
-    assert.ok(!seen.has(saved.last),"Repeated after only "+i+" entries: "+saved.last);
-    seen.add(saved.last);
+test("Freeplay independently samples from every country without persistent history",()=>{
+  const first=boot({randomValue:0}),a=first.get;
+  const low=first.window.CartigmaCountries[0];
+  for(let i=0;i<4;i++){
+    a("freeBtn").click();
+    first.select(low.name);a("guessBtn").click();
+    assert.equal(a("reportHeading").textContent,low.name);
   }
-  assert.equal(seen.size,195);
-  assert.equal(JSON.parse(g.storage.get(FREE_BAG_KEY)).remaining.length,0);
-  const previous=JSON.parse(g.storage.get(FREE_BAG_KEY)).last;
-  $("freeBtn").click();
-  const next=JSON.parse(g.storage.get(FREE_BAG_KEY));
-  assert.notEqual(next.last,previous,"No immediate cross-cycle repetition");
-  assert.equal(next.remaining.length,194);
+  assert.equal(first.storage.has(FREE_BAG_KEY),false);
+  const last=boot({randomValue:0.99999}),b=last.get,
+    high=last.window.CartigmaCountries.at(-1);
+  b("freeBtn").click();
+  last.select(high.name);b("guessBtn").click();
+  assert.equal(b("reportHeading").textContent,high.name);
+  assert.equal(last.storage.has(FREE_BAG_KEY),false);
 });
-test("Daily cycles through all 195 countries once per difficulty",()=>{
+test("Daily country is shared and deterministic per UTC day, without a no-repeat cycle",()=>{
   const Clock=fakeClock("2026-01-01T12:00:00.000Z");
-  const countries=new Set();
-  for(let i=0;i<195;i++){
+  for(let i=0;i<75;i++){
     const date=new Clock().toISOString().slice(0,10);
-    const storage=new Map();
-    boot({clock:Clock,storage});
-    const game=JSON.parse(storage.get(CATALOG_KEY+date+"-normal"));
-    assert.ok(game&&game.index>=0&&game.index<195);
-    assert.ok(!countries.has(game.index),"Daily repeated before cycle completion: "+i);
-    countries.add(game.index);
+    const left=new Map(),right=new Map();
+    boot({clock:Clock,storage:left});boot({clock:Clock,storage:right});
+    const first=JSON.parse(left.get(CATALOG_KEY+date+"-normal"));
+    const second=JSON.parse(right.get(CATALOG_KEY+date+"-normal"));
+    assert.equal(first.index,second.index);
+    assert.ok(first.index>=0&&first.index<195);
     Clock.ms+=86400000;
   }
-  assert.equal(countries.size,195);
 });
 test("Country search supports translated names and codes, without city geocoding",()=>{
   const g=boot(),$=g.get;
@@ -335,5 +342,68 @@ test("All localizations have country dossier labels and no 500-city count",()=>{
     for(const key of ["title","subtitle","search","count","geoDetails","countryPlural"])
       assert.ok(typeof pack[key]==="string"&&pack[key].length>0,lang+" missing "+key);
     assert.ok(!pack.count.includes("500"),lang+" old cities count");
+  }
+});
+
+
+test("Rush pins show selected names, map-click positions and numbered guess history",async()=>{
+  const Clock=fakeClock();
+  const poly=(west,south,east,north)=>({
+    type:"Polygon",coordinates:[[[west,south],[east,south],[east,north],
+      [west,north],[west,south]]]});
+  const features={features:[
+    ...Array.from({length:101},()=>({
+      properties:{ISO_A2:"ZZ"},geometry:poly(0,0,1,1)})),
+    {properties:{ISO_A2:"BR"},geometry:poly(-74,-34,-34,6)}
+  ]};
+  const g=boot({clock:Clock,map:true,countryData:features}),$=g.get;
+  g.difficulty("rush");
+  $("rushStartBtn").click();
+  const save=JSON.parse(g.storage.get(CATALOG_KEY+"2026-11-17-rush"));
+  const target=g.window.CartigmaCountries[save.index];
+  const guessCode=target.code==="BR"?"MX":"BR";
+  const guess=g.window.CartigmaCountries.find(c=>c.code===guessCode);
+  g.select(guess.name);
+  assert.equal($("selectedText").textContent,guess.name);
+  assert.equal($("guessBtn").disabled,false);
+  assert.ok(g.mapState.markers.some(m=>
+    m.coordinate[0]===guess.lng&&m.coordinate[1]===guess.lat&&
+    m.element.children[0].textContent==="+"),
+    "Typing and selecting a suggestion must show a pin immediately");
+  $("guessBtn").click();
+  assert.equal($("guessHistory").children.length,1);
+  assert.ok(g.mapState.markers.some(m=>
+    m.coordinate[0]===guess.lng&&m.coordinate[1]===guess.lat&&
+    m.element.children[0].textContent==="1"),
+    "Submitted Rush guesses must stay visible as numbered pins");
+  if(target.code!=="BR"){
+    g.mapState.events.click({lngLat:{lat:-15,lng:-50}});
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.ok(g.mapState.markers.some(m=>
+      m.coordinate[0]===-50&&m.coordinate[1]===-15&&
+      m.element.children[0].textContent==="+"),
+      "A map click must also display the unconfirmed Rush pin");
+  }
+  g.tick();
+  assert.ok(g.mapState.markers.some(m=>m.element.children[0].textContent==="1"));
+});
+test("No latitude-sector clue is used alongside country latitude belt in any locale",()=>{
+  const g=boot(),$=g.get;
+  $("atlasBtn").click();
+  const options=$("atlasOptions").children;
+  for(const level of ["Normal","Hard"]){
+    for(let index=0;index<195;index++){
+      options.find(b=>b.dataset.index===String(index)).click();
+      const clues=$("atlas"+level+"Evidence").children.map(row=>row.children[1].textContent);
+      assert.equal(clues.length,10);
+      assert.ok(clues.some(v=>v.startsWith("Latitude belt:")));
+      assert.ok(clues.every(v=>!v.startsWith("Latitude sector:")));
+    }
+  }
+  for(const [lang,pack] of Object.entries(g.window.GeoI18n.PACKS)){
+    assert.ok(pack.latitudeOtherOne&&pack.latitudeOtherMany,lang);
+  }
+  for(const [lang,pack] of Object.entries(g.window.GeoCountryClueI18n)){
+    assert.ok(pack.countryBorders.includes("{value}"),lang);
   }
 });

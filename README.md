@@ -22,27 +22,27 @@ Country selection by map uses Natural Earth admin-0 polygons (50m with a 110m fa
 
 All modes target **the country**, not a city or its coordinates. Wrong guesses reveal further evidence in Normal and Hard. Rush never shows a clue (including its category) before **Start** is pressed. The 60-second countdown begins at Start and is based on the wall clock; hiding the tab does not pause it.
 
-Every guess is timestamped and its elapsed time is displayed in the guess history and report. Results show the correct country, flag, history, guesses and score, but never disclose a nonexistent city target.
+Every guess is timestamped and its elapsed time is displayed in the guess history and report. Results show the correct country, flag, history, guesses and score, but never disclose a nonexistent city target. **Rush shows an immediate selection pin after a map click or country-name suggestion, and numbered pins remain for every confirmed guess**, even after a wrong answer.
 
 ### Randomness and repetition
 
-- **Daily:** a fixed, seeded shuffle of all 195 countries per difficulty. Every country appears exactly once within **any consecutive 195-day window**, including cycle boundaries; the same randomized order repeats only after 195 days. The day's case is identical worldwide for the same UTC date and difficulty.
-- **Freeplay:** an independent, shuffled **bag of all 195 countries**, shared between difficulties and persisted in `localStorage`. A country cannot reappear until the bag is exhausted. The next shuffled bag avoids repeating the immediately previous country across the cycle boundary.
+- **Daily:** each UTC date and difficulty independently determine a reproducible pseudo-random country, shared worldwide. Countries **can repeat** on different days, with no predetermined no-repeat sequence that could be solved by elimination.
+- **Freeplay:** each new round independently chooses one of **all 195 countries with equal probability**, using browser cryptographic randomness when available (`Math.random()` fallback). There is **no shuffled bag or country history**; repeats are possible, preventing elimination by tracking past cases.
 - The country-only catalogue uses new saved-game keys so old city-based daily records cannot be confused with the new investigations.
 
 ### Evidence
 
-Each investigation has **10 clues**, drawn from the available country-level facts and geographical references. Possible topics include continent, latitude belt, longitude/latitude sectors, UTM zone/band, hemisphere of the geographic reference, country currency denomination, language family, flag color where verified, country population, GDP per capita, territorial area and access to the sea.
+Each investigation has **10 clues**, drawn from the available country-level facts and geographical references. Possible topics include continent, latitude belt, longitude sectors, UTM zone/band, hemisphere of the geographic reference, country currency denomination, language family, flag color where verified, country population, GDP per capita, territorial area and access to the sea.
 
 **Landscape (“Paisagem”) is not an evidence type.** National-capital status, distance to a capital and distance to a coast are also excluded from gameplay, as are city population and density. These old city-only facts do not appear in the country archive either.
 
 Numerical evidence uses a strictly valid rounded bound, such as `> 100,000,000` or `< 2,000,000 km²`. Source values and years remain available in the country dossier where verified. Missing economic data is never substituted with invented values.
 
-Countries that intersect multiple latitude bands display a representative band and the number of additional bands: **Mexico: Subtropical (+1)** and **Brazil: Tropical (+2)**. Purchasing the corresponding overlay highlights all represented latitude bands.
+Countries that intersect multiple latitude bands display the primary band and a localized **+another / +others** marker without showing counts: **Mexico: Subtropical +another**, **Brazil: Tropical +others** (Portuguese: **Subtropical +outra**, **Tropical +outras**). When a latitude-belt clue exists, the redundant **latitude-sector** clue is never selected. A sourced land-border-neighbors clue helps maintain ten distinct clues; UTM latitude bands remain separate. Purchasing the overlay highlights the represented latitude bands.
 
 ### Optional map aids
 
-The game has an interactive MapLibre vector map with an OpenStreetMap/Leaflet fallback. Where supported, paid overlays can show a latitude/longitude sector, equator/hemisphere, continent outline or UTM grid. Normal and Hard retain their existing hint price and score systems; Hard's assisted information is more expensive. Rush automatically unlocks hints over time, with no manual Reveal button.
+The game has an interactive MapLibre vector map with an OpenStreetMap/Leaflet fallback. Where supported, paid overlays can show a longitude sector, equator/hemisphere, continent outline or UTM grid. Normal and Hard retain their existing hint price and score systems; Hard's assisted information is more expensive. Rush automatically unlocks hints over time, with no manual Reveal button.
 
 The map has layer filters for country/city *basemap labels*, state boundaries, roads and physical features. These are map labels, **not a city database** and cannot be selected as game answers. The map theme supports dark and light appearances and localized country names.
 
