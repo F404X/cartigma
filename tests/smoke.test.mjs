@@ -39,7 +39,7 @@ class Element {
   closest(){return null}
 }
 const hash=input=>{let h=2166136261;for(const c of input){h ^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0};
-function boot({storage=new Map(),map=false,randomValue=0.42,mobile=false,clock=Date,countryData=null}={}){
+function boot({storage=new Map(),map=false,randomValue=0.42,mobile=false,clock=Date,countryData=null,autoStart=true}={}){
   const clockCallbacks=[],nodes=new Map(),window={},mobileCase=new Element("mobile-case"),mapState={fits:[],eases:[],styles:[],zoomRanges:[],markers:[],layers:new Map(),sources:new Map(),events:{},canvas:new Element("canvas")};
   const document={
     readyState:"complete",documentElement:{lang:"en",dir:"ltr"},hidden:false,
@@ -124,7 +124,21 @@ function boot({storage=new Map(),map=false,randomValue=0.42,mobile=false,clock=D
     assert.ok(choice,"Missing search result for "+name);
     choice.handlers.click();
   }
-  const difficulty=value=>get("difficultySelect").handlers.change({target:{value}});
+  // Most existing tests describe active game behavior. Opt into their
+  // legacy "already started" fixture, while dedicated tests verify the new gate.
+  const startActiveFixture=()=>{
+    if(autoStart&&get("difficultySelect").value!=="rush"&&
+       !get("rushIntro").classList.contains("hidden"))get("rushStartBtn").click();
+  };
+  for(const id of ["dailyBtn","freeBtn"]){
+    const original=get(id).handlers.click;
+    get(id).handlers.click=e=>{original(e);startActiveFixture();};
+  }
+  startActiveFixture();
+  const difficulty=value=>{
+    get("difficultySelect").handlers.change({target:{value}});
+    startActiveFixture();
+  };
   const language=value=>get("langSelect").handlers.change({target:{value}});
   return {get,window,document,storage,select,difficulty,language,mapState,mobileCase,perf,
     tick(){for(const callback of clockCallbacks)callback()}};
@@ -222,6 +236,19 @@ test("Country-spanning latitude hints show a representative band plus more",()=>
     row.children[1].textContent.includes(" +outras")));
   assert.ok(!$("atlasNormalEvidence").children.some(row=>
     /\(\+\d+\)/.test(row.children[1].textContent)));
+});
+test("Normal, Hard, and Rush all require explicit Start before revealing clues",()=>{
+  for(const level of ["normal","hard","rush"]){
+    const g=boot({autoStart:false}),$=g.get;
+    g.difficulty(level);
+    assert.equal($("clueList").children.length,0);
+    assert.equal($("rushIntro").classList.contains("hidden"),false);
+    assert.equal($("countrySearch").disabled,true);
+    $("rushStartBtn").click();
+    assert.equal($("rushIntro").classList.contains("hidden"),true);
+    assert.equal($("clueList").children.length,10);
+    assert.equal($("hintCount").textContent,level==="rush"?"1 / 10":level==="hard"?"1 / 10":"2 / 10");
+  }
 });
 test("Normal and Hard accept country names, with correct attempts and results",()=>{
   for(const level of ["normal","hard"]){
