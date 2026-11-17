@@ -50,12 +50,6 @@
   const $ = id => document.getElementById(id);
   const hash = input => {let h=2166136261;for(const char of input){h ^=char.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0;};
   const norm = s => String(s).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
-  // Index immutable search terms once instead of normalizing 74 cities per keystroke.
-  const LOCAL_SEARCH_INDEX = PLACES.map((place,index)=>({
-    place,index,terms:norm(place[0]+" "+(EN_CITY[place[0]]||"")+" "+
-      (PT_EXTRA_NAMES[place[0]]||"")+" "+place[1])
-  }));
-  const GEOCODER_LANGUAGES=new Set(["en","pt","es","fr","de","it","ru","zh","ja","nl","pl","tr"]);
   const rad = n => n*Math.PI/180;
   const dist = (a,b) => {
     const la=rad(b[0]-a[0]),lo=rad(b[1]-a[1]);
@@ -1521,22 +1515,15 @@
   }
   function searchLocal(term){
     const q=norm(term),results=[];
-    if(isCountryGame()){
-      for(const code of [...new Set(COUNTRY_CODES)].sort((a,b)=>
-        displayRegion(a).localeCompare(displayRegion(b),locale()))){
-        const name=displayRegion(code);
-        if(!norm(name).includes(q)&&!norm(code).includes(q))continue;
-        const index=COUNTRY_CODES.indexOf(code),place=cityAt(index);
-        results.push({name,description:code,lat:place[3],lon:place[4],
-          countryCode:code});
-        if(results.length===7)break;
-      }
-      return results;
-    }
-    for(const {place,index,terms} of LOCAL_SEARCH_INDEX){
-      if(!terms.includes(q))continue;
-      results.push({name:cityName(place),description:countryName(index),lat:place[3],lon:place[4]});
-      if(results.length===5)break;
+    for(const code of COUNTRY_CODES.slice().sort((a,b)=>
+      displayRegion(a).localeCompare(displayRegion(b),locale()))){
+      const name=displayRegion(code);
+      if(!norm(name).includes(q)&&!norm(code).includes(q)&&
+        !norm(COUNTRIES[COUNTRY_CODES.indexOf(code)].name).includes(q))continue;
+      const index=COUNTRY_CODES.indexOf(code),country=COUNTRIES[index];
+      results.push({name,description:code,lat:country.lat,lon:country.lng,
+        countryCode:code});
+      if(results.length===7)break;
     }
     return results;
   }
@@ -1562,27 +1549,6 @@
       list.append(button);
     }
     list.classList.remove("hidden");
-  }
-  async function searchRemote(term){
-    if(term.length<3||game.finished||isCountryGame())return;
-    // Local matches were already rendered by the input handler.
-    const local=searchLocal(term);
-    if(controller)controller.abort();
-    const signaler=new AbortController();controller=signaler;
-    try{
-      const supported=GEOCODER_LANGUAGES.has(lang)?lang:"en";
-      const url="https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(term)+"&count=8&language="+supported+"&format=json";
-      const response=await fetch(url,{signal:signaler.signal});
-      if(!response.ok)throw Error("search failed");
-      const data=await response.json();
-      if(signaler!==controller||game.finished||$("citySearch").value.trim()!==term)return;
-      const all=[...local];
-      for(const p of data.results||[]){
-        if(!all.some(item=>dist([item.lat,item.lon],[p.latitude,p.longitude])<10))
-          all.push({name:p.name,description:[p.admin1,p.country].filter(Boolean).join(", "),lat:p.latitude,lon:p.longitude});
-      }
-      suggestions(all);
-    }catch(e){if(e.name!=="AbortError"&&!local.length)suggestions([])}
   }
   async function share(){
     const symbols=game.guesses.map(g=>isCountryGame()?(g.countryCode===COUNTRY_CODES[game.index]?"✓":"×"):g.distance<=WIN_RADIUS?"🟨":g.distance<500?"🟧":"⬛").join("");
@@ -1923,9 +1889,9 @@
       const term=e.target.value.trim();
       if(controller)controller.abort();
       clearTimeout(debounce);
-      if(term.length<(isCountryGame()?1:3)){$("suggestions").classList.add("hidden");return}
+      if(term.length<1){$("suggestions").classList.add("hidden");return}
       suggestions(searchLocal(term));
-      if(!isCountryGame())debounce=setTimeout(()=>searchRemote(term),450);
+      // Local country catalogue only; no city geocoder or network search.
     });
     $("citySearch").addEventListener("keydown",e=>{
       if(e.key==="Escape")$("suggestions").classList.add("hidden");
