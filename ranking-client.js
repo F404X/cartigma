@@ -170,6 +170,7 @@
    const key=sessionKey(mode,difficulty);
    const old=storedSession(mode,difficulty);
    if(old?.id&&old?.playToken){
+     if(mode==="free"&&old.finished)return null;
      state.activeRank=old;
      try {
        const existing=await api("/games/state",{id:old.id,playToken:old.playToken});
@@ -178,6 +179,8 @@
        // A completed free-play case must never be silently reused as the
        // next free case. Continue unlimited free-play locally instead.
        if(existing.finished&&mode==="free"){
+         old.finished=true;
+         sessionStorage.setItem(key,JSON.stringify(old));
          state.activeRank=null;
          return null;
        }
@@ -222,18 +225,27 @@
        result.saveError=e.message||"Não foi possível salvar a pontuação";
      }
    }
+   if(result.finished&&mode==="free"){
+     item.finished=true;
+     sessionStorage.setItem(sessionKey(mode,difficulty),JSON.stringify(item));
+   }
    return result;
  }
  async function resumeRanked(mode,difficulty){
    if(!await signedInUser())return null;
    const stored=storedSession(mode,difficulty);
    if(!stored?.id||!stored?.playToken)return null;
+   if(mode==="free"&&stored.finished)return null;
    try{
      const result=await api("/games/state",{id:stored.id,playToken:stored.playToken});
      if(result.mode!==mode)return null;
      recordAttempt(difficulty);
      // Free mode always opens a fresh case once its previous case finished.
-     if(mode==="free"&&result.finished)return null;
+     if(mode==="free"&&result.finished){
+       stored.finished=true;
+       sessionStorage.setItem(sessionKey(mode,difficulty),JSON.stringify(stored));
+       return null;
+     }
      state.activeRank=stored;
      return result;
    }catch(e){
