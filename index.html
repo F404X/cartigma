@@ -19,7 +19,7 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.18.0/dist/maplibre-gl.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=20261117-country195">
+  <link rel="stylesheet" href="styles.css?v=20261117-keyboard-country-search">
   <link rel="stylesheet" href="themes.css?v=20261117-rush-ready-v2">
   <link rel="stylesheet" href="mobile.css?v=20261117-rush-ready-v2">
 
@@ -216,7 +216,7 @@
             <label class="search-label" for="countrySearch" id="searchLabel" data-i18n="searchLabel">Search or select on the map</label>
             <div class="search-wrap">
               <span class="search-icon" aria-hidden="true">⌕</span>
-              <input id="countrySearch" type="search" placeholder="Country name..." autocomplete="off" autocapitalize="off" enterkeyhint="search" spellcheck="false" aria-autocomplete="list" aria-controls="suggestions">
+              <input id="countrySearch" type="search" placeholder="Country name..." autocomplete="off" autocapitalize="off" enterkeyhint="go" spellcheck="false" role="combobox" aria-autocomplete="list" aria-controls="suggestions" aria-expanded="false" aria-activedescendant="">
               <div class="suggestions hidden" id="suggestions" role="listbox"></div>
             </div>
             <div class="selection" id="selection"><span class="selection-target" aria-hidden="true">⌖</span><span id="selectedText" data-i18n="noSelection">Select a location</span></div>
