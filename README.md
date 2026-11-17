@@ -208,3 +208,21 @@ short and do not name the capital or show a year, as in gameplay.
 
 The panel works in all 19 UI languages and adapts to a compact phone
 layout. It is a separate modal archive and never mutates the active case.
+
+### Paid latitude-belt map overlays
+
+A revealed **latitude/climate** clue such as `Faixa de latitude: Equatorial`
+has its own optional Map button. The separate overlay costs **600 points
+on Normal** and **900 on Hard** (the existing 50% Hard surcharge), in addition
+to any cost for revealing the clue itself. Purchasing it does not consume
+guesses, can only be done once per case, and survives style changes and
+reopening a saved daily case. Unknown or locked clues have no purchase button.
+
+The yellow, translucent world-map highlight uses the same boundaries as
+the six existing latitude-belt labels: Equatorial (10°S–10°N), Tropical
+(10°–23.5°), Subtropical (23.5°–35°), Temperate (35°–55°),
+Subpolar (55°–66.5°) and Polar (66.5°–90°, clipped to ±85.05°
+for Web Mercator). Except Equatorial, **both northern and southern
+bands** are always highlighted, so buying the overlay does not reveal an
+otherwise unknown hemisphere. The new map source has independent cleanup
+and works with both MapLibre and Leaflet fallback.

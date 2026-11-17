@@ -39,7 +39,7 @@
     cityDensity:400,cityTimezone:200
   });
   // Overlay costs differ by how tightly each display constrains the target.
-  const MAP_OVERLAY_COSTS=Object.freeze({hemisphere:250,continent:500,
+  const MAP_OVERLAY_COSTS=Object.freeze({hemisphere:250,continent:500,zone:600,
     longitude:1000,latitude:1100,utmZone:1200,utmBand:1300});
   // Hard charges 50% more for clues AND every map aid, rounding to 50 points.
   // Stored purchases retain their original cost when a daily case is reopened.
@@ -210,11 +210,26 @@
     const key = FEATURES[index] || "urban";
     return CLUE_I18N[lang]?.features?.[key] || CLUE_I18N.en?.features?.[key] || key;
   }
-  function latitudeZone(latitude) {
+  function latitudeZoneKey(latitude){
     const a=Math.abs(latitude);
-    const key=a<10?"equatorial":a<23.5?"tropical":a<35?"subtropical":a<55?"temperate":a<66.5?"subpolar":"polar";
+    return a<10?"equatorial":a<23.5?"tropical":a<35?"subtropical":
+      a<55?"temperate":a<66.5?"subpolar":"polar";
+  }
+  function latitudeZone(latitude) {
+    const key=latitudeZoneKey(latitude);
     return CLUE_I18N[lang]?.zones?.[key] || CLUE_I18N.en?.zones?.[key] || key;
   }
+  // Latitude belts describe angular position, not meteorological climate.
+  // All non-equatorial belts occur in both hemispheres. Keep both visible,
+  // since a latitude clue alone must not disclose the target's hemisphere.
+  const LATITUDE_BELT_LIMITS=Object.freeze({
+    equatorial:[[-10,10]],
+    tropical:[[-23.5,-10],[10,23.5]],
+    subtropical:[[-35,-23.5],[23.5,35]],
+    temperate:[[-55,-35],[35,55]],
+    subpolar:[[-66.5,-55],[55,66.5]],
+    polar:[[-85.05,-66.5],[66.5,85.05]]
+  });
   function cityAt(index){return PLACES[index]}
   function cityCoords(index){return [PLACES[index][3],PLACES[index][4]]}
   function nearestOther(index) {
@@ -632,7 +647,7 @@
       item.key===clue.key&&(
         item.key==="utmZone"?item.zone===clue.zone:
         item.key==="utmBand"?item.band===clue.band:
-        ["hemisphere","continent"].includes(clue.key)
+        ["hemisphere","continent","zone"].includes(clue.key)
           ?item.value===clue.value:item.from===clue.from&&item.to===clue.to)))return;
     if(!Array.isArray(game.sectorReveals))game.sectorReveals=[];
     if(game.sectorReveals.includes(clue.key))return;
@@ -646,6 +661,9 @@
       map.fitBounds([[bounds[0],bounds[1]],[bounds[2],bounds[3]]],{
         padding:{top:20,bottom:20,left:20,right:20},maxZoom:4,duration:400
       });
+    }else if(clue.key==="zone"){
+      // Show both hemispheres without centering on the hidden city's latitude.
+      map.easeTo({center:[0,0],zoom:1.55,duration:450});
     }else{
       let bounds;
       if(clue.key==="utmZone"){
@@ -1185,7 +1203,7 @@
     if(map.getSource("case-distance-line"))map.removeSource("case-distance-line");
     // The symbol layer depends on the Equator line source: remove it first.
     for(const id of ["case-sector-longitude","case-sector-latitude",
-      "case-utm-annotations","case-utm-grid","case-utm-zone","case-utm-band",
+      "case-latitude-belt","case-utm-annotations","case-utm-grid","case-utm-zone","case-utm-band",
       "case-hemisphere-arrows","case-hemisphere-line","case-continent-outline"]){
       if(map.getLayer(id))map.removeLayer(id);
       if(map.getSource(id))map.removeSource(id);
@@ -1209,6 +1227,22 @@
       map.addLayer({id,type:"fill",source:id,
         paint:{"fill-color":"#ffd449","fill-opacity":0.10,"fill-outline-color":"#ffd449"}});
     }
+  }
+  function drawLatitudeBeltOverlay(){
+    if(!map||!mapStyleReady||!game?.sectorReveals?.includes("zone")||
+      !cluesFor(game.index,difficulty).some(clue=>clue.key==="zone"))return;
+    const belt=latitudeZoneKey(cityAt(game.index)[3]);
+    // Web Mercator cannot display exact poles: clip polar rectangles to
+    // 85.05 degrees. Split at 60-degree longitude intervals to avoid wraps.
+    const coordinates=LATITUDE_BELT_LIMITS[belt].flatMap(([south,north])=>
+      Array.from({length:6},(_,i)=>
+        sectorRectangle(-180+i*60,south,-120+i*60,north)));
+    const id="case-latitude-belt";
+    map.addSource(id,{type:"geojson",data:{type:"Feature",properties:{belt},
+      geometry:{type:"MultiPolygon",coordinates}}});
+    map.addLayer({id,type:"fill",source:id,
+      paint:{"fill-color":"#ffd449","fill-opacity":0.10,
+        "fill-outline-color":"#ffd449"}});
   }
   // UTM grid spans 80°S–84°N. Bands C–W are 8° high; X is 12°.
   // Norway's 32V and Svalbard's 31X/33X/35X/37X boundaries are irregular.
@@ -1447,6 +1481,7 @@
     if(!map)return;
     clearMapOverlays();
     drawSectorOverlays();
+    drawLatitudeBeltOverlay();
     drawUtmOverlays();
     drawHemisphereOverlay();
     drawContinentOutline();

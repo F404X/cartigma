@@ -1395,7 +1395,7 @@ test("a correct fifth guess in Cape Town has no distance or bearing in history o
 });
 
 test("fresh deployments fingerprint both game engine and translated clues",()=>{
-  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-city-archive"'));
+  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261116-latitude-overlay"'));
   assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-profile-diversity"'));
   assert.ok(files["map-bootstrap.js"].includes('new URL(import.meta.url).searchParams.get("v")'));
   assert.ok(files["app.js"].includes("function guessMetricText(g)"));
@@ -1514,6 +1514,126 @@ test("both UTM overlays persist in daily Hard games without charging twice",()=>
   loaded.difficulty("normal");
   assert.ok(!loaded.mapState.sources.has("case-utm-zone"));
   assert.equal(loaded.get("clueList").children[1].children[1].children[2]?.textContent,"Map −500");
+});
+
+test("paid latitude-zone overlays match all six climate belts and highlight both hemispheres",()=>{
+  const examples=[
+    {index:16,key:"equatorial",bounds:[[-10,10]]},
+    {index:48,key:"tropical",bounds:[[-23.5,-10],[10,23.5]]},
+    {index:13,key:"subtropical",bounds:[[-35,-23.5],[23.5,35]]},
+    {index:41,key:"temperate",bounds:[[-55,-35],[35,55]]},
+    {index:152,key:"subpolar",bounds:[[-66.5,-55],[55,66.5]]},
+    {index:1,key:"polar",bounds:[[-85.05,-66.5],[66.5,85.05]]}
+  ];
+  const cities=boot().window.GEODETECTIVE_PLACES;
+  for(const example of examples){
+    const g=boot({map:true,randomValue:(example.index+.25)/cities.length}),$=g.get;
+    $("freeBtn").handlers.click();
+    const first=clueTexts(g)[0];
+    assert.ok(first.startsWith("Latitude belt:"),cities[example.index][0]);
+    const button=$("clueList").children[0].children[1].children[2];
+    assert.equal(button.textContent,"Map −600");
+    assert.equal(button.disabled,false);
+    assert.equal(g.mapState.sources.has("case-latitude-belt"),false);
+    button.handlers.click();
+    const source=g.mapState.sources.get("case-latitude-belt");
+    assert.ok(source,"Missing latitude overlay for "+example.key);
+    assert.equal(source.data.properties.belt,example.key);
+    assert.equal(source.data.geometry.type,"MultiPolygon");
+    const rings=source.data.geometry.coordinates;
+    assert.equal(rings.length,example.bounds.length*6);
+    const actual=[...new Set(rings.map(poly=>poly[0][0][1]+","+poly[0][2][1]))].sort();
+    const wanted=example.bounds.map(([a,b])=>a+","+b).sort();
+    assert.deepEqual(actual,wanted,"Latitude limits must exactly match clue classification");
+    const longitudes=rings.map(poly=>poly[0].map(point=>point[0]));
+    assert.ok(longitudes.every(row=>Math.max(...row)-Math.min(...row)===60),
+      "Each shape must be split at the date line for stable globe rendering");
+    assert.ok(rings.some(poly=>poly[0][0][0]===-180)&&
+      rings.some(poly=>poly[0][1][0]===180));
+    const layer=g.mapState.layers.get("case-latitude-belt");
+    assert.equal(layer.type,"fill");
+    assert.equal(layer.paint["fill-color"],"#ffd449");
+    assert.equal(layer.paint["fill-opacity"],.1);
+    assert.equal($("clueList").children[0].children[1].children[2].disabled,true);
+    assert.equal($("attemptCount").textContent,"6 / 6");
+    assert.deepEqual(g.mapState.eases.at(-1).center,[0,0],
+      "Center must not leak the hidden city's hemisphere");
+    const savedPenalty=600;
+    button.handlers.click();
+    g.language("pt");
+    assert.match($("clueList").children[0].children[1].children[2].textContent,/No mapa/);
+    assert.equal(g.mapState.sources.get("case-latitude-belt").data.properties.belt,example.key);
+    g.select(cities[example.index][0]);
+    $("guessBtn").handlers.click();
+    assert.equal($("reportScore").textContent,
+      new Intl.NumberFormat("pt-BR").format(5000-savedPenalty)+" / 5,000");
+    assert.equal($("reportHints").textContent,"0");
+  }
+});
+
+test("latitude-zone overlay is locked until evidence revealed, costs 900 on Hard and needs a map",()=>{
+  const cities=boot().window.GEODETECTIVE_PLACES,index=cities.findIndex(city=>city[0]==="Tóquio");
+  assert.ok(index>=0);
+  const g=boot({map:true,randomValue:(index+.25)/cities.length}),$=g.get;
+  g.difficulty("hard");$("freeBtn").handlers.click();
+  assert.ok(!clueTexts(g)[0].startsWith("Latitude belt:"),
+    "Tokyo must not start with the latitude clue");
+  assert.equal(g.mapState.sources.has("case-latitude-belt"),false);
+  let zoneRow=$("clueList").children.find(row=>
+    row.children[1]?.children[1]?.textContent.startsWith("Latitude belt:"));
+  assert.equal(zoneRow,undefined,"Unrevealed latitude should not have a purchase button");
+  const {button,index:slot}=unlockClue(g,/^Latitude belt:/);
+  assert.ok(slot>0);
+  assert.equal(button.textContent,"Map −900");
+  assert.equal(button.disabled,false);
+  const remaining=$("attemptCount").textContent;
+  button.handlers.click();
+  assert.equal($("attemptCount").textContent,remaining);
+  assert.equal(g.mapState.sources.get("case-latitude-belt").data.properties.belt,"temperate");
+  assert.equal($("clueList").children[slot].children[1].children[2].disabled,true);
+  const mapless=boot({map:false,randomValue:(index+.25)/cities.length});
+  mapless.difficulty("hard");mapless.get("freeBtn").handlers.click();
+  const {button:noMap}=unlockClue(mapless,/^Latitude belt:/);
+  assert.equal(noMap.textContent,"Map −900");
+  assert.equal(noMap.disabled,true);
+});
+
+test("paid latitude-zone overlays persist across daily case reloads and map-style changes",async()=>{
+  const world=boot().window,places=world.GEODETECTIVE_PLACES;
+  const date=Array.from({length:730},(_,i)=>
+    new Date(Date.UTC(2027,0,i+1)).toISOString().slice(0,10))
+    .find(day=>{
+      const index=normalIndexForDay(day,world);
+      return hash("opening:"+places[index][0])%3===1&&![7,8,10,35].includes(index);
+    });
+  assert.ok(date);
+  class FixedDate extends Date{
+    constructor(...args){super(...(args.length?args:[date+"T12:00:00Z"]));}
+  }
+  const storage=new Map(),g=boot({map:true,storage,clock:FixedDate}),$=g.get;
+  assert.ok(clueTexts(g)[0].startsWith("Latitude belt:"));
+  $("clueList").children[0].children[1].children[2].handlers.click();
+  const key="geodetective-daily-v3-"+date+"-normal";
+  const saved=JSON.parse(storage.get(key));
+  assert.deepEqual(saved.sectorReveals,["zone"]);
+  assert.equal(saved.sectorMapPenalty,600);
+  assert.equal(saved.guesses.length,0);
+  assert.ok(g.mapState.sources.has("case-latitude-belt"));
+  await $("mapOsmBtn").handlers.click();
+  assert.ok(g.mapState.sources.has("case-latitude-belt"),
+    "Overlay must survive the raster map switch");
+  await $("mapVectorBtn").handlers.click();
+  assert.ok(g.mapState.sources.has("case-latitude-belt"));
+  assert.equal($("clueList").children[0].children[1].children[2].disabled,true);
+  const reopened=boot({map:true,storage,clock:FixedDate});
+  assert.equal(reopened.get("clueList").children[0].children[1].children[2].disabled,true);
+  assert.ok(reopened.mapState.sources.has("case-latitude-belt"));
+  const savedAgain=JSON.parse(storage.get(key));
+  assert.equal(savedAgain.sectorMapPenalty,600,"No second charge on reload");
+  assert.deepEqual(savedAgain.sectorReveals,["zone"]);
+  reopened.difficulty("hard");
+  assert.ok(!reopened.mapState.sources.has("case-latitude-belt"),
+    "New case must not inherit the previous difficulty's overlay");
 });
 
 test("paid longitude sector remains available regardless of shuffled evidence order",()=>{

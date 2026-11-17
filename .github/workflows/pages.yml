@@ -43,6 +43,7 @@ jobs:
           sed -i "s|v=20261116-utm-ruler|v=${GITHUB_SHA}|g" dist/index.html
           sed -i "s|v=20261116-city-evidence|v=${GITHUB_SHA}|g" dist/index.html
           sed -i "s|v=20261116-city-archive|v=${GITHUB_SHA}|g" dist/index.html
+          sed -i "s|v=20261116-latitude-overlay|v=${GITHUB_SHA}|g" dist/index.html
           sed -i "s|v=20261116-short-distances|v=${GITHUB_SHA}|g" dist/index.html
           touch dist/.nojekyll
 
