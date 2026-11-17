@@ -1,7 +1,7 @@
 /* Isolated ranked-game client. Casual Cartigma never depends on this module. */
 (()=>{
  "use strict";
- const BASE=(window.CARTIGMA_RANKING_API||"https://api.cartigma.f404x.net").replace(/\/$/,"");
+ const BASE=(window.CARTIGMA_RANKING_API||(location.hostname.endsWith(".workers.dev")?location.origin:"https://api.cartigma.f404x.net")).replace(/\/$/,"");
  const CACHE_KEY="cartigma-leaderboard-cache-v1";
  const TABS=["boards","play","account"];
  const state={tab:"boards",difficulty:"normal",period:"week",boards:null,user:null,
