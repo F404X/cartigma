@@ -1343,23 +1343,14 @@
     drawUtmOverlays();
     drawHemisphereOverlay();
     drawContinentOutline();
-    const target=countryCoords(game.index);
     const best=game.finished?bestGuess():null;
-    if(!isRush())game.guesses.forEach((g,i)=>addMarker(g.lat,g.lng,i+1,g===best?"best":"past"));
-    if(game.finished){
-      if(!isCountryGame()){
-        const adjustedLng=best?target[1]+360*Math.round((best.lng-target[1])/360):target[1];
-        addMarker(target[0],adjustedLng,"★","target",
-          cityName(countryAt(game.index))+" · "+countryName(game.index));
-        if(best)addResultLine([best.lng,best.lat],[adjustedLng,target[0]]);
-        frameResult(best,target);
-      }
-    }else if(selected){
+    if(!isRush())game.guesses.forEach((g,i)=>
+      addMarker(g.lat,g.lng,i+1,g===best?"best":"past"));
+    if(!game.finished&&selected)
       marker=addMarker(selected.lat,selected.lng,isRush()?"✓":"+","current");
-    }
-    $("coordinates").textContent=game.finished
-      ?(isCountryGame()?countryName(game.index):target[0].toFixed(3)+"°, "+target[1].toFixed(3)+"°")
-      :selected?selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°":t("noSelection");
+    $("coordinates").textContent=game.finished?countryName(game.index):
+      selected?selected.label||selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°":
+      t("noSelection");
   }
   function resetMapView(){
     if(map&&!game.finished)map.easeTo({center:[8,15],zoom:1.7,duration:350});
