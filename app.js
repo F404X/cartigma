@@ -1417,12 +1417,13 @@
         guess===best?"best":"past",guess.label||"");
       guessMarkers.push(pin);
     }
-    // Reveal the actual answer as a star pin only after Rush has ended.
-    // Keep it separate from numbered guesses across redraws and style changes.
-    if(isRush()&&game.finished&&!resultMarker){
+    // Every difficulty has the same country-answer target. Reveal a distinct
+    // star marker only after a case ends, whether won or lost (including Rush).
+    // Keep it separate from numbered guess pins across map/style redraws.
+    if(game.finished&&!resultMarker){
       const answer=COUNTRIES[game.index];
       resultMarker=addMarker(answer.lat,answer.lng,"★","target",countryName(game.index));
-    }else if((!isRush()||!game.finished)&&resultMarker){
+    }else if(!game.finished&&resultMarker){
       resultMarker.remove();
       resultMarker=null;
     }
@@ -1994,11 +1995,12 @@
     $("reportCloseBtn").addEventListener("click",closeReport);
     $("reportMapBtn").addEventListener("click",()=>{
       closeReport();
-      // The map button in the dossier goes to the answer pin in Rush.
-      if(isRush()&&game.finished&&map){
+      // Normal, Hard and Rush all reveal a country-answer marker. Make sure
+      // 'View map' always takes the player to it, including tiny Lesotho.
+      if(game.finished&&map){
         const answer=COUNTRIES[game.index];
         map.easeTo({center:[answer.lng,answer.lat],
-          zoom:Math.max(3,Math.min(map.getZoom(),5)),duration:450});
+          zoom:Math.max(4,Math.min(map.getZoom(),6)),duration:450});
       }
     });
     $("reportNextBtn").addEventListener("click",()=>{closeReport();startFree()});
