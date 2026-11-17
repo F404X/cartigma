@@ -1,9 +1,19 @@
-import {dayUTC,periodKeys,json,ipOf,rate} from "./lib.js";
+import {dayUTC,periodKeys,json,ipOf,rate,sha256,now,fail} from "./lib.js";
 import {requireUser} from "./auth.js";
 const DIFFICULTIES=["normal","hard","rush"];
 const PERIODS=["week","month","total"];
 export async function leaderboard(request,env){
   await rate(env,"LEADERBOARD_LIMIT","leaderboard:"+ipOf(request));
+  // Atomic 3-minute per-IP cooldown. The native rate limiter supports
+  // only 10/60-second windows, so D1 enforces the longer interval.
+  if(!env.GAME_SECRET)fail(503,"cooldown_not_configured");
+  const hashedIp=(await sha256(env.GAME_SECRET+":leaderboard:"+ipOf(request))).slice(0,40);
+  const t=now();
+  const reservation=await env.DB.prepare(`INSERT INTO leaderboard_cooldowns(ip_hash,next_allowed)
+    VALUES(?,?) ON CONFLICT(ip_hash) DO UPDATE SET next_allowed=excluded.next_allowed
+    WHERE leaderboard_cooldowns.next_allowed<=? RETURNING next_allowed`)
+    .bind(hashedIp,t+180,t).first();
+  if(!reservation)fail(429,"cooldown");
   const date=dayUTC(),keys=periodKeys(date);
   const boards={};
   // Each query uses the period/difficulty/score index; no full result history scan.
