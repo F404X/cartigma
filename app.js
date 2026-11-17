@@ -140,6 +140,22 @@
   }
   function locale() {return LANGS[lang] || "en";}
   function number(value){return Math.round(value).toLocaleString(locale())}
+  // Each published inequality is strictly true for the source value. The
+  // threshold is deliberately rounded and 11–21% away from that value.
+  function numericBoundary(actual,seed){
+    if(!Number.isFinite(actual)||actual<=0)throw Error("Invalid numeric evidence");
+    const comparison=actual<=1||hash(seed)%2?"<":">";
+    const fraction=.11+(hash(seed+":spread")%11)/100;
+    const step=Math.max(1,10**(Math.floor(Math.log10(actual))-1));
+    const reference=actual*(comparison===">"?1-fraction:1+fraction);
+    let bound=Math.round(reference/step)*step;
+    if(comparison===">"&&bound>=actual)bound=Math.floor((actual-1)/step)*step;
+    if(comparison==="<"&&bound<=actual)bound=Math.ceil((actual+1)/step)*step;
+    bound=Math.max(1,Math.round(bound));
+    if(!(comparison===">"?actual>bound:actual<bound))
+      throw Error("Invalid numeric inequality");
+    return {comparison,value:number(bound)};
+  }
   function displayRegion(code){
     try{
       const language=locale();
@@ -366,37 +382,15 @@
         COUNTRY_CLUE_I18N.en?.colors?.[data.flagColor]||data.flagColor;
       add("countryFlagColor",{color});
     }
-    const roundingStep=(amount,level)=>{
-      if(amount>=1e9)return level==="hard"?250e6:100e6;
-      if(amount>=100e6)return level==="hard"?50e6:20e6;
-      if(amount>=10e6)return level==="hard"?10e6:5e6;
-      if(amount>=1e6)return level==="hard"?2e6:500e3;
-      return level==="hard"?200e3:50e3;
-    };
-    if(data.population&&data.populationYear){
-      const step=roundingStep(data.population,level);
-      add("countryPopulation",{value:number(Math.max(step,Math.round(data.population/step)*step)),
-        year:data.populationYear});
-    }
-    if(data.gdpPerCapita&&data.gdpYear){
-      // Preserve meaningful scale for low-income economies; avoid a 10,000
-      // USD rounding step when GDP/capita is only a few hundred dollars.
-      const value=data.gdpPerCapita;
-      const step=value>=50000?5000:value>=10000?1000:
-        value>=1000?100:10;
-      const roundedStep=step*(level==="hard"?2:1);
-      add("countryGDP",{value:number(Math.max(roundedStep,
-        Math.round(value/roundedStep)*roundedStep)),year:data.gdpYear});
-    }
-    if(data.area){
-      // Singapore and island territories are not remotely 10,000 km².
-      const area=data.area;
-      const step=area>=1000000?100000:area>=100000?10000:
-        area>=10000?1000:area>=1000?100:area>=100?10:1;
-      const roundedStep=step*(level==="hard"?2:1);
-      add("countryArea",{value:number(Math.max(roundedStep,
-        Math.round(area/roundedStep)*roundedStep))});
-    }
+    if(data.population&&data.populationYear)
+      add("countryPopulation",{...numericBoundary(data.population,
+        code+":countryPopulation:"+level),year:data.populationYear});
+    if(data.gdpPerCapita&&data.gdpYear)
+      add("countryGDP",{...numericBoundary(data.gdpPerCapita,
+        code+":countryGDP:"+level),year:data.gdpYear});
+    if(data.area)
+      add("countryArea",{...numericBoundary(data.area,
+        code+":countryArea:"+level)});
     if(typeof data.landlocked==="boolean")
       // Keep the source boolean, not a translated yes/no string.
       add("countryLandlocked",{landlocked:data.landlocked});
@@ -431,9 +425,9 @@
     if(data.coast&&!nearCaspian)
       add("cityCoastDistance",{value:number(data.coast),year:2026});
     if(urban.population>0&&urban.year===2025)
-      add("cityPopulation",{value:number(urban.population),year:2025});
+      add("cityPopulation",{...numericBoundary(urban.population,index+":cityPopulation"),year:2025});
     if(urban.density>0&&urban.year===2025)
-      add("cityDensity",{value:number(urban.density),year:2025});
+      add("cityDensity",{...numericBoundary(urban.density,index+":cityDensity"),year:2025});
     if(data.tz){
       try{
         const stamp=new Date();
