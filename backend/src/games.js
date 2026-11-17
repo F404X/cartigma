@@ -46,8 +46,8 @@ function state(g,includeToken=false){
   const response={
     id:g.id,day:g.day,difficulty:g.difficulty,startedAt:g.created_at*1000,
     remainingMs:g.difficulty==="rush"?Math.max(0,RUSH_MS-elapsed):null,
-    revealed:accessible,clues:g.difficulty==="rush"&&!isFinished?clues:clues.slice(0,accessible),
-    guesses:guesses.map(x=>x.code),finished:isFinished,won:Boolean(g.won),
+    revealed:accessible,clues:clues.slice(0,accessible),mode:g.mode||"daily",
+    guesses:guesses.map(x=>({code:x.code,elapsedMs:x.elapsedMs})),finished:isFinished,won:Boolean(g.won),
     score:isFinished?g.score:null,penalty:g.penalty,hints:g.hints_bought,
     saved:Boolean(g.saved_user_id)
   };
@@ -59,8 +59,10 @@ async function lookup(request,env,body){
   if(typeof id!=="string"||id.length!==36||typeof token!=="string"||token.length!==43)
     fail(401,"invalid_game_session");
   const hash=await sha256(token);
-  const g=await env.DB.prepare("SELECT * FROM game_sessions WHERE id=? AND play_hash=?").bind(id,hash).first();
+  const g=await env.DB.prepare("SELECT g.*,r.mode,r.user_id AS owner_user_id FROM game_sessions g JOIN ranked_reservations r ON r.game_id=g.id WHERE g.id=? AND g.play_hash=?").bind(id,hash).first();
   if(!g)fail(404,"game_not_found");
+  const user=await requireUser(request,env);
+  if(user.id!==g.owner_user_id)fail(403,"not_your_game");
   if(now()-g.created_at>2*86400)fail(410,"game_expired");
   return g;
 }
@@ -81,18 +83,30 @@ export async function gameRoute(request,env,path){
   await rate(env,"GAME_LIMIT","game:"+ipOf(request));
   const body=await readJSON(request);
   if(path==="/v1/games/start"){
+    const user=await requireUser(request,env);
     const d=difficulty(body.difficulty);
+    const mode=body.mode==="free"?"free":"daily";
     const day=dayUTC();
-    const code=await targetFor(env,day,d);
+    const code=mode==="daily"?await targetFor(env,day,d):countries[crypto.getRandomValues(new Uint32Array(1))[0]%countries.length].code;
     const playToken=randomToken();
-    const g={id:crypto.randomUUID(),day,difficulty:d,target_code:code,created_at:now(),
+    const g={id:crypto.randomUUID(),day,difficulty:d,mode,owner_user_id:user.id,target_code:code,created_at:now(),
       finished_at:null,guesses_json:"[]",revealed:INITIAL[d],
       penalty:0,hints_bought:0,won:0,score:0,saved_user_id:null};
-    await env.DB.prepare("INSERT INTO game_sessions(id,play_hash,day,difficulty,target_code,created_at,guesses_json,revealed) VALUES(?,?,?,?,?,?,?,?)")
-      .bind(g.id,await sha256(playToken),g.day,d,code,g.created_at,g.guesses_json,g.revealed).run();
+    try{
+      await env.DB.batch([
+        env.DB.prepare("INSERT INTO game_sessions(id,play_hash,day,difficulty,target_code,created_at,guesses_json,revealed) VALUES(?,?,?,?,?,?,?,?)")
+          .bind(g.id,await sha256(playToken),g.day,d,code,g.created_at,g.guesses_json,g.revealed),
+        env.DB.prepare("INSERT INTO ranked_reservations(user_id,game_id,challenge_day,difficulty,mode) VALUES(?,?,?,?,?)")
+          .bind(user.id,g.id,day,d,mode)
+      ]);
+    }catch(error){
+      if(/UNIQUE constraint failed/i.test(String(error)))fail(409,"ranked_attempt_already_started");
+      throw error;
+    }
     return json({...state(g),playToken},201);
   }
   const g=await lookup(request,env,body);
+  if(path==="/v1/games/state")return json(state(g));
   const previous={...g};
   const elapsed=Math.max(0,Date.now()-g.created_at*1000);
   if(path==="/v1/games/save"){
