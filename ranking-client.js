@@ -177,7 +177,10 @@
        recordAttempt(difficulty);
        // A completed free-play case must never be silently reused as the
        // next free case. Continue unlimited free-play locally instead.
-       if(existing.finished&&mode==="free")return null;
+       if(existing.finished&&mode==="free"){
+         state.activeRank=null;
+         return null;
+       }
        return existing;
      }catch(e){
        if(e.code!=="game_not_found"&&e.code!=="game_expired")throw e;
@@ -205,9 +208,12 @@
    return result;
  }
  async function gameAction(action,payload={}){
-   const item=state.activeRank;
-   if(!item)throw Error("Sessão competitiva indisponível");
-   const data={id:item.id,playToken:item.playToken,...payload};
+   // Resolve by the current game's own mode and difficulty, not a mutable
+   // global that an asynchronous tab/mode restoration could overwrite.
+   const {mode,difficulty,...args}=payload;
+   const item=storedSession(mode,difficulty);
+   if(!item?.id||!item?.playToken)throw Error("Sessão competitiva indisponível");
+   const data={id:item.id,playToken:item.playToken,...args};
    let result=await api("/games/"+action,data);
    if(result.finished&&!result.saved&&action!=="save"){
      try{
@@ -222,13 +228,14 @@
    if(!await signedInUser())return null;
    const stored=storedSession(mode,difficulty);
    if(!stored?.id||!stored?.playToken)return null;
-   state.activeRank=stored;
    try{
      const result=await api("/games/state",{id:stored.id,playToken:stored.playToken});
      if(result.mode!==mode)return null;
      recordAttempt(difficulty);
      // Free mode always opens a fresh case once its previous case finished.
-     return mode==="free"&&result.finished?null:result;
+     if(mode==="free"&&result.finished)return null;
+     state.activeRank=stored;
+     return result;
    }catch(e){
      if(e.code==="game_expired"||e.code==="game_not_found"){
        sessionStorage.removeItem(sessionKey(mode,difficulty));
