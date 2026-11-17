@@ -104,7 +104,7 @@ test("vector map follows dark/light appearance while keeping keyless OpenStreetM
   assert.match(game,/window\.addEventListener\?\.\("geodetective:themechange",updateMapTheme\)/);
   assert.match(game,/style:vectorMapStyle\(\)/);
   assert.match(html,/id="themeToggle"/);
-  assert.match(html,/href="themes\.css"/);
+  assert.match(html,/href="themes\.css(?:\?[^"]+)?"/);
   assert.match(html,/src="theme\.js"/);
   assert.match(workflow,/themes\.css mobile\.css theme\.js/);
 });
