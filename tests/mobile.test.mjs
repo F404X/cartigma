@@ -92,5 +92,21 @@ test("evidence popover is capped to a small portion of mobile viewport",()=>{
   assert.match(cockpit,/\.case-columns>\.clue-panel\.mobile-open\{\s*max-height:min\(42dvh,195px,calc\(100% - 104px\)\)/);
   assert.match(cockpit,/\.case-columns \.clue-list\{[\s\S]*?overflow-y:auto!important/);
   assert.match(cockpit,/\.case-columns \.clue-list \.clue\.latest\{/);
-  assert.match(app,/if\(Number\.isFinite\(list\.scrollHeight\)\)list\.scrollTop=list\.scrollHeight/);
+  assert.match(app,/const bottomOverlap=card\.bottom-\(viewport\.bottom-12\)/);
+  assert.match(app,/if\(bottomOverlap>0\)list\.scrollTop\+=bottomOverlap/);
+  assert.match(app,/list\.scrollTop=list\.scrollHeight/);
+});
+
+
+test("the mobile evidence sheet is above the map footer, not hidden behind it",()=>{
+  const cockpit=mobile.slice(mobile.indexOf("/* One-screen mobile cockpit."));
+  const stylesheet=readFileSync(new URL("styles.css",root),"utf8");
+  assert.match(stylesheet,/\.map-bottom\{position:relative;z-index:12;overflow:visible\}/);
+  assert.match(cockpit,/\.case-card\{\s*\/\*[\s\S]*?position:absolute;inset:0;z-index:20;/);
+  assert.match(cockpit,/\.case-columns>\.clue-panel\.mobile-open\{[\s\S]*?isolation:isolate;/);
+  assert.match(cockpit,/\.case-columns \.clue-list\{[\s\S]*?padding:0 2px 12px;[\s\S]*?scroll-padding-block-end:12px;/);
+  assert.match(cockpit,/\.case-columns \.clue-text\{[\s\S]*?display:block;white-space:normal;[\s\S]*?overflow:visible;max-height:none;/);
+  // Scope preserves the original desktop z-index/layout rules.
+  assert.ok(mobile.indexOf("position:absolute;inset:0;z-index:20")>
+    mobile.indexOf("@media (max-width:760px), (max-height:540px) and (pointer:coarse)"));
 });
