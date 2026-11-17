@@ -2303,3 +2303,76 @@ test("Rush daily has a separate saved case and expires after sixty wall-clock se
   assert.equal(reopened.get("resultCard").classList.contains("hidden"),false);
   assert.equal(JSON.parse(storage.get(key)).finished,true);
 });
+
+
+test("Rush map clicks select the country containing the click, not the nearest city",async()=>{
+  class Clock extends Date{
+    static ms=Date.UTC(2026,10,17,12,0,0);
+    static now(){return Clock.ms}
+    constructor(...args){super(...(args.length?args:[Clock.ms]))}
+  }
+  const rectangle=(west,south,east,north)=>({
+    type:"Polygon",coordinates:[[[west,south],[east,south],[east,north],
+      [west,north],[west,south]]]
+  });
+  // The small fixture validates polygon hit testing without depending on
+  // live requests to the Natural Earth dataset in CI.
+  const countryData={features:[
+    ...Array.from({length:101},()=>({
+      properties:{ISO_A2:"ZZ"},geometry:rectangle(0,0,1,1)
+    })),
+    {properties:{ISO_A2:"BR"},geometry:rectangle(-74,-34,-34,6)},
+    {properties:{ISO_A2:"MX"},geometry:rectangle(-118,14,-86,33)}
+  ]};
+  const places=boot().window.GEODETECTIVE_PLACES;
+  const index=places.findIndex(p=>p[0]==="São Paulo");
+  const g=boot({clock:Clock,map:true,countryData,
+    randomValue:(index+.25)/places.length}),$=g.get;
+  g.difficulty("rush");$("freeBtn").click();
+  assert.equal($("rushIntro").classList.contains("hidden"),false);
+  assert.equal($("citySearch").disabled,true);
+  // Before starting, map taps must not select or begin the countdown.
+  g.mapState.events.click({lngLat:{lat:-15,lng:-50}});
+  await Promise.resolve();
+  assert.equal($("guessBtn").disabled,true);
+  assert.equal($("gameTimer").textContent,"01:00");
+  $("rushStartBtn").click();
+  assert.equal($("citySearch").disabled,false);
+  assert.equal($("rushIntro").classList.contains("hidden"),true);
+  assert.equal($("timerLabel").textContent,"Time left");
+  g.mapState.events.click({lngLat:{lat:-15,lng:-50}});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal($("selectedText").textContent,"Brazil");
+  assert.equal($("guessBtn").disabled,false);
+  assert.ok(g.mapState.markers.some(pin=>pin.coordinate[0]===-50),
+    "The selected country should show a pin at the actual click");
+  $("guessBtn").click();
+  assert.equal($("reportDialog").open,true);
+  assert.equal($("reportHeading").textContent,"Brazil");
+});
+
+test("Rush start screen survives reload and timer layout stays in its own row",()=>{
+  class Clock extends Date{
+    static ms=Date.UTC(2026,10,17,12,0,0);
+    static now(){return Clock.ms}
+    constructor(...args){super(...(args.length?args:[Clock.ms]))}
+  }
+  const storage=new Map(),g=boot({storage,clock:Clock});
+  g.difficulty("rush");
+  Clock.ms+=90000;g.tick();
+  const reopened=boot({storage,clock:Clock});
+  assert.equal(reopened.get("gameTimer").textContent,"01:00");
+  assert.equal(reopened.get("rushIntro").classList.contains("hidden"),false);
+  assert.equal(reopened.get("reportDialog").open,false);
+  assert.match(files["index.html"],/id="rushStartBtn"/);
+  const clockAt=files["index.html"].indexOf('id="caseTimer"');
+  const toolbarEnd=files["index.html"].indexOf('<\/div>',files["index.html"].indexOf('id="resetViewBtn"'));
+  const mapAt=files["index.html"].indexOf('id="map"');
+  assert.ok(clockAt>toolbarEnd&&clockAt<mapAt,
+    "Timer should be a dedicated strip between toolbar and map");
+  assert.match(files["styles.css"],/\.case-timer\{[\s\S]*?grid-template-columns:/);
+  for(const [code,pack] of Object.entries(g.window.GeoI18n.PACKS)){
+    for(const key of ["rushReady","rushIntroText","rushStart","rushNoCountry","rushMapUnavailable"])
+      assert.ok(pack[key]&&pack[key].length>2,code+" missing "+key);
+  }
+});
