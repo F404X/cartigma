@@ -2,7 +2,6 @@
   <button type="button" id="rank-close" aria-label="Fechar">×</button></div>
 <div class="rank-tabs" role="tablist">
   <button type="button" data-rank-tab="boards">Classificação</button>
-  <button type="button" data-rank-tab="play">Competir</button>
   <button type="button" data-rank-tab="account">Conta</button>
 </div>
 <section class="rank-body" id="rank-boards" aria-label="Rankings">
@@ -11,25 +10,7 @@
   <div class="rank-field"><label for="rank-board-difficulty">Dificuldade</label>
     <select id="rank-board-difficulty"><option value="normal">Normal</option><option value="hard">Difícil</option><option value="rush">Rush</option></select></div>
   <ol id="rank-list" class="rank-list"></ol>
-  <button type="button" id="rank-refresh" class="rank-secondary">Atualizar placar</button>
-  <p class="rank-note">O placar permanece salvo localmente por 5 minutos para economizar requisições.</p>
-</section>
-<section class="rank-body" id="rank-play" aria-label="Partidas competitivas" hidden>
-  <p class="rank-note">Jogue sem cadastro; entre na conta apenas para salvar a pontuação.</p>
-  <div class="rank-field"><label for="rank-play-difficulty">Dificuldade</label>
-    <select id="rank-play-difficulty"><option value="normal">Normal</option><option value="hard">Difícil</option><option value="rush">Rush</option></select></div>
-  <button type="button" class="rank-primary" id="rank-start">Iniciar desafio do dia</button>
-  <div id="rank-game" hidden>
-    <div class="rank-gameinfo"><span id="rank-timer">00:00</span><span id="rank-progress">0 / 0</span></div>
-    <div id="rank-clues" class="rank-clues"></div>
-    <label for="rank-country">Selecione um país (ou clique no mapa)</label>
-    <select id="rank-country"><option value="">Escolha um país...</option></select>
-    <button type="button" id="rank-guess" class="rank-primary" disabled>Confirmar hipótese</button>
-    <button type="button" id="rank-reveal" class="rank-secondary">Comprar evidência</button>
-    <button type="button" id="rank-finish" class="rank-secondary">Desistir</button>
-    <div id="rank-result" hidden></div>
-    <button type="button" id="rank-save" class="rank-primary" hidden>Salvar pontuação</button>
-  </div>
+
 </section>
 <section class="rank-body" id="rank-account" aria-label="Sua conta" hidden>
   <div id="rank-user" hidden>
