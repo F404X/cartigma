@@ -137,3 +137,23 @@ test("mobile-only icon sizing keeps country list and map settings visible and ce
   const baseCss=readFileSync(new URL("styles.css",root),"utf8");
   assert.match(baseCss,/\.map-filter-gear svg\{display:block;pointer-events:none\}/);
 });
+
+
+test("completed mobile cases expose a three-way dock for clues, guesses and case file",()=>{
+  const cockpit=mobile.slice(mobile.indexOf("/* Completed cases stay navigable"));
+  assert.ok(cockpit.length>200);
+  assert.match(cockpit,/@media \(max-width:760px\), \(max-height:540px\) and \(pointer:coarse\)/);
+  assert.match(cockpit,/\.mobile-panel-tabs\.finished\{[\s\S]*?grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+  assert.match(cockpit,/\.mobile-panel-tabs \.mobile-report-tab\{display:none\}/);
+  assert.match(cockpit,/\.mobile-panel-tabs\.finished \.mobile-report-tab:not\(\[hidden\]\)\{[\s\S]*?display:flex/);
+  assert.match(cockpit,/\.mobile-case-finished \.search-label/);
+  assert.match(cockpit,/\.mobile-case-finished \.guess-history\{max-height:min\(30dvh,170px\)/);
+  assert.match(app,/const active=mobile&&!waiting\?mobilePanel:null/);
+  assert.match(app,/mobileReportBtn"\)\.hidden=!game\.finished/);
+  assert.match(app,/mobileReportBtn"\)\.addEventListener\("click"/);
+  const reportControl=html.match(/<button[^>]*id="mobileReportBtn"[\s\S]*?<\/button>/)?.[0];
+  assert.ok(reportControl);
+  assert.match(reportControl,/aria-controls="reportDialog"/);
+  assert.match(reportControl,/data-i18n="openReport"/);
+  assert.match(reportControl,/hidden disabled/);
+});

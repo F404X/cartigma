@@ -868,3 +868,44 @@
     flex-shrink:0;stroke-width:1.8;
   }
 }
+
+/* Completed cases stay navigable after "View map". Only phones get the
+   third Case-file control; desktop retains its original report behavior. */
+@media (max-width:760px), (max-height:540px) and (pointer:coarse){
+  .mobile-panel-tabs .mobile-report-tab{display:none}
+  .mobile-panel-tabs.finished{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:6px;
+  }
+  .mobile-panel-tabs.finished .mobile-report-tab:not([hidden]){
+    display:flex;
+    justify-content:center;
+  }
+  .mobile-panel-tabs.finished .mobile-panel-tab{
+    padding-inline:7px;
+    gap:6px;
+  }
+  .mobile-panel-tabs.finished .mobile-panel-tab svg{
+    width:17px;height:17px;flex-basis:17px;
+  }
+  .mobile-panel-tabs.finished .mobile-tab-copy strong{
+    font-size:11px;
+  }
+  /* A finished guess sheet is a compact, read-only history and result view.
+     Remove the disabled search/confirm form so the attempts are not buried. */
+  .mobile-case-finished .search-label,
+  .mobile-case-finished .search-wrap,
+  .mobile-case-finished .selection,
+  .mobile-case-finished #guessBtn,
+  .mobile-case-finished #feedback{display:none!important}
+  .mobile-case-finished .history-heading{margin-top:2px}
+  .mobile-case-finished .guess-history{max-height:min(30dvh,170px)}
+}
+@media (max-height:540px) and (pointer:coarse) and (orientation:landscape){
+  .mobile-panel-tabs.finished{gap:3px}
+  .mobile-panel-tabs.finished .mobile-panel-tab{gap:4px;padding-inline:4px}
+  .mobile-panel-tabs.finished .mobile-panel-tab svg{
+    width:15px;height:15px;flex-basis:15px;
+  }
+  .mobile-panel-tabs.finished .mobile-tab-copy strong{font-size:9px}
+}
