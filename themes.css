@@ -236,7 +236,10 @@ dialog.case-report,dialog.case-report[open]{background:var(--surface);color:var(
   .github-link{display:inline-flex;flex-basis:28px;width:28px;height:28px}
   .github-link svg{width:17px;height:17px}
   .header-button{width:27px;height:28px;padding:0;font-size:0;display:grid;place-items:center}
-  .header-button::after{content:"?";font:600 15px var(--font)}
+  /* Only Help needs a textual ? glyph. The country list already has
+     an inline SVG and must not receive a second icon below it. */
+  #helpBtn::after{content:"?";font:600 15px/1 var(--font)}
+  .atlas-trigger::after{content:none}
 }
 @media(max-width:390px){
   .site-header{padding-inline:5px;gap:5px}

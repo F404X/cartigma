@@ -850,3 +850,21 @@
   .rush-intro{inset:72px 0 28px}
   .rush-intro-card p{font-size:11px}
 }
+
+/* Phone icon controls: preserve a single list glyph in the header and
+   center a legible settings cog inside the map-style controls. */
+@media (max-width:760px), (max-height:540px) and (pointer:coarse){
+  #atlasBtn svg{
+    display:block;width:19px;height:19px;
+    flex-shrink:0;overflow:visible;
+  }
+  .map-filter-gear{
+    display:grid;place-items:center;
+    width:28px;min-width:28px;height:28px;
+    flex:0 0 28px;padding:0;line-height:1;
+  }
+  .map-filter-gear svg{
+    display:block;width:19px;height:19px;
+    flex-shrink:0;stroke-width:1.8;
+  }
+}

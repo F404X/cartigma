@@ -108,3 +108,33 @@ test("vector map follows dark/light appearance while keeping keyless OpenStreetM
   assert.match(html,/src="theme\.js"/);
   assert.match(workflow,/themes\.css mobile\.css theme\.js/);
 });
+
+
+test("mobile header list icon is not followed by a duplicate question mark",()=>{
+  // Before this fix a generic .header-button::after rule injected '?' below
+  // the inline SVG in the country-list button on phones.
+  const small=stylesheet.slice(stylesheet.indexOf("@media(max-width:520px){"),stylesheet.indexOf("@media(max-width:390px){",stylesheet.indexOf("@media(max-width:520px){")));
+  assert.ok(small,"Mobile header media query should be present");
+  assert.match(small,/#helpBtn::after\{content:"\?"/);
+  assert.match(small,/\.atlas-trigger::after\{content:none\}/);
+  assert.doesNotMatch(small,/\.header-button::after\{content:"\?"/);
+  const archive=html.match(/<button[^>]*id="atlasBtn"[\s\S]*?<\/button>/)?.[0];
+  assert.ok(archive,"Country archive header control must exist");
+  assert.match(archive,/<svg[^>]*aria-hidden="true"/);
+  assert.match(archive,/aria-label="Country archive"/);
+  assert.ok(!archive.includes("?"),"Country-list button must not embed help icon text");
+  const help=html.match(/<button[^>]*id="helpBtn"[^>]*>/)?.[0];
+  assert.ok(help,"Help must remain a separate labeled control");
+});
+
+test("map-layer settings control uses a centered, recognizable gear glyph",()=>{
+  const button=html.match(/<button[^>]*id="mapFiltersButton"[\s\S]*?<\/button>/)?.[0];
+  assert.ok(button,"Map settings trigger must exist");
+  assert.match(button,/aria-controls="mapFiltersPopover"/);
+  assert.match(button,/aria-label="Map filters"/);
+  assert.match(button,/<svg viewBox="0 0 24 24" width="18" height="18"/);
+  assert.match(button,/<path d="M10\.6 2h2\.8l\.5 2\.25/);
+  assert.match(button,/<circle cx="12" cy="12" r="3"/);
+  assert.doesNotMatch(button,/M10 2h4l\.6 2\.4/,
+    "The original distorted gear path must not return");
+});
