@@ -5,6 +5,13 @@ on:
     branches: ["feature/ranking"]
     paths:
       - "backend/**"
+      - "app.js"
+      - "index.html"
+      - "ranking-client.js"
+      - "ranking-panel.html"
+      - "ranking.css"
+      - "mobile.css"
+      - "styles.css"
       - ".github/workflows/ranking-deploy.yml"
 permissions:
   contents: read
