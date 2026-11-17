@@ -143,9 +143,9 @@
   }
   function init(){
     if(ready)return;
-    ready=true;
     const trigger=$("languageTrigger"),search=$("languageSearch"),picker=$("languagePicker");
     if(!trigger||!search||!picker)return;
+    ready=true;
     $("languageFlagImage").addEventListener("error",()=>{
       $("languageFlagImage").style.display="none";
       $("languageFlag").style.display="inline-flex";
