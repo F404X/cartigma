@@ -39,7 +39,7 @@ class Element {
   closest(){return null}
 }
 const hash=input=>{let h=2166136261;for(const c of input){h ^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0};
-function boot({storage=new Map(),map=false,randomValue=0.42,mobile=false,clock=Date,countryData=null,autoStart=true}={}){
+function boot({storage=new Map(),map=false,randomValue=0.42,mobile=false,clock=Date,countryData=null,autoStart=true,ranking=null}={}){
   const clockCallbacks=[],nodes=new Map(),window={},mobileCase=new Element("mobile-case"),mapState={fits:[],eases:[],styles:[],zoomRanges:[],markers:[],layers:new Map(),sources:new Map(),events:{},canvas:new Element("canvas")};
   const document={
     readyState:"complete",documentElement:{lang:"en",dir:"ltr"},hidden:false,
@@ -98,6 +98,7 @@ function boot({storage=new Map(),map=false,randomValue=0.42,mobile=false,clock=D
       setDOMContent(){return this}
     }
   };
+  if(ranking)window.CartigmaRanking=ranking;
   if(mobile)window.matchMedia=()=>({matches:true});
   if(map){
     window.maplibregl=libre;
@@ -236,6 +237,42 @@ test("Country-spanning latitude hints show a representative band plus more",()=>
     row.children[1].textContent.includes(" +outras")));
   assert.ok(!$("atlasNormalEvidence").children.some(row=>
     /\(\+\d+\)/.test(row.children[1].textContent)));
+});
+test("Signed-in account automatically uses the native map in ranked mode",async()=>{
+  const events=[];
+  const state={
+    id:"b1592f31-fc31-4189-aebf-1d2ee615d877",
+    mode:"daily",day:"2026-11-17",difficulty:"normal",
+    startedAt:Date.parse("2026-11-17T12:00:00Z"),
+    clues:[{key:"continent",label:"Continente",value:"América do Sul"}],
+    revealed:1,guesses:[],finished:false,won:false,score:null,
+    penalty:0,hints:0,saved:false
+  };
+  const ranking={
+    mayRank:()=>true,
+    resumeRanked:async()=>null,
+    beginRanked:async args=>{events.push("start:"+args.mode);return {...state};},
+    gameAction:async(name,payload)=>{
+      events.push(name+":"+(payload.code||""));
+      return {...state,guesses:[{code:"BR",elapsedMs:1000}],
+        clues:[...state.clues,{key:"hemisphere",label:"Hemisfério",value:"Sul"}],
+        revealed:10,finished:true,won:true,score:5000,saved:true,target:"BR"};
+    }
+  };
+  const g=boot({ranking,autoStart:false}),$=g.get;
+  assert.equal($("rushIntro").classList.contains("hidden"),false);
+  $("rushStartBtn").click();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal($("rushIntro").classList.contains("hidden"),true);
+  assert.equal($("caseTitle").textContent,"Unknown location");
+  assert.equal($("hintCount").textContent,"1 / 10");
+  g.select("Brazil");
+  assert.equal($("guessBtn").disabled,false);
+  $("guessBtn").click();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal($("reportHeading").textContent,"Brazil");
+  assert.equal($("finalScore").textContent,"5,000");
+  assert.deepEqual(events,["start:daily","guess:BR"]);
 });
 test("Normal, Hard, and Rush all require explicit Start before revealing clues",()=>{
   for(const level of ["normal","hard","rush"]){
