@@ -77,6 +77,41 @@
   let activeMapStyle=window.maplibregl?.isFallback?"osm":"vector";
   let controller = null, debounce = null, toastTimer = null;
   let rushCountryRequest=0, countryShapesPromise=null;
+  // Mobile-only compact evidence and hypothesis windows.
+  let mobilePanel="clues";
+  function isMobileScreen(){
+    return window.matchMedia?.(
+      "(max-width: 760px), (max-height: 540px) and (pointer: coarse)"
+    )?.matches===true;
+  }
+  function syncMobilePanels(){
+    if(!game)return;
+    const mobile=isMobileScreen();
+    const waiting=isRush()&&!game.started&&!game.finished;
+    const active=mobile&&!waiting&&!game.finished?mobilePanel:null;
+    for(const [kind,panelId,buttonId] of [
+      ["clues","mobileEvidencePanel","mobileEvidenceBtn"],
+      ["guess","mobileGuessPanel","mobileGuessBtn"]
+    ]){
+      const panel=$(panelId),button=$(buttonId),open=active===kind;
+      panel.classList.toggle("mobile-open",open);
+      button.classList.toggle("active",open);
+      button.setAttribute("aria-expanded",String(open));
+      button.disabled=kind==="clues"&&waiting;
+      if(mobile)panel.setAttribute("aria-hidden",String(!open));
+      else panel.removeAttribute("aria-hidden");
+    }
+    $("mobileEvidencePreview").textContent=
+      (waiting?0:game.revealed)+" / "+EVIDENCE_COUNT;
+    $("mobileGuessPreview").textContent=
+      game.guesses.length+" / "+(isRush()?"∞":maximum());
+  }
+  function setMobilePanel(panel){
+    if(!isMobileScreen()||!game)return;
+    if(panel==="clues"&&isRush()&&!game.started&&!game.finished)return;
+    mobilePanel=mobilePanel===panel?null:panel;
+    syncMobilePanels();
+  }
   let suggestionOptions=[],activeSuggestionIndex=0;
   const regionFormatters = new Map();
   const currencyFormatters = new Map();
@@ -369,6 +404,7 @@
     game.started=true;
     game.startedAt=Date.now();
     game.revealed=DIFFICULTIES.rush.initial;
+    mobilePanel="clues";
     rushCountryRequest++;
     save();render();clockTick();
   }
@@ -424,6 +460,7 @@
     return Math.floor(entropy*COUNTRIES.length);
   }
   function startDaily(){
+    mobilePanel="clues";
     rushCountryRequest++;
     game=savedDaily()||newGame("daily",dailyIndex());
     if(!Number.isInteger(game.serial)||game.serial<1){
@@ -435,6 +472,7 @@
     if(isCountryGame())rushCountryFeatures().catch(()=>{});
   }
   function startFree(){
+    mobilePanel="clues";
     rushCountryRequest++;game=newGame("free",chooseFree());
     selected=null;closeReport();render();resetMapView();clockTick();
     if(isCountryGame())rushCountryFeatures().catch(()=>{});
@@ -480,6 +518,8 @@
     countryBorders:"clueRegion"
   });
   function revealGeographyOnMap(clue){
+    // Rush unlocks evidence by time and never offers purchasable overlays.
+    if(isRush())return;
     const cost=overlayCost(clue.key);
     if(game.finished||!map||!mapStyleReady||!cost)return;
     if(clue.key==="continent"&&!CONTINENT_BORDERS[continentKey(game.index)])return;
@@ -556,7 +596,7 @@
       value.textContent=clueValue;
       value.title=clueValue;
       body.append(category,value);
-      if(i<revealed&&MAP_OVERLAY_COSTS[clue.key]){
+      if(!isRush()&&i<revealed&&MAP_OVERLAY_COSTS[clue.key]){
         const purchased=Array.isArray(game.sectorReveals)&&game.sectorReveals.includes(clue.key);
         const button=document.createElement("button");
         button.type="button";
@@ -576,6 +616,7 @@
     $("revealCost").textContent=game.finished||revealed>=EVIDENCE_COUNT
       ?"":"−"+number(nextHintCost());
     $("revealBtn").classList.toggle("hidden",game.finished||isRush());
+    syncMobilePanels();
   }
   function guessMetricText(g){
     if(isCountryGame())return g.countryCode===COUNTRY_CODES[game.index]?"✓":"×";
@@ -1016,6 +1057,7 @@
     $("rushIntroText").textContent=t("rushIntroText");
     $("rushStartBtn").textContent=t("rushStart");
     updateClock();renderMap();
+    syncMobilePanels();
   }
   function makeMarker(text,style){
     // The wrapper includes both the circle and the pointed tail. Its bottom edge
@@ -1367,11 +1409,13 @@
     // reconfigured, including on style reloads and Rush clue unlocks.
     syncCasePins();
     clearMapOverlays();
-    drawSectorOverlays();
-    drawLatitudeBeltOverlay();
-    drawUtmOverlays();
-    drawHemisphereOverlay();
-    drawContinentOutline();
+    if(!isRush()){
+      drawSectorOverlays();
+      drawLatitudeBeltOverlay();
+      drawUtmOverlays();
+      drawHemisphereOverlay();
+      drawContinentOutline();
+    }
     $("coordinates").textContent=game.finished?countryName(game.index):
       selected?selected.label||selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°":
       t("noSelection");
@@ -1454,6 +1498,10 @@
       $("countrySearch").value=selected.label;
       hideSuggestions();
       $("guessBtn").disabled=false;
+      if(isMobileScreen()){
+        mobilePanel="guess";
+        syncMobilePanels();
+      }
       renderMap();
     }catch(error){
       if(game!==session||request!==rushCountryRequest)return;
