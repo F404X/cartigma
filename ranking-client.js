@@ -3,9 +3,13 @@
  "use strict";
  const BASE=(window.CARTIGMA_RANKING_API||(location.hostname.endsWith(".workers.dev")?location.origin:"https://api.cartigma.f404x.net")).replace(/\/$/,"");
  const CACHE_KEY="cartigma-leaderboard-cache-v1";
- const TABS=["boards","play","account"];
+ const TABS=["boards","account"];
+ const ACCOUNT_MARKER="cartigma-ranked-account-v1";
+ const RANK_SESSION_PREFIX="cartigma-ranked-session-v2:";
+ const CACHE_TTL=15*60*1000;
+ const COOLDOWN=3*60*1000;
  const state={tab:"boards",difficulty:"normal",period:"week",boards:null,user:null,
-   meChecked:false,game:null,playToken:null,selected:null,loading:false,nextRankingFetch:0,visible:false};
+   meChecked:false,activeRank:null,loading:false,nextRankingFetch:0,visible:false};
  let turnstileSiteKey=null,turnstileToken=null;
  const $=id=>document.getElementById(id);
  function text(id,value){const el=$(id);if(el)el.textContent=value;}
@@ -67,26 +71,11 @@
    panel.querySelectorAll("[data-rank-tab]").forEach(b=>b.onclick=()=>setTab(b.dataset.rankTab));
    $("rank-period").onchange=e=>{state.period=e.target.value;renderBoards();};
    $("rank-board-difficulty").onchange=e=>{state.difficulty=e.target.value;renderBoards();};
-   $("rank-refresh").onclick=()=>loadBoards(true);
-   $("rank-start").onclick=start;
-   $("rank-guess").onclick=guess;
-   $("rank-reveal").onclick=reveal;
-   $("rank-finish").onclick=finish;
-   $("rank-save").onclick=save;
-   $("rank-country").onchange=e=>selectCountry(e.target.value);
-   $("rank-play-difficulty").onchange=e=>{state.difficulty=e.target.value;};
    panel.querySelectorAll("[data-auth-mode]").forEach(b=>b.onclick=()=>setAuthMode(b.dataset.authMode));
    $("rank-form").onsubmit=authenticate;
    $("rank-logout").onclick=logout;
    $("rank-forgot").onclick=requestReset;
-   const options=(window.CartigmaCountries||[]).slice()
-     .sort((a,b)=>countryName(a.code).localeCompare(countryName(b.code)));
-   for(const country of options){
-     const o=document.createElement("option");o.value=country.code;
-     o.textContent=countryName(country.code);$("rank-country").append(o);
-   }
    setAuthMode("login");renderBoards();
-   setInterval(()=>{if(state.visible&&state.game&&!state.game.finished)renderTimer();},1000);
    const reset=new URL(location.href).searchParams.get("reset");
    if(reset){open();setTab("account");setTimeout(()=>resetPassword(reset),0);}
  }
@@ -94,7 +83,10 @@
    state.visible=true;$("rank-panel").hidden=false;setTab(state.tab);
    if(!state.meChecked){
      state.meChecked=true;
-     try{state.user=(await api("/auth/me")).user;}catch{}
+     try{state.user=(await api("/auth/me")).user;
+       if(state.user)localStorage.setItem(ACCOUNT_MARKER,"1");
+       else localStorage.removeItem(ACCOUNT_MARKER);
+     }catch{}
      renderAccount();
    }
  }
@@ -108,23 +100,20 @@
    });
    if(tab==="boards")loadBoards(false);
    if(tab==="account")renderAccount();
-   if(tab==="play")renderGame();
  }
  async function loadBoards(force){
    const cache=cached();
    if(cache?.data){state.boards=cache.data;renderBoards();}
    const timestamp=Date.now();
-   if(!force&&cache&&timestamp-cache.at<300000)return;
-   if(timestamp<state.nextRankingFetch){
-     message("Aguarde o cooldown; usando placar em cache.");return;
-   }
-   state.nextRankingFetch=timestamp+60000;
+   if(!force&&cache&&timestamp-cache.at<CACHE_TTL)return;
+   if(timestamp<state.nextRankingFetch)return;
+   state.nextRankingFetch=timestamp+COOLDOWN;
    try{
      const result=await api("/leaderboards");
-     state.boards=result;saveCache(result);renderBoards();message("Placar atualizado.");
+     state.boards=result;saveCache(result);renderBoards();message("");
    }catch(e){
      if(e.code==="cooldown")state.nextRankingFetch=Date.now()+e.retry*1000;
-     message(e.message,true);
+     if(e.code!=="cooldown"&&!state.boards)message(e.message,true);
    }
  }
  function renderBoards(){
@@ -143,82 +132,78 @@
      li.append(username,points);list.append(li);
    }
  }
- function selectCountry(code){
-   if(!state.game||state.game.finished)return;
-   state.selected=code||null;$("rank-country").value=code||"";
-   $("rank-guess").disabled=!state.selected||state.loading;
+
+ // Authenticate once when an existing account may be present. An anonymous
+ // visitor never makes a session-check request just to play locally.
+ async function signedInUser(){
+   if(state.user)return state.user;
+   if(localStorage.getItem(ACCOUNT_MARKER)!=="1")return null;
+   const me=await api("/auth/me");
+   state.user=me.user;
+   if(!state.user)localStorage.removeItem(ACCOUNT_MARKER);
+   renderAccount();
+   return state.user;
  }
- function renderTimer(){
-   const g=state.game;if(!g)return;
-   const elapsed=Math.max(0,Date.now()-g.startedAt);
-   const time=g.difficulty==="rush"?Math.max(0,60000-elapsed):elapsed;
-   const seconds=Math.ceil(time/1000);
-   text("rank-timer",String(Math.floor(seconds/60)).padStart(2,"0")+":"+
-     String(seconds%60).padStart(2,"0"));
-   const max=g.difficulty==="rush"?"∞":g.difficulty==="hard"?4:6;
-   text("rank-progress",g.guesses.length+" / "+max);
-   if(g.difficulty==="rush")renderClues();
+ function sessionKey(difficulty){
+   return RANK_SESSION_PREFIX+
+     new Date().toISOString().slice(0,10)+":"+difficulty;
  }
- function renderClues(){
-   const g=state.game,container=$("rank-clues");if(!g||!container)return;
-   const elapsed=Math.max(0,Date.now()-g.startedAt);
-   const max=g.difficulty==="rush"&&!g.finished?Math.min(10,1+Math.floor(elapsed/6000)):g.clues.length;
-   container.replaceChildren();
-   for(const clue of g.clues.slice(0,max)){
-     const p=document.createElement("p");p.textContent=clue.label+": "+clue.value;container.append(p);
+ function storedSession(difficulty){
+   try{return JSON.parse(sessionStorage.getItem(sessionKey(difficulty))||"null");}
+   catch{return null;}
+ }
+ async function beginRanked({mode,difficulty}){
+   if(!await signedInUser())return null;
+   const key=sessionKey(difficulty);
+   const old=storedSession(difficulty);
+   if(old?.id&&old?.playToken){
+     state.activeRank=old;
+     try{return await api("/games/state",{id:old.id,playToken:old.playToken});}
+     catch(e){
+       if(e.code!=="game_not_found"&&e.code!=="game_expired")throw e;
+       sessionStorage.removeItem(key);
+       state.activeRank=null;
+     }
    }
+   const result=await api("/games/start",{mode,difficulty});
+   const playToken=result.playToken;delete result.playToken;
+   state.activeRank={id:result.id,playToken,difficulty};
+   sessionStorage.setItem(key,JSON.stringify(state.activeRank));
+   return result;
  }
- function renderGame(){
-   const g=state.game;if(!$("rank-game"))return;
-   $("rank-game").hidden=!g;
-   $("rank-start").hidden=Boolean(g&&!g.finished);
-   $("rank-play-difficulty").disabled=Boolean(g&&!g.finished);
-   if(!g)return;
-   renderTimer();renderClues();
-   const ongoing=!g.finished;
-   for(const id of ["rank-country","rank-finish"])$(id).disabled=!ongoing||state.loading;
-   $("rank-guess").disabled=!ongoing||!state.selected||state.loading;
-   $("rank-reveal").disabled=!ongoing||g.difficulty==="rush"||g.revealed>=10||state.loading;
-   $("rank-result").hidden=ongoing;
-   if(!ongoing){
-     text("rank-result",(g.won?"Vitória! ":"Derrota. ")+
-       "País: "+countryName(g.target)+". Pontos: "+g.score.toLocaleString("pt-BR"));
+ async function gameAction(action,payload={}){
+   const item=state.activeRank;
+   if(!item)throw Error("Sessão competitiva indisponível");
+   const data={id:item.id,playToken:item.playToken,...payload};
+   let result=await api("/games/"+action,data);
+   if(result.finished&&!result.saved&&action!=="save"){
+     try{
+       result=await api("/games/save",data);
+     }catch(e){
+       result.saveError=e.message||"Não foi possível salvar a pontuação";
+     }
    }
-   $("rank-save").hidden=ongoing||g.saved;
-   text("rank-save",state.user?"Salvar pontuação":"Entrar para salvar");
+   return result;
  }
- async function withGame(path,extra={}){
-   if(state.loading||!state.game)return;
-   state.loading=true;renderGame();
-   try {
-     state.game=await api("/games/"+path,{id:state.game.id,playToken:state.playToken,...extra});
-     state.selected=null;renderGame();message("");
-   }catch(e){message(e.message,true);}
-   finally{state.loading=false;renderGame();}
- }
- async function start(){
-   if(state.loading)return;
-   state.loading=true;$("rank-start").disabled=true;
-   try{
-     const g=await api("/games/start",{difficulty:$("rank-play-difficulty").value});
-     state.playToken=g.playToken;delete g.playToken;state.game=g;state.selected=null;
-     message("Desafio iniciado.");renderGame();
-   }catch(e){message(e.message,true);}
-   finally{state.loading=false;$("rank-start").disabled=false;}
- }
- async function guess(){if(state.selected)await withGame("guess",{code:state.selected});}
- async function reveal(){await withGame("reveal");}
- async function finish(){await withGame("finish");}
- async function save(){
-   if(!state.user){setTab("account");message("Faça login ou cadastre-se para salvar.");return;}
-   await withGame("save");
-   if(state.game?.saved)message("Pontuação salva. Ranking atualizará após o cache.");
+ async function resumeRanked(difficulty){
+   if(!await signedInUser())return null;
+   const stored=storedSession(difficulty);
+   if(!stored)return null;
+   state.activeRank=stored;
+   try{return await api("/games/state",{id:stored.id,playToken:stored.playToken});}
+   catch(e){
+     if(e.code==="game_expired"||e.code==="game_not_found"){
+       sessionStorage.removeItem(sessionKey(difficulty));
+       state.activeRank=null;
+       return null;
+     }
+     throw e;
+   }
  }
  function renderAccount(){
    if(!$("rank-user"))return;
    $("rank-user").hidden=!state.user;$("rank-auth").hidden=Boolean(state.user);
    if(state.user)text("rank-username","Conectado como "+state.user.username);
-   if(state.game?.finished)renderGame();
  }
  let authMode="login";
  function setAuthMode(mode){
@@ -255,13 +240,14 @@
    if(authMode==="register"){payload.username=$("rank-username-input").value;payload.turnstile=turnstileToken;}
    try{
      state.user=(await api("/auth/"+authMode,payload)).user;
+     localStorage.setItem(ACCOUNT_MARKER,"1");
      $("rank-password").value="";renderAccount();message("Conta conectada.");
-     if(state.game?.finished&&!state.game.saved)setTab("play");
    }catch(e){message(e.message,true);}
    finally{state.loading=false;$("rank-auth-submit").disabled=false;}
  }
  async function logout(){
-   try{await api("/auth/logout",{});state.user=null;renderAccount();message("Sessão encerrada.");}
+   try{await api("/auth/logout",{});state.user=null;state.activeRank=null;
+     localStorage.removeItem(ACCOUNT_MARKER);renderAccount();message("Sessão encerrada.");}
    catch(e){message(e.message,true);}
  }
  async function requestReset(){
@@ -280,10 +266,7 @@
      history.replaceState(null,"",location.pathname);message("Senha alterada. Faça login.");
    }catch(e){message(e.message,true);}
  }
- window.CartigmaRanking={
-   get isPlaying(){return state.visible&&state.tab==="play"&&Boolean(state.game)&&!state.game.finished;},
-   selectCountry
- };
+ window.CartigmaRanking={beginRanked,gameAction,resumeRanked};
  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",build);
  else build();
 })();
