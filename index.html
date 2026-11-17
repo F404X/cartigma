@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0c111b">
   <meta name="description" content="Cartigma: find the hidden location with geographic clues.">
-  <meta property="og:title" content="Cartigma — Find the hidden city">
+  <meta property="og:title" content="Cartigma — Find the hidden country">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://cartigma.f404x.net/">
   <meta name="twitter:card" content="summary">
@@ -19,7 +19,7 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.18.0/dist/maplibre-gl.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=20261117-country-edition">
+  <link rel="stylesheet" href="styles.css?v=20261117-country195">
   <link rel="stylesheet" href="themes.css?v=20261117-rush-ready-v2">
   <link rel="stylesheet" href="mobile.css?v=20261117-rush-ready-v2">
 
@@ -213,10 +213,10 @@
               <h2 id="guessHeading"><span class="section-index">02</span> <span data-i18n="yourGuess">Your guess</span></h2>
               <span id="guessCounter">0 / 6</span>
             </div>
-            <label class="search-label" for="citySearch" id="searchLabel" data-i18n="searchLabel">Search or select on the map</label>
+            <label class="search-label" for="countrySearch" id="searchLabel" data-i18n="searchLabel">Search or select on the map</label>
             <div class="search-wrap">
               <span class="search-icon" aria-hidden="true">⌕</span>
-              <input id="citySearch" type="search" placeholder="City or region..." autocomplete="off" autocapitalize="off" enterkeyhint="search" spellcheck="false" aria-autocomplete="list" aria-controls="suggestions">
+              <input id="countrySearch" type="search" placeholder="Country name..." autocomplete="off" autocapitalize="off" enterkeyhint="search" spellcheck="false" aria-autocomplete="list" aria-controls="suggestions">
               <div class="suggestions hidden" id="suggestions" role="listbox"></div>
             </div>
             <div class="selection" id="selection"><span class="selection-target" aria-hidden="true">⌖</span><span id="selectedText" data-i18n="noSelection">Select a location</span></div>
