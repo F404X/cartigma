@@ -22,29 +22,26 @@
   <link rel="stylesheet" href="styles.css?v=20261117-country-edition">
   <link rel="stylesheet" href="themes.css?v=20261117-rush-ready-v2">
   <link rel="stylesheet" href="mobile.css?v=20261117-rush-ready-v2">
-  
-  <script defer src="places.js"></script>
+
+  <script defer src="country-catalog.js?v=20261117-country195"></script>
   <script defer src="continent-borders.js?v=20261116-profile-diversity"></script>
-  <script defer src="i18n.js?v=20261117-country-edition"></script>
+  <script defer src="i18n.js?v=20261117-country195"></script>
   <script defer src="clues-i18n.js?v=20261116-profile-diversity"></script>
   <script defer src="map-filters-i18n.js?v=20261116-profile-diversity"></script>
   <script defer src="report-i18n.js?v=20261116-daily-navigation"></script>
-  <script defer src="facts.js"></script>
-  <script defer src="cities-extended.js?v=20261116-profile-diversity"></script>
-  <script defer src="country-insights.js?v=20261116-currency-names"></script>
+
+  <script defer src="country-insights.js?v=20261117-country195"></script>
   <script defer src="country-clues-i18n.js?v=20261117-numeric-bounds"></script>
   <script defer src="currency-denominations.js?v=20261116-short-currency"></script>
-  <script defer src="city-indicators.js?v=20261116-city-evidence"></script>
-  <script defer src="urban-2025.js?v=20261116-city-evidence"></script>
-  <script defer src="city-clues-i18n.js?v=20261117-numeric-bounds"></script>
-  <script defer src="atlas-i18n.js?v=20261116-city-archive"></script>
+
+  <script defer src="atlas-i18n.js?v=20261117-country195"></script>
   <script defer src="country-profile-i18n.js?v=20261116-area-scope"></script>
-  <script defer src="references.js"></script>
+
   <script defer src="compass-i18n.js"></script>
   <script defer src="theme.js"></script>
   <script defer src="map-fallback.js?v=20261117-clean-overlays"></script>
   <script defer src="language-picker.js"></script>
-  <script type="module" src="map-bootstrap.js?v=20261117-country-edition"></script>
+  <script type="module" src="map-bootstrap.js?v=20261117-country195"></script>
 </head>
 <body>
 <div class="app">
@@ -84,7 +81,7 @@
         <svg class="theme-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.1 15.6A8.4 8.4 0 0 1 8.4 3.9 8.5 8.5 0 1 0 20.1 15.6Z"/></svg>
         <span id="themeLabel">Light mode</span>
       </button>
-      <button type="button" class="header-button atlas-trigger" id="atlasBtn" aria-label="City archive" title="City archive" aria-haspopup="dialog">
+      <button type="button" class="header-button atlas-trigger" id="atlasBtn" aria-label="Country archive" title="Country archive" aria-haspopup="dialog">
         <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r=".8" fill="currentColor"/><circle cx="3.5" cy="12" r=".8" fill="currentColor"/><circle cx="3.5" cy="18" r=".8" fill="currentColor"/>
         </svg>
@@ -243,35 +240,35 @@
         </div>
       </div>
     </section>
-    <div class="status-bar"><span id="modeCaption">Same case worldwide · UTC</span><span><span id="placeCount">500</span> <span data-i18n="locations">locations</span> · <span data-i18n="distanceNote">Straight-line distance</span></span></div>
+    <div class="status-bar"><span id="modeCaption">Same case worldwide · UTC</span><span><span id="placeCount">195</span> <span id="countryCountLabel">countries</span></span></div>
   </main>
 </div>
 
 <dialog id="atlasDialog" class="city-atlas" aria-labelledby="atlasTitle">
   <div class="atlas-topbar">
     <div class="atlas-title-block">
-      <span class="atlas-eyebrow">CARTIGMA / 500</span>
-      <h2 id="atlasTitle">City archive</h2>
-      <p id="atlasSubtitle">Browse all 500 registered cities and their verified facts.</p>
+      <span class="atlas-eyebrow">CARTIGMA / 195</span>
+      <h2 id="atlasTitle">Country archive</h2>
+      <p id="atlasSubtitle">Browse all 195 countries and their available verified facts.</p>
     </div>
     <button type="button" id="atlasCloseBtn" class="atlas-close" aria-label="Close archive" title="Close archive">×</button>
   </div>
   <div class="atlas-layout">
-    <aside class="atlas-picker" aria-label="City selector">
-      <label for="atlasSearch" class="visually-hidden" id="atlasSearchLabel">Search city</label>
+    <aside class="atlas-picker" aria-label="Country selector">
+      <label for="atlasSearch" class="visually-hidden" id="atlasSearchLabel">Search country</label>
       <div class="atlas-search">
         <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-        <input id="atlasSearch" type="search" placeholder="Search city, country or region..." autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-controls="atlasOptions">
+        <input id="atlasSearch" type="search" placeholder="Search a country..." autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-controls="atlasOptions">
       </div>
-      <div id="atlasCount" class="atlas-count" aria-live="polite">500 of 500 cities</div>
-      <div id="atlasOptions" class="atlas-options" role="listbox" aria-label="Cities"></div>
+      <div id="atlasCount" class="atlas-count" aria-live="polite">195 of 195 countries</div>
+      <div id="atlasOptions" class="atlas-options" role="listbox" aria-label="Countries"></div>
     </aside>
     <div class="atlas-sheet" id="atlasSheet">
       <div class="atlas-city-heading">
         <div class="atlas-city-name">
-          <span class="atlas-eyebrow" id="atlasEntryNo">001 / 500</span>
-          <h3 id="atlasCityName">Reykjavík</h3>
-          <p id="atlasCityCountry"></p>
+          <span class="atlas-eyebrow" id="atlasEntryNo">001 / 195</span>
+          <h3 id="atlasCountryName">Iceland</h3>
+          <p id="atlasCountryCode"></p>
         </div>
         <div class="atlas-flag">
           <img id="atlasFlag" alt="" loading="lazy" referrerpolicy="no-referrer">
@@ -279,12 +276,8 @@
         </div>
       </div>
       <section class="atlas-section">
-        <h4 id="atlasCitySectionTitle">City profile</h4>
-        <dl id="atlasCityFacts" class="report-country-stats"></dl>
-      </section>
-      <section class="atlas-section">
-        <h4 id="atlasFactTitle">About the city</h4>
-        <p id="atlasFact" class="atlas-text"></p>
+        <h4 id="atlasGeoTitle">Geographic profile</h4>
+        <dl id="atlasGeoFacts" class="report-country-stats"></dl>
       </section>
       <section class="atlas-section">
         <h4 id="atlasHistoryTitle">Country history</h4>
