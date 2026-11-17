@@ -2407,3 +2407,95 @@ test("An untouched older Rush daily is reset to the new Start gate",()=>{
   assert.equal(g.get("hintCount").textContent,"1 / 10");
   assert.equal(JSON.parse(storage.get("geodetective-daily-v3-2026-11-17-rush")).started,false);
 });
+
+test("New Normal/Hard cases accept countries, not city locations, preserving 6/4 guesses",()=>{
+  const places=boot().window.GEODETECTIVE_PLACES;
+  const mexico=places.findIndex(p=>p[0]==="Cidade do México");
+  assert.ok(mexico>=0);
+  for(const level of ["normal","hard"]){
+    const g=boot({randomValue:(mexico+.25)/places.length}),$=g.get;
+    g.difficulty(level);$("freeBtn").click();
+    assert.equal($("attemptCount").textContent,level==="normal"?"6 / 6":"4 / 4");
+    assert.match($("citySearch").placeholder,/Country name/);
+    assert.equal($("searchLabel").textContent,"Search for a country");
+    $("citySearch").value="São Paulo";$("citySearch").handlers.input({target:$("citySearch")});
+    assert.ok(!$("suggestions").children.some(item=>item.textContent==="São Paulo"),
+      "City names must not be playable options");
+    g.select("Canada");
+    $("guessBtn").click();
+    assert.equal($("guessHistory").children.length,1);
+    assert.equal($("guessHistory").children[0].children.at(-1).textContent,"×");
+    assert.equal($("feedback").textContent,"Wrong country. Try another.");
+    assert.ok(!/km|[↗↘↙↖]/.test($("feedback").textContent),"No reference-city feedback");
+    g.select("Mexico");
+    $("guessBtn").click();
+    assert.equal($("reportDialog").open,true);
+    assert.equal($("reportHeading").textContent,"Mexico");
+    assert.equal($("reportCoordinates").textContent,"—");
+    assert.equal($("reportBest").textContent,"—");
+    assert.equal($("reportTimeline").children.length,2);
+    assert.equal($("guessHistory").children[0].children.at(-1).textContent,"✓");
+    assert.equal($("finalScore").textContent,"3,900");
+    assert.match($("resultDetail").textContent,/Mexico/);
+  }
+});
+
+test("New country evidence never includes capital status, coast or capital-distance clues",()=>{
+  const g=boot(),$=g.get;
+  $("atlasBtn").click();
+  const options=$("atlasOptions").children;
+  const denied=/^(National capital:|≈ .* (?:from the coast|from the capital)|National capital distance:)/;
+  for(let i=0;i<500;i++){
+    options.find(row=>row.dataset.index===String(i)).click();
+    for(const level of ["Normal","Hard"]){
+      const lines=$("atlas"+level+"Evidence").children.map(row=>row.children[1].textContent);
+      assert.equal(lines.length,10,"City "+i+" "+level);
+      assert.ok(!lines.some(text=>denied.test(text)),
+        "Retired evidence present for "+i+": "+lines.join(" | "));
+    }
+  }
+  const index=options.find(x=>x.children[1].children[0].textContent==="Mexico City");
+  // The atlas can keep historic source distances in its informational profile.
+  assert.ok($("atlasCityFacts").children.length>0);
+});
+
+test("Country latitude-zone clues count other bands: Mexico +1 and Brazil +2",()=>{
+  const g=boot(),$=g.get,places=g.window.GEODETECTIVE_PLACES;
+  $("atlasBtn").click();
+  const options=$("atlasOptions").children;
+  const check=(name,expected)=>{
+    const i=places.findIndex(p=>p[0]===name);
+    assert.ok(i>=0,name);
+    options.find(b=>b.dataset.index===String(i)).click();
+    for(const level of ["Normal","Hard"]){
+      const clues=$("atlas"+level+"Evidence").children.map(row=>row.children[1].textContent);
+      assert.ok(clues.some(text=>text===expected),name+" "+level+" "+clues.join(" | "));
+    }
+  };
+  check("Cidade do México","Latitude belt: Subtropical (+1)");
+  check("São Paulo","Latitude belt: Tropical (+2)");
+  check("Ottawa","Latitude belt: Subpolar (+2)");
+});
+
+test("Normal map clicks select the containing country and cannot reveal the hidden city",async()=>{
+  const rectangle=(west,south,east,north)=>({
+    type:"Polygon",coordinates:[[[west,south],[east,south],[east,north],[west,north],[west,south]]]
+  });
+  const data={features:[
+    ...Array.from({length:101},()=>({
+      properties:{ISO_A2:"ZZ"},geometry:rectangle(0,0,1,1)
+    })),
+    {properties:{ISO_A2:"BR"},geometry:rectangle(-74,-34,-34,6)},
+    {properties:{ISO_A2:"MX"},geometry:rectangle(-118,14,-86,33)}
+  ]};
+  const g=boot({map:true,countryData:data}),$=g.get;
+  g.mapState.events.click({lngLat:{lat:-15,lng:-50}});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal($("selectedText").textContent,"Brazil");
+  assert.equal($("guessBtn").disabled,false);
+  assert.ok(g.mapState.markers.some(pin=>pin.coordinate?.[0]===-50));
+  $("guessBtn").click();
+  assert.ok(g.get("guessHistory").children.length>0);
+  assert.ok(!g.mapState.markers.some(pin=>pin.element?.textContent==="★"),
+    "A country game must not reveal a secret city's target pin");
+});
