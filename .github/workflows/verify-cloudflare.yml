@@ -39,3 +39,9 @@ jobs:
             exit 1
           fi
           echo "Cloudflare D1 account access confirmed"
+          workers_response="$(curl --silent --show-error --fail --max-time 20 "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN")"
+          if ! jq -e '.success == true' <<< "$workers_response" >/dev/null; then
+            echo "::error::Workers Scripts API returned an unsuccessful response"
+            exit 1
+          fi
+          echo "Cloudflare Workers Scripts account access confirmed"
