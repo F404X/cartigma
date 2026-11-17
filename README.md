@@ -26,7 +26,7 @@ Every guess is timestamped and its elapsed time is displayed in the guess histor
 
 ### Randomness and repetition
 
-- **Daily:** a seeded shuffle of all 195 countries per difficulty and 195-day cycle. Every country appears exactly once within a full cycle, then the order reshuffles. The day's case is identical worldwide for the same UTC date and difficulty.
+- **Daily:** a fixed, seeded shuffle of all 195 countries per difficulty. Every country appears exactly once within **any consecutive 195-day window**, including cycle boundaries; the same randomized order repeats only after 195 days. The day's case is identical worldwide for the same UTC date and difficulty.
 - **Freeplay:** an independent, shuffled **bag of all 195 countries**, shared between difficulties and persisted in `localStorage`. A country cannot reappear until the bag is exhausted. The next shuffled bag avoids repeating the immediately previous country across the cycle boundary.
 - The country-only catalogue uses new saved-game keys so old city-based daily records cannot be confused with the new investigations.
 
