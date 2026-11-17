@@ -648,8 +648,12 @@
       store.set(dailyStorageKey(),s);
     }
     if(s.difficulty==="rush"&&typeof s.started!=="boolean"){
-      // Rush cases from the previous release already had a running clock.
-      s.started=Number.isFinite(s.startedAt);
+      // Previously opening a Rush daily started the timer without consent.
+      // Allow unopened, unguessed legacy cases to use the new Start gate.
+      if(!s.guesses.length){
+        s.started=false;s.startedAt=null;s.endedAt=null;s.durationMs=null;
+        s.finished=false;s.won=false;s.score=0;s.revealed=DIFFICULTIES.rush.initial;
+      }else s.started=Number.isFinite(s.startedAt);
       store.set(dailyStorageKey(),s);
     }
     if(!Number.isFinite(s.startedAt)&&s.difficulty!=="rush"){
@@ -696,8 +700,13 @@
     }
     save();
     selected=null;closeReport();render();resetMapView();clockTick();
+    if(isRush())rushCountryFeatures().catch(()=>{});
   }
-  function startFree(){rushCountryRequest++;game=newGame("free",chooseFree());selected=null;closeReport();render();resetMapView();clockTick()}
+  function startFree(){
+    rushCountryRequest++;game=newGame("free",chooseFree());
+    selected=null;closeReport();render();resetMapView();clockTick();
+    if(isRush())rushCountryFeatures().catch(()=>{});
+  }
   function setDifficulty(level){
     if(!DIFFICULTIES[level]||level===difficulty)return;
     difficulty=level;store.set("geodetective-difficulty",level);
@@ -1642,8 +1651,8 @@
   // catalogued city (which gives wrong results along borders and in large states).
   // Natural Earth admin-0 boundaries are small enough to cache in one request.
   const RUSH_BORDERS_URLS=Object.freeze([
-    "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson",
-    "https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_110m_admin_0_countries.geojson"
+    "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson",
+    "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson"
   ]);
   function rushCountryFeatures(){
     if(!countryShapesPromise){
