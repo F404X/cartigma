@@ -80,3 +80,17 @@ test("MapLibre and Leaflet update when the responsive map changes shape",()=>{
   assert.match(app,/observer\.observe\(\$\("map"\)\)/);
   assert.match(fallback,/resize\(\)\{this\.root\.invalidateSize\(\{pan:false\}\);return this;\}/);
 });
+
+
+test("evidence popover is capped to a small portion of mobile viewport",()=>{
+  const cockpit=mobile.slice(mobile.indexOf("/* One-screen mobile cockpit."));
+  // The 54dvh rule belongs to the general panels; the later evidence-only
+  // override must cap the actual open evidence panel substantially lower.
+  const evidence=/\.case-columns>\.clue-panel\.mobile-open\{\s*max-height:min\(30dvh,230px\)/;
+  assert.match(cockpit,evidence);
+  assert.match(cockpit,/\.case-columns>\.clue-panel\.mobile-open\{max-height:min\(32dvh,190px\)\}/);
+  assert.match(cockpit,/\.case-columns>\.clue-panel\.mobile-open\{\s*max-height:min\(42dvh,195px,calc\(100% - 104px\)\)/);
+  assert.match(cockpit,/\.case-columns \.clue-list\{[\s\S]*?overflow-y:auto!important/);
+  assert.match(cockpit,/\.case-columns \.clue-list \.clue\.latest\{/);
+  assert.match(app,/if\(Number\.isFinite\(list\.scrollHeight\)\)list\.scrollTop=list\.scrollHeight/);
+});
