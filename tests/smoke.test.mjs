@@ -1036,7 +1036,7 @@ test("city-specific clues remain 10 and translated on Normal and Hard",()=>{
     const clues=revealAll(g);
     assert.equal(clues.length,10);
     assert.ok(clues.some(x=>x==="≈ 875 km da capital"));
-    assert.ok(clues.some(x=>/[<>] [\\d.]+ habitantes \\(est\\. 2025\\)/.test(x)));
+    assert.ok(clues.some(x=>/[<>] [\d.]+ habitantes \(est\. 2025\)/.test(x)));
     assert.ok(clues.some(x=>x.includes("UTC-3 (2026)")));
     assert.equal(new Set(clues).size,10);
     assert.equal(g.get("attemptCount").textContent,
