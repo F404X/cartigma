@@ -4,7 +4,7 @@
   // One entry per country. Reference coordinates are geographic centroids,
   // never hidden city answers or additional city database records.
   const COUNTRIES=window.CartigmaCountries||[];
-  const PLACES=COUNTRIES.map(c=>[c.name,c.name,c.continent,c.lat,c.lng]);
+  const COUNTRY_REFS=COUNTRIES.map(c=>[c.name,c.name,c.continent,c.lat,c.lng]);
   const TRANSLATIONS = window.GeoI18n?.PACKS || {};
   const CLUE_I18N = window.GeoCluesI18n || {};
   const COUNTRY_INSIGHTS = window.GeoCountryInsights || {};
@@ -12,8 +12,6 @@
   const CURRENCY_DENOMINATIONS = window.GeoCurrencyDenominations || {};
   const ATLAS_I18N = window.CartigmaAtlasI18n || {};
   const COUNTRY_FAMILIES_PT = window.GeoCountryLanguageFamiliesPT || {};
-  const EXTRA_CLUE_KEYS = new Set(["countryCurrency","countryLanguageFamily","countryFlagColor",
-    "countryPopulation","countryGDP","countryArea","countryLandlocked"]);
   const FILTER_TRANSLATIONS = window.GeoMapFilterLabels || {};
   const LANGS = window.GeoI18n?.langNames || {};
   const REPORT_I18N = window.GeoReportI18n || {};
@@ -26,13 +24,10 @@
   // 300 is preserved only for loading older saved games. New charges reflect
   // information gain; the price for the NEXT clue is always shown before purchase.
   const HINT_PRICES=Object.freeze({
-    hemisphere:150,terrain:200,zone:200,continent:300,capital:250,
-    adminRegion:350,landmark:500,
-    longitude:400,latitude:450,utmZone:450,utmBand:450,
+    hemisphere:150,zone:200,continent:300,longitude:400,latitude:450,
+    utmZone:450,utmBand:450,
     countryCurrency:250,countryLanguageFamily:250,countryFlagColor:200,
-    countryPopulation:300,countryGDP:350,countryArea:300,countryLandlocked:200,
-    cityCapitalDistance:500,cityCoastDistance:350,cityPopulation:300,
-    cityDensity:400,cityTimezone:200
+    countryPopulation:300,countryGDP:350,countryArea:300,countryLandlocked:200
   });
   // Overlay costs differ by how tightly each display constrains the target.
   const MAP_OVERLAY_COSTS=Object.freeze({hemisphere:250,continent:500,zone:600,
@@ -45,7 +40,6 @@
   const overlayCost=(key)=>pricedCost(MAP_OVERLAY_COSTS[key]||0);
   // Europe and North America are fully/almost entirely in the Northern
   // Hemisphere. The others have meaningful populations on BOTH sides of 0°.
-  const EQUATOR_CROSSING_CONTINENTS=new Set(["asia","africa","southAmerica","oceania"]);
   const COUNTRY_CODES=COUNTRIES.map(c=>c.code);
   const $ = id => document.getElementById(id);
   const hash = input => {let h=2166136261;for(const char of input){h ^=char.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0;};
@@ -214,8 +208,8 @@
     subpolar:[[-66.5,-55],[55,66.5]],
     polar:[[-85.05,-66.5],[66.5,85.05]]
   });
-  function cityAt(index){return PLACES[index]}
-  function cityCoords(index){return [PLACES[index][3],PLACES[index][4]]}
+  function countryAt(index){return COUNTRY_REFS[index]}
+  function countryCoords(index){return [COUNTRY_REFS[index][3],COUNTRY_REFS[index][4]]}
   function utmZone(latitude,longitude){
     if(latitude>=56&&latitude<64&&longitude>=3&&longitude<12)return 32;
     if(latitude>=72&&latitude<84&&longitude>=0&&longitude<42){
@@ -227,13 +221,13 @@
     return "CDEFGHJKLMNPQRSTUVWX"[Math.min(19,Math.max(0,Math.floor((latitude+80)/8)))];
   }
   function coordinateClue(index,level){
-    const p=cityAt(index);
+    const p=countryAt(index);
     if(level==="hard")return {key:"utmZone",zone:utmZone(p[3],p[4])};
     const from=Math.floor(p[4]/30)*30;
     return {key:"longitude",from,to:from+30};
   }
   function latitudeGridClue(index,level){
-    const latitude=cityAt(index)[3];
+    const latitude=countryAt(index)[3];
     if(level==="hard")return {key:"utmBand",band:utmLatitudeBand(latitude)};
     const from=Math.floor(latitude/15)*15;
     return {key:"latitude",from,to:from+15};
@@ -494,7 +488,7 @@
     updateMapLanguage();
     syncMapFiltersUI();
     document.querySelectorAll("[data-i18n]").forEach(element=>{element.textContent=t(element.dataset.i18n)});
-    $("citySearch").placeholder=t(isCountryGame()?"rushSearchPlaceholder":"searchPlaceholder");
+    $("countrySearch").placeholder=t(isCountryGame()?"rushSearchPlaceholder":"searchPlaceholder");
     $("helpBtn").setAttribute("aria-label",t("help"));
     syncAtlasLanguage();
     $("resetViewBtn").title=t("reset");
@@ -507,16 +501,12 @@
   }
   // Reuse the clue-category lookup instead of rebuilding it for every row.
   const CLUE_CATEGORY_KEYS=Object.freeze({
-    terrain:"clueTerrain",continent:"clueRegion",zone:"clueClimate",adminRegion:"clueRegion",
-    countryCurrency:"clueCivic",countryLanguageFamily:"clueCivic",
-    countryFlagColor:"clueCivic",countryPopulation:"clueCivic",
-    countryGDP:"clueCivic",countryArea:"clueRegion",
-    countryLandlocked:"clueRegion",
-    hemisphere:"clueRegion",capital:"clueCivic",longitude:"clueRegion",
-    latitude:"clueRegion",utmZone:"clueRegion",utmBand:"clueRegion",
-    landmark:"clueLandmark",
-    cityCapitalDistance:"clueRegion",cityCoastDistance:"clueRegion",
-    cityPopulation:"clueCivic",cityDensity:"clueCivic",cityTimezone:"clueRegion"
+    continent:"clueRegion",zone:"clueClimate",hemisphere:"clueRegion",
+    longitude:"clueRegion",latitude:"clueRegion",utmZone:"clueRegion",
+    utmBand:"clueRegion",countryCurrency:"clueCivic",
+    countryLanguageFamily:"clueCivic",countryFlagColor:"clueCivic",
+    countryPopulation:"clueCivic",countryGDP:"clueCivic",
+    countryArea:"clueRegion",countryLandlocked:"clueRegion"
   });
   function revealGeographyOnMap(clue){
     const cost=overlayCost(clue.key);
@@ -767,7 +757,7 @@
       details.history?.en||atlasText("notAvailable");
     $("atlasHistorySource").textContent=COUNTRY_CLUE_I18N[lang]?.countryHistorySource||
       COUNTRY_CLUE_I18N.en?.countryHistorySource||"";
-    renderCountryProfile(details,code,cityAt(index),{
+    renderCountryProfile(details,code,countryAt(index),{
       title:"atlasCountryTitle",source:"atlasCountrySource",list:"atlasCountryStats"
     });
     atlasEvidence(index,"normal","atlasNormalEvidence");
@@ -893,7 +883,7 @@
   function renderDossier(){
     if(!game.finished)return;
     const best=bestGuess();
-    const place=cityAt(game.index);
+    const place=countryAt(game.index);
     $("reportCode").textContent=caseCode();
     $("reportVerdict").textContent=t(game.won?"caseSolved":"caseClosed");
     $("reportHeading").textContent=countryName(game.index);
@@ -986,12 +976,9 @@
     $("resultKicker").textContent=t(game.won?"solved":"closed");
     $("resultTitle").textContent=name;
     $("resultDetail").textContent=isRush()
-      ?t(game.won?"rushFound":"rushLost",{country:name,count:game.guesses.length,
-        time:formatElapsed(game.durationMs??elapsedMs())})
-      :isCountryGame()?t(game.won?"countryFound":"countryLost",
-        {country:name,count:game.guesses.length})
-      :game.won?t("foundText",{city:name,count:game.guesses.length,
-        km:number(bestGuess().distance)}):t("lostText",{city:name});
+      ?t(game.won?"rushFound":"rushLost",{country:name,
+        count:game.guesses.length,time:formatElapsed(game.durationMs??elapsedMs())})
+      :t(game.won?"countryFound":"countryLost",{country:name,count:game.guesses.length});
     $("finalScore").textContent=number(game.score);
     renderDossier();
   }
@@ -1029,10 +1016,10 @@
     $("placeCount").textContent=String(COUNTRIES.length);
     renderClues();renderHistory();renderResult();feedback();
     $("guessBtn").disabled=game.finished||!selected||(isRush()&&!game.started);
-    $("citySearch").disabled=game.finished||(isRush()&&!game.started);
-    $("citySearch").placeholder=t(isCountryGame()?"rushSearchPlaceholder":"searchPlaceholder");
+    $("countrySearch").disabled=game.finished||(isRush()&&!game.started);
+    $("countrySearch").placeholder=t(isCountryGame()?"rushSearchPlaceholder":"searchPlaceholder");
     $("searchLabel").textContent=t(isCountryGame()?"rushSearchLabel":"searchLabel");
-    $("citySearch").value="";
+    $("countrySearch").value="";
     $("suggestions").classList.add("hidden");
     $("selection").classList.toggle("hidden",game.finished);
     $("selectedText").textContent=selected?(selected.label||selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°"):t("noSelection");
@@ -1099,7 +1086,7 @@
       !cluesFor(game.index,difficulty).some(clue=>clue.key==="zone"))return;
     const countryEdition=game.evidenceVersion>=4;
     const belts=countryEdition?countryBelts(game.index).zones:
-      [latitudeZoneKey(cityAt(game.index)[3])];
+      [latitudeZoneKey(countryAt(game.index)[3])];
     // A country crossing several latitude belts highlights ALL of them.
     // Detached overseas territories do not imply intervening latitude belts.
     // Web Mercator clips poles to 85.05° and splits strips to prevent seams.
@@ -1238,7 +1225,7 @@
     if(!map||!mapStyleReady||!Array.isArray(game.sectorReveals)
       ||!game.sectorReveals.includes("hemisphere")
       ||!cluesFor(game.index,difficulty).some(clue=>clue.key==="hemisphere"))return;
-    const north=cityAt(game.index)[3]>=0;
+    const north=countryAt(game.index)[3]>=0;
     const lineId="case-hemisphere-line",arrowsId="case-hemisphere-arrows";
     map.addSource(lineId,{type:"geojson",data:{type:"Feature",properties:{},
       geometry:{type:"LineString",coordinates:[[-179.9,0],[179.9,0]]}}});
@@ -1356,14 +1343,14 @@
     drawUtmOverlays();
     drawHemisphereOverlay();
     drawContinentOutline();
-    const target=cityCoords(game.index);
+    const target=countryCoords(game.index);
     const best=game.finished?bestGuess():null;
     if(!isRush())game.guesses.forEach((g,i)=>addMarker(g.lat,g.lng,i+1,g===best?"best":"past"));
     if(game.finished){
       if(!isCountryGame()){
         const adjustedLng=best?target[1]+360*Math.round((best.lng-target[1])/360):target[1];
         addMarker(target[0],adjustedLng,"★","target",
-          cityName(cityAt(game.index))+" · "+countryName(game.index));
+          cityName(countryAt(game.index))+" · "+countryName(game.index));
         if(best)addResultLine([best.lng,best.lat],[adjustedLng,target[0]]);
         frameResult(best,target);
       }
@@ -1449,7 +1436,7 @@
       }
       selected={lat,lng,label:displayRegion(countryCode),countryCode};
       $("selectedText").textContent=selected.label;
-      $("citySearch").value=selected.label;
+      $("countrySearch").value=selected.label;
       $("suggestions").classList.add("hidden");
       $("guessBtn").disabled=false;
       renderMap();
@@ -1488,30 +1475,28 @@
   function guess(){
     if(isRush()&&!game?.started)return;
     clockTick();
-    if(!selected||game.finished)return;
-    const pos=[selected.lat,selected.lng],to=cityCoords(game.index),distance=dist(pos,to);
+    if(!selected||game.finished||!selected.countryCode)return;
     const now=Date.now(),elapsed=Math.max(0,now-game.startedAt);
     if(isRush()&&elapsed>=RUSH_DURATION_MS){clockTick();return}
     game.guesses.push({lat:selected.lat,lng:selected.lng,label:selected.label,
-      countryCode:selected.countryCode||null,at:new Date(now).toISOString(),
-      elapsedMs:elapsed,distance:Math.round(distance),bearing:Math.round(heading(pos,to))});
-    game.won=isCountryGame()?selected.countryCode===COUNTRY_CODES[game.index]:distance<=WIN_RADIUS;
+      countryCode:selected.countryCode,at:new Date(now).toISOString(),elapsedMs:elapsed});
+    game.won=selected.countryCode===COUNTRY_CODES[game.index];
     if(game.won||game.guesses.length>=maximum()){
       game.finished=true;game.revealed=EVIDENCE_COUNT;
-      game.endedAt=new Date(now).toISOString();
-      game.durationMs=elapsed;
+      game.endedAt=new Date(now).toISOString();game.durationMs=elapsed;
       game.score=game.won
         ?isRush()
-          ?Math.max(0,Math.round(5000*(1-Math.min(RUSH_DURATION_MS,elapsed)/RUSH_DURATION_MS))-(game.sectorMapPenalty||0))
-          :Math.max(0,Math.max(250,Math.round(5000*Math.pow(.78,game.guesses.length-1)*
-            (isCountryGame()?1:Math.max(.76,1-distance/425))-game.penalty))-
-            (game.sectorMapPenalty||0))
+          ?Math.max(0,Math.round(5000*(1-Math.min(RUSH_DURATION_MS,elapsed)/
+            RUSH_DURATION_MS))-(game.sectorMapPenalty||0))
+          :Math.max(0,Math.max(250,Math.round(5000*Math.pow(.78,game.guesses.length-1)-
+            game.penalty))-(game.sectorMapPenalty||0))
         :0;
-    }else if(!isRush())game.revealed=Math.min(EVIDENCE_COUNT,
-      Math.max(game.revealed,DIFFICULTIES[difficulty].initial+game.guesses.length));
+    }else if(!isRush()){
+      game.revealed=Math.min(EVIDENCE_COUNT,
+        Math.max(game.revealed,DIFFICULTIES[difficulty].initial+game.guesses.length));
+    }
     save();selected=null;render();
-    if(game.finished){showReport();}
-    // Keep the investigator’s chosen zoom after a wrong guess.
+    if(game.finished)showReport();
   }
   function searchLocal(term){
     const q=norm(term),results=[];
@@ -1544,7 +1529,7 @@
           $("suggestions").classList.add("hidden");
           renderMap();
         }else selectPoint(item.lat,item.lon,item.name);
-        $("citySearch").value=item.name;
+        $("countrySearch").value=item.name;
       });
       list.append(button);
     }
@@ -1885,7 +1870,7 @@
     $("closeHelpBtn").addEventListener("click",()=>$("helpDialog").close());
     $("startHelpBtn").addEventListener("click",()=>$("helpDialog").close());
     $("helpDialog").addEventListener("click",e=>{if(e.target===$("helpDialog"))$("helpDialog").close()});
-    $("citySearch").addEventListener("input",e=>{
+    $("countrySearch").addEventListener("input",e=>{
       const term=e.target.value.trim();
       if(controller)controller.abort();
       clearTimeout(debounce);
@@ -1893,7 +1878,7 @@
       suggestions(searchLocal(term));
       // Local country catalogue only; no city geocoder or network search.
     });
-    $("citySearch").addEventListener("keydown",e=>{
+    $("countrySearch").addEventListener("keydown",e=>{
       if(e.key==="Escape")$("suggestions").classList.add("hidden");
       if(e.key==="Enter"){
         const option=$("suggestions").querySelector("button.suggestion");
