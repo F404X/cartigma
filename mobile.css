@@ -504,3 +504,8 @@
   .language-menu .language-menu-heading{min-height:46px;padding:6px 12px}
   .language-menu .language-search-wrap{margin:6px 12px;height:44px;min-height:44px;flex-basis:44px}
 }
+
+@media(max-width:760px){
+  .map-toolbar .case-timer{flex:0 0 auto}
+  .guess-timestamp{font-size:9px}
+}
