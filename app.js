@@ -465,6 +465,7 @@
     return clues;
   }
   function cluesFor(index,level,revision=null){
+    // Version 4 uses country-wide latitude belts and excludes city/capital hints.
     // Version 3 retires landmark and administrative-region evidence.
     // Preserve purchased hints in version 1/2 daily saves. The public city
     // archive always requests version 3, regardless of the active save.
@@ -472,11 +473,12 @@
       ?(game.evidenceVersion??2):3);
     const legacy=evidenceVersion===1;
     const archived=evidenceVersion<3;
+    const countryEdition=evidenceVersion>=4;
     const cacheKey=index+":"+level+":"+lang+":"+evidenceVersion;
     if(clueCache.has(cacheKey))return clueCache.get(cacheKey);
     const p=cityAt(index);
      const terrain={key:"terrain",value:locationFeature(index)};
-    const zone={key:"zone",value:latitudeZone(p[3])};
+    const zone={key:"zone",value:countryEdition?countryLatitudeZone(index):latitudeZone(p[3])};
     const capital={key:"capital",value:tc(CAPITALS.has(p[0])?"yes":"no")};
     const hemisphere={key:"hemisphere",value:tc(p[3]>=0?"north":"south")};
     const hemisphereUseful=EQUATOR_CROSSING_CONTINENTS.has(continentKey(index));
@@ -488,8 +490,8 @@
       (choice===2&&hemisphereUseful?hemisphere:(choice===0?terrain:zone));
     const extra=index>=BASE_CITIES?EXTENDED[index-BASE_CITIES]:null;
     const safeRegion=extra&&p[2]&&!norm(p[2]).includes(norm(p[0]));
-    const third=extra
-      ?(archived&&safeRegion&&!extra.capital
+    const third=countryEdition?(opening===terrain?zone:terrain):
+      extra?(archived&&safeRegion&&!extra.capital
         ?{key:"adminRegion",value:p[2]}:capital)
       :(reliableCapital&&hash("profile:"+p[0])%3===0?capital:
         (opening===terrain?zone:terrain));
@@ -517,7 +519,7 @@
     const usedKeys=new Set(clues.map(clue=>clue.key));
     const extraGeographic=[
       zone,terrain,
-      ...(reliableCapital||index>=BASE_CITIES?[capital]:[]),
+      ...(!countryEdition&&(reliableCapital||index>=BASE_CITIES)?[capital]:[]),
       ...(archived&&safeRegion?[{key:"adminRegion",value:p[2]}]:[])
     ].find(clue=>!usedKeys.has(clue.key));
     let additional;
@@ -532,7 +534,9 @@
       additional=[];
       const fallbacks=[...(extraGeographic?[extraGeographic]:[]),
         ...countryFacts.slice(2)];
-      for(const item of [...extraCityClues(index),...fallbacks]){
+      for(const item of [...extraCityClues(index).filter(clue=>
+        !countryEdition||!["cityCapitalDistance","cityCoastDistance"].includes(clue.key)),
+        ...fallbacks]){
         if(usedKeys.has(item.key)||additional.some(x=>x.key===item.key))continue;
         additional.push(item);
         if(additional.length===3)break;
@@ -544,6 +548,9 @@
     clues.push(...additional);
     if(!archived&&clues.some(clue=>["landmark","adminRegion"].includes(clue.key)))
       throw Error("Retired evidence in a new case "+index);
+    if(countryEdition&&clues.some(clue=>
+      ["capital","cityCapitalDistance","cityCoastDistance"].includes(clue.key)))
+      throw Error("Retired country-game evidence in case "+index);
     if(clues.length!==EVIDENCE_COUNT)throw Error("Incomplete evidence set for "+index);
     clueCache.set(cacheKey,clues);
     return clues;
@@ -590,7 +597,7 @@
       started:difficulty!=="rush",
       startedAt:difficulty==="rush"?null:Date.now(),endedAt:null,durationMs:null,
       revealed:DIFFICULTIES[difficulty].initial,penalty:0,paidHints:0,
-      sectorMapPenalty:0,sectorReveals:[],evidenceVersion:3,
+      sectorMapPenalty:0,sectorReveals:[],evidenceVersion:4,targetKind:"country",
       finished:false,won:false,score:0};
   }
   function isRush(){return difficulty==="rush"}
@@ -682,6 +689,8 @@
       s.startedAt=s.finished?(Date.parse(s.guesses[0]?.at)||Date.now()):Date.now();
       store.set(dailyStorageKey(),s);
     }
+    // Saved city-target cases retain their original rules and earned hints.
+    if(!s.targetKind)s.targetKind="city";
     // A never-played saved daily case can safely receive the new clue set.
     // Cases with previous attempts or paid evidence retain their prior clues.
     if(s.evidenceVersion<3&&!s.finished&&s.guesses.length===0&&
@@ -1031,7 +1040,7 @@
   }
   function atlasEvidence(index,level,target){
     const list=$(target);list.replaceChildren();
-    cluesFor(index,level,3).forEach((clue,i)=>{
+    cluesFor(index,level,4).forEach((clue,i)=>{
       const row=document.createElement("li");row.className="report-evidence-row";
       const count=document.createElement("span");count.textContent=String(i+1).padStart(2,"0");
       const value=document.createElement("span");value.textContent=clueText(clue,index);
