@@ -247,7 +247,9 @@
  }
  async function logout(){
    try{await api("/auth/logout",{});state.user=null;state.activeRank=null;
-     localStorage.removeItem(ACCOUNT_MARKER);renderAccount();message("Sessão encerrada.");}
+     localStorage.removeItem(ACCOUNT_MARKER);
+     for(const d of ["normal","hard","rush"])sessionStorage.removeItem(sessionKey(d));
+     renderAccount();message("Sessão encerrada.");}
    catch(e){message(e.message,true);}
  }
  async function requestReset(){
@@ -266,7 +268,8 @@
      history.replaceState(null,"",location.pathname);message("Senha alterada. Faça login.");
    }catch(e){message(e.message,true);}
  }
- window.CartigmaRanking={beginRanked,gameAction,resumeRanked};
+ window.CartigmaRanking={beginRanked,gameAction,resumeRanked,
+   mayRank:()=>Boolean(state.user)||localStorage.getItem(ACCOUNT_MARKER)==="1"};
  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",build);
  else build();
 })();
