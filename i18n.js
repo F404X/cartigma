@@ -124,5 +124,13 @@
     Object.assign(PACKS[language],Object.fromEntries(
       COUNTRY_MODE_KEYS.map((key,i)=>[key,values[i]])));
   }
+
+  // Latitude clues intentionally do not disclose the number of extra belts.
+  const ADDITIONAL_LATITUDE_LABELS={"en":["+another","+others"],"pt":["+outra","+outras"],"es":["+otra","+otras"],"zh":["+其他","+其他"],"ja":["+ほかにも","+ほかにも"],"ru":["+ещё одна","+другие"],"fr":["+une autre","+d'autres"],"de":["+eine weitere","+weitere"],"it":["+un'altra","+altre"],"nl":["+nog een","+andere"],"pl":["+jeszcze jedna","+kolejne"],"sv":["+en till","+fler"],"tr":["+bir diğer","+diğerleri"],"ar":["+أخرى","+أخرى"],"he":["+עוד אחת","+אחרות"],"ko":["+다른 하나","+다른 지역"],"th":["+อีกหนึ่ง","+อื่น ๆ"],"vi":["+một dải khác","+các dải khác"],"id":["+satu lagi","+lainnya"]};
+  for(const [language,[one,many]] of Object.entries(ADDITIONAL_LATITUDE_LABELS)){
+    if(!PACKS[language])throw Error("Missing latitude translation: "+language);
+    PACKS[language].latitudeOtherOne=one;
+    PACKS[language].latitudeOtherMany=many;
+  }
   window.GeoI18n = {PACKS,langNames,keys:KEYS};
 })();
