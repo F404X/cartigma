@@ -76,6 +76,7 @@
   let fallbackSwitching=false, mapStyleTimeout=null, mapSwitching=false, mapPointerController=null;
   let activeMapStyle=window.maplibregl?.isFallback?"osm":"vector";
   let controller = null, debounce = null, toastTimer = null;
+  let activeSuggestionIndex=-1;
   let rushCountryRequest=0, countryShapesPromise=null;
   const regionFormatters = new Map();
   const currencyFormatters = new Map();
@@ -1501,28 +1502,64 @@
     }
     return results;
   }
+  function suggestionButtons(){
+    return [...$("suggestions").children].filter(button=>
+      button.className==="suggestion");
+  }
+  function closeSuggestions(){
+    $("suggestions").classList.add("hidden");
+    activeSuggestionIndex=-1;
+    $("countrySearch").setAttribute("aria-expanded","false");
+    $("countrySearch").setAttribute("aria-activedescendant","");
+  }
+  function highlightSuggestion(index){
+    const buttons=suggestionButtons();
+    if(!buttons.length)return;
+    activeSuggestionIndex=(index+buttons.length)%buttons.length;
+    buttons.forEach((button,i)=>{
+      const active=i===activeSuggestionIndex;
+      button.classList.toggle("active",active);
+      button.setAttribute("aria-selected",String(active));
+    });
+    const current=buttons[activeSuggestionIndex];
+    $("countrySearch").setAttribute("aria-activedescendant",current.id);
+    current.scrollIntoView?.({block:"nearest"});
+  }
   function suggestions(items){
     const list=$("suggestions");list.replaceChildren();
+    activeSuggestionIndex=-1;
     if(!items.length){
-      const empty=document.createElement("div");empty.className="suggestion-empty";empty.textContent=t("noResults");list.append(empty);
+      const empty=document.createElement("div");
+      empty.className="suggestion-empty";empty.textContent=t("noResults");
+      list.append(empty);
     }
     for(let i=0;i<items.length&&i<7;i++){
       const item=items[i];
-      const button=document.createElement("button");button.type="button";button.className="suggestion";button.setAttribute("role","option");
+      const button=document.createElement("button");
+      button.type="button";button.className="suggestion";
+      button.id="country-suggestion-"+i;
+      button.setAttribute("role","option");
+      button.setAttribute("aria-selected","false");
       button.textContent=item.name;
-      const desc=document.createElement("small");desc.textContent=item.description;button.append(desc);
+      const desc=document.createElement("small");
+      desc.textContent=item.description;button.append(desc);
       button.addEventListener("click",()=>{
-        if(item.countryCode){
-          selected={lat:item.lat,lng:item.lon,label:item.name,countryCode:item.countryCode};
-          $("guessBtn").disabled=false;$("selectedText").textContent=item.name;
-          $("suggestions").classList.add("hidden");
-          renderMap();
-        }else selectPoint(item.lat,item.lon,item.name);
+        if(game.finished||(isRush()&&!game.started))return;
+        selected={lat:item.lat,lng:item.lon,label:item.name,
+          countryCode:item.countryCode};
+        $("guessBtn").disabled=false;
+        $("selectedText").textContent=item.name;
         $("countrySearch").value=item.name;
+        closeSuggestions();
+        renderMap();
       });
+      button.addEventListener("mouseenter",()=>highlightSuggestion(i));
       list.append(button);
     }
     list.classList.remove("hidden");
+    $("countrySearch").setAttribute("aria-expanded","true");
+    if(items.length)highlightSuggestion(0);
+    else $("countrySearch").setAttribute("aria-activedescendant","");
   }
   async function share(){
     const symbols=game.guesses.map(g=>isCountryGame()?(g.countryCode===COUNTRY_CODES[game.index]?"✓":"×"):g.distance<=WIN_RADIUS?"🟨":g.distance<500?"🟧":"⬛").join("");
@@ -1864,18 +1901,38 @@
       const term=e.target.value.trim();
       if(controller)controller.abort();
       clearTimeout(debounce);
-      if(term.length<1){$("suggestions").classList.add("hidden");return}
+      if(term.length<1){closeSuggestions();return}
       suggestions(searchLocal(term));
       // Local country catalogue only; no city geocoder or network search.
     });
     $("countrySearch").addEventListener("keydown",e=>{
-      if(e.key==="Escape")$("suggestions").classList.add("hidden");
+      if(e.key==="Escape"){
+        closeSuggestions();
+        return;
+      }
+      const list=$("suggestions");
+      const open=!list.classList.contains("hidden");
+      const options=open?suggestionButtons():[];
+      if((e.key==="ArrowDown"||e.key==="ArrowUp")&&options.length){
+        e.preventDefault();
+        highlightSuggestion(activeSuggestionIndex+
+          (e.key==="ArrowDown"?1:-1));
+        return;
+      }
       if(e.key==="Enter"){
-        const option=$("suggestions").querySelector("button.suggestion");
-        if(option&&!$("suggestions").classList.contains("hidden")){e.preventDefault();option.click()}
+        if(options.length||selected){
+          e.preventDefault();
+          if(e.repeat)return; // Holding Enter must never submit twice.
+          if(options.length){
+            options[activeSuggestionIndex<0?0:activeSuggestionIndex].click();
+          }
+          if(selected&&!game.finished)guess();
+        }
       }
     });
-    document.addEventListener("click",e=>{if(!e.target.closest(".search-wrap"))$("suggestions").classList.add("hidden")});
+    document.addEventListener("click",e=>{
+      if(!e.target.closest(".search-wrap"))closeSuggestions();
+    });
     startDaily();
     setLanguage(lang);
     if(typeof setInterval==="function")setInterval(clockTick,250);
