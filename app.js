@@ -306,14 +306,14 @@
     return tc(clue.key,clue);
   }
   function maximum(){return DIFFICULTIES[difficulty].attempts}
-  // One deterministic, uniformly distributed 195-day permutation per difficulty.
-  // Every country appears once per full cycle; separate cycles reshuffle.
+  // The same seeded permutation repeats after all 195 states are used.
+  // A fixed permutation prevents duplicates in ANY rolling 195-day window,
+  // including the date a new player starts or a 195-day boundary.
   const DAY_MS=86400000;
   function dailyIndex(level=difficulty){
     const day=Math.floor(Date.parse(today()+"T00:00:00Z")/DAY_MS);
-    const cycle=Math.floor(day/COUNTRIES.length);
     const offset=((day%COUNTRIES.length)+COUNTRIES.length)%COUNTRIES.length;
-    const seed="cartigma-country-daily-v5:"+level+":"+cycle;
+    const seed="cartigma-country-daily-v5:"+level;
     const order=COUNTRY_CODES.map((code,index)=>({code,index}))
       .sort((a,b)=>hash(seed+":"+a.code)-hash(seed+":"+b.code)||
         a.code.localeCompare(b.code));
