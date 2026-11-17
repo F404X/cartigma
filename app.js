@@ -105,6 +105,18 @@
       (waiting?0:game.revealed)+" / "+EVIDENCE_COUNT;
     $("mobileGuessPreview").textContent=
       game.guesses.length+" / "+(isRush()?"∞":maximum());
+    if(active==="clues"){
+      // The list is rebuilt as time-based Rush clues unlock. Follow the
+      // newest unlocked evidence only within the open mobile popover;
+      // never scroll the page or affect the full-size desktop dossier.
+      const list=$("clueList"),currentCase=game;
+      const scrollNewest=()=>{
+        if(game!==currentCase||!isMobileScreen()||mobilePanel!=="clues")return;
+        if(Number.isFinite(list.scrollHeight))list.scrollTop=list.scrollHeight;
+      };
+      if(typeof requestAnimationFrame==="function")requestAnimationFrame(scrollNewest);
+      else scrollNewest();
+    }
   }
   function setMobilePanel(panel){
     if(!isMobileScreen()||!game)return;
@@ -583,6 +595,7 @@
     const lockedText=t("locked");
     clues.forEach((clue,i)=>{
       const row=document.createElement("li");row.className="clue"+(i>=revealed?" locked":"");
+      if(i===revealed-1)row.classList.add("latest");
       const idx=document.createElement("span");idx.className="clue-index";idx.textContent=String(i+1).padStart(2,"0");
       const body=document.createElement("span");body.className="clue-body";
       const category=document.createElement("span");category.className="clue-category";
