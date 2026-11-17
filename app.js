@@ -318,16 +318,18 @@
     return tc(clue.key,clue);
   }
   function maximum(){return DIFFICULTIES[difficulty].attempts}
-  // Most Normal cases deliberately feature capitals or recognizable cities;
-  // Hard still draws from the complete 500-location catalogue.
-  const NORMAL_FOCUS=PLACES.map((_,index)=>index).filter(index=>
-    index<BASE_CITIES||Boolean(EXTENDED[index-BASE_CITIES]?.capital)||
-    Number(EXTENDED[index-BASE_CITIES]?.populationRank)<=2);
+  // One deterministic, uniformly distributed 195-day permutation per difficulty.
+  // Every country appears once per full cycle; separate cycles reshuffle.
+  const DAY_MS=86400000;
   function dailyIndex(level=difficulty){
-    const seed=hash("GEODETECTIVE-v3|"+today()+"|"+level);
-    if(level==="normal"&&seed%10!==0&&NORMAL_FOCUS.length)
-      return NORMAL_FOCUS[seed%NORMAL_FOCUS.length];
-    return seed%PLACES.length;
+    const day=Math.floor(Date.parse(today()+"T00:00:00Z")/DAY_MS);
+    const cycle=Math.floor(day/COUNTRIES.length);
+    const offset=((day%COUNTRIES.length)+COUNTRIES.length)%COUNTRIES.length;
+    const seed="cartigma-country-daily-v5:"+level+":"+cycle;
+    const order=COUNTRY_CODES.map((code,index)=>({code,index}))
+      .sort((a,b)=>hash(seed+":"+a.code)-hash(seed+":"+b.code)||
+        a.code.localeCompare(b.code));
+    return order[offset].index;
   }
   function dailyStorageKey(level=difficulty){return DAILY_KEY+today()+"-"+level}
   // Finished daily cases cannot be replayed, whether solved or closed after
@@ -348,8 +350,8 @@
     return {mode,index,difficulty,date:today(),serial:nextCaseNumber(),guesses:[],
       started:difficulty!=="rush",
       startedAt:difficulty==="rush"?null:Date.now(),endedAt:null,durationMs:null,
-      revealed:DIFFICULTIES[difficulty].initial,penalty:0,paidHints:0,
-      sectorMapPenalty:0,sectorReveals:[],evidenceVersion:4,targetKind:"country",
+      revealed:difficulty==="rush"?0:DIFFICULTIES[difficulty].initial,penalty:0,paidHints:0,
+      sectorMapPenalty:0,sectorReveals:[],evidenceVersion:5,targetKind:"country",
       finished:false,won:false,score:0};
   }
   function isRush(){return difficulty==="rush"}
@@ -383,6 +385,7 @@
     if(!game||!isRush()||game.finished||game.started)return;
     game.started=true;
     game.startedAt=Date.now();
+    game.revealed=DIFFICULTIES.rush.initial;
     rushCountryRequest++;
     save();render();clockTick();
   }
@@ -417,63 +420,50 @@
     if(count>game.revealed){game.revealed=count;save();renderClues();}
   }
   function savedDaily(){
-    const s=store.get(dailyStorageKey());
-    const valid=s&&s.mode==="daily"&&s.date===today()&&s.difficulty===difficulty
-      &&s.index===dailyIndex()&&Array.isArray(s.guesses)&&s.guesses.length<=maximum()
-      &&Number.isFinite(s.revealed)
-      &&s.guesses.every(g=>Number.isFinite(g.lat)&&Number.isFinite(g.lng)&&Number.isFinite(g.distance));
-    if(!valid)return null;
-    if(!Number.isInteger(s.evidenceVersion)){
-      // Older saved cases with slots 8–10 already revealed retain the
-      // original evidence, protecting points already spent.
-      s.evidenceVersion=s.revealed>7?1:2;
-      store.set(dailyStorageKey(),s);
+    const saved=store.get(dailyStorageKey());
+    if(!saved||saved.mode!=="daily"||saved.date!==today()||
+       saved.difficulty!==difficulty||saved.index!==dailyIndex()||
+       saved.targetKind!=="country"||saved.evidenceVersion!==5||
+       !Array.isArray(saved.guesses)||saved.guesses.length>maximum()||
+       !Number.isFinite(saved.revealed))return null;
+    if(isRush()&&!saved.started){
+      saved.startedAt=null;saved.revealed=0;
     }
-    if(s.difficulty==="rush"&&typeof s.started!=="boolean"){
-      // Previously opening a Rush daily started the timer without consent.
-      // Allow unopened, unguessed legacy cases to use the new Start gate.
-      if(!s.guesses.length){
-        s.started=false;s.startedAt=null;s.endedAt=null;s.durationMs=null;
-        s.finished=false;s.won=false;s.score=0;s.revealed=DIFFICULTIES.rush.initial;
-      }else s.started=Number.isFinite(s.startedAt);
-      store.set(dailyStorageKey(),s);
-    }
-    if(!Number.isFinite(s.startedAt)&&s.difficulty!=="rush"){
-      s.startedAt=s.finished?(Date.parse(s.guesses[0]?.at)||Date.now()):Date.now();
-      store.set(dailyStorageKey(),s);
-    }
-    // Saved city-target cases retain their original rules and earned hints.
-    if(!s.targetKind)s.targetKind="city";
-    // A never-played saved daily case can safely receive the new clue set.
-    // Cases with previous attempts or paid evidence retain their prior clues.
-    if(s.evidenceVersion<3&&!s.finished&&s.guesses.length===0&&
-      s.revealed===DIFFICULTIES[difficulty].initial&&!s.paidHints){
-      s.evidenceVersion=3;
-      store.set(dailyStorageKey(),s);
-    }
-    // Before this release, northern-only regions could receive a hemisphere
-    // map purchase. Refund its previous 600-point cost on open cases now that
-    // the evidence no longer appears in those continents.
-    if(!s.finished&&Array.isArray(s.sectorReveals)
-      &&s.sectorReveals.includes("hemisphere")
-      &&!EQUATOR_CROSSING_CONTINENTS.has(continentKey(s.index))){
-      s.sectorReveals=s.sectorReveals.filter(key=>key!=="hemisphere");
-      s.sectorMapPenalty=Math.max(0,(s.sectorMapPenalty||0)-600);
-      store.set(dailyStorageKey(),s);
-    }
-    return s;
+    return saved;
   }
   function save(){if(game?.mode==="daily")store.set(dailyStorageKey(),game)}
+  // A persistent, shared, fully shuffled bag prevents repetition until all
+  // 195 countries have appeared in Freeplay (across all difficulties).
+  const FREE_BAG_KEY="cartigma-freeplay-country-bag-v1";
+  function randomIndex(max){
+    const bytes=typeof window.crypto?.getRandomValues==="function"?
+      window.crypto.getRandomValues(new Uint32Array(1))[0]/4294967296:
+      Math.random();
+    return Math.floor(bytes*max);
+  }
   function chooseFree(){
-    const options=PLACES.map((_,i)=>i).filter(i=>i!==freeIndex);
-    // Bounded rerolls: Normal strongly favors capitals/famous cities,
-    // without banning lesser-known places or biasing the Hard catalogue.
-    for(let attempt=0;attempt<(difficulty==="normal"?4:1);attempt++){
-      const pick=options[Math.floor(Math.random()*options.length)];
-      freeIndex=pick;
-      if(difficulty!=="normal"||NORMAL_FOCUS.includes(pick))break;
+    let bag=store.get(FREE_BAG_KEY);
+    const possible=new Set(COUNTRY_CODES);
+    if(!bag||!Array.isArray(bag.remaining)||
+      bag.remaining.length===0||new Set(bag.remaining).size!==bag.remaining.length||
+      bag.remaining.some(code=>!possible.has(code))){
+      const previous=bag?.last;
+      const remaining=[...COUNTRY_CODES];
+      for(let i=remaining.length-1;i>0;i--){
+        const j=randomIndex(i+1);
+        [remaining[i],remaining[j]]=[remaining[j],remaining[i]];
+      }
+      if(remaining.length>1&&remaining.at(-1)===previous){
+        const j=randomIndex(remaining.length-1);
+        [remaining[j],remaining[remaining.length-1]]=
+          [remaining[remaining.length-1],remaining[j]];
+      }
+      bag={remaining,last:previous||null};
     }
-    return freeIndex;
+    const code=bag.remaining.pop();
+    bag.last=code;
+    store.set(FREE_BAG_KEY,bag);
+    return COUNTRY_CODES.indexOf(code);
   }
   function startDaily(){
     rushCountryRequest++;
