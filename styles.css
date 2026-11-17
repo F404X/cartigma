@@ -777,23 +777,106 @@ dialog.city-atlas::backdrop{background:#050806d9;backdrop-filter:blur(3px)}
 @media(max-width:390px){.atlas-option-number{display:none}.atlas-title-block p{display:none}}
 [dir="rtl"] .atlas-option{text-align:start}
 
-/* Investigation clocks and timestamped attempts. */
-.case-timer{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;
-  gap:2px;flex:0 0 auto;min-width:75px;font:600 10px var(--mono);line-height:1.1}
-.case-timer .timer-caption{font:500 9px var(--font);opacity:.8;white-space:nowrap}
-.case-timer strong{font:700 17px var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
-.timer-track{height:3px;width:100%;max-width:86px;background:#ffffff50;border-radius:3px;overflow:hidden}
-.timer-track i{display:block;height:100%;background:#fff;transition:width .2s linear}
-.guess-timestamp{display:block;margin-top:3px;font:500 9px/1.3 var(--mono);
-  color:var(--muted);white-space:nowrap;text-decoration:none}
+/* Keep the clock outside the 38px map toolbar: three stacked lines there
+   previously spilled over the map and overlapped the reset-view button. */
+.map-card{position:relative}
+.case-timer{
+  box-sizing:border-box;
+  flex:0 0 auto;
+  min-width:0;
+  width:100%;
+  height:32px;
+  padding:5px 12px;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  color:var(--text);
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  grid-template-rows:auto auto;
+  column-gap:12px;
+  row-gap:3px;
+  align-items:center;
+  font-variant-numeric:tabular-nums;
+}
+.case-timer .timer-caption{
+  grid-column:1;grid-row:1;min-width:0;margin:0;
+  font:600 11px/1.2 var(--font);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;
+}
+.case-timer #gameTimer{
+  grid-column:2;grid-row:1;margin:0;
+  font:700 18px/1 var(--mono);white-space:nowrap;text-align:end;
+}
+.case-timer .timer-score{
+  grid-column:1;grid-row:2;min-width:0;
+  margin:0;font:600 10px/1.2 var(--mono);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.case-timer .timer-track{
+  grid-column:2;grid-row:2;
+  width:94px;height:4px;
+  background:#ffffff3b;border-radius:999px;overflow:hidden;
+}
+.timer-track i{
+  display:block;height:100%;background:currentColor;
+  transition:width .2s linear;
+}
+.rush-mode .case-timer{
+  height:53px;
+  padding-block:8px;
+  background:#cc347f;
+  border-bottom-color:#af286a;
+  color:#fff;
+}
+.rush-mode .case-timer #gameTimer{font-size:20px}
+.guess-timestamp{
+  display:block;margin-top:3px;
+  font:500 9px/1.3 var(--mono);
+  color:var(--muted);white-space:nowrap;text-decoration:none;
+}
 .report-log-place .guess-timestamp{margin-top:4px}
 #difficultySelect option[value="rush"]{color:#df4b94}
 body.rush-mode #difficultySelect{border-color:#e05a9c}
-@media(max-width:520px){
-  .case-timer{min-width:55px;gap:2px}
-  .case-timer .timer-caption{display:none}
-  .case-timer strong{font-size:14px}
-  .map-toolbar .map-hint{display:none}
-}
 
-.timer-score{font:600 9px var(--mono);white-space:nowrap;opacity:.92}
+/* Start gate floats above the actual map, not over its controls or clock. */
+.rush-intro{
+  position:absolute;inset:calc(38px + 53px) 0 31px;
+  z-index:8;
+  display:flex;align-items:center;justify-content:center;
+  padding:12px;box-sizing:border-box;
+  background:rgba(12,16,20,.76);backdrop-filter:blur(3px);
+  overflow:auto;
+}
+.rush-intro-card{
+  width:min(100%,360px);max-height:100%;
+  box-sizing:border-box;
+  padding:25px 22px;
+  border:1px solid #ef76b3;
+  border-radius:8px;
+  background:var(--surface);
+  color:var(--text);
+  box-shadow:0 12px 36px #0009;
+  text-align:center;
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+}
+.rush-intro-eyebrow{
+  color:#ef76b3;font:700 10px var(--mono);
+  letter-spacing:1.2px;
+}
+.rush-intro-card h2{margin:0;font:700 24px/1.2 var(--font)}
+.rush-intro-card p{margin:0;color:var(--muted);font:13px/1.6 var(--font)}
+.rush-intro-card .primary-btn{
+  width:100%;max-width:240px;min-height:43px;
+  margin-top:7px;background:#ec4899;border-color:#ec4899;color:#fff;
+}
+.rush-intro-card .primary-btn:hover{background:#d42b80;border-color:#d42b80}
+@media(max-width:760px){
+  .rush-intro{inset:calc(36px + 53px) 0 35px}
+  .case-timer{padding-inline:10px}
+  .rush-intro-card{padding:20px 18px;gap:8px}
+}
+@media(max-width:390px){
+  .rush-intro{padding:8px}
+  .rush-intro-card h2{font-size:21px}
+  .case-timer .timer-caption{font-size:10px}
+}
