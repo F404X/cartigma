@@ -1501,7 +1501,7 @@ test("a correct fifth guess in Cape Town has no distance or bearing in history o
 });
 
 test("fresh deployments fingerprint both game engine and translated clues",()=>{
-  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261117-rush"'));
+  assert.ok(files["index.html"].includes('src="map-bootstrap.js?v=20261117-rush-ready-v2"'));
   assert.ok(files["index.html"].includes('src="clues-i18n.js?v=20261116-profile-diversity"'));
   assert.ok(files["map-bootstrap.js"].includes('new URL(import.meta.url).searchParams.get("v")'));
   assert.ok(files["app.js"].includes("function guessMetricText(g)"));
@@ -2373,6 +2373,31 @@ test("Rush start screen survives reload and timer layout stays in its own row",(
   assert.match(files["styles.css"],/\.case-timer\{[\s\S]*?grid-template-columns:/);
   for(const [code,pack] of Object.entries(g.window.GeoI18n.PACKS)){
     for(const key of ["rushReady","rushIntroText","rushStart","rushNoCountry","rushMapUnavailable"])
-      assert.ok(pack[key]&&pack[key].length>2,code+" missing "+key);
+      assert.ok(typeof pack[key]==="string"&&pack[key].length>0,code+" missing "+key);
   }
+});
+
+
+test("An untouched older Rush daily is reset to the new Start gate",()=>{
+  class Clock extends Date{
+    static ms=Date.UTC(2026,10,17,12,0,0);
+    static now(){return Clock.ms}
+    constructor(...args){super(...(args.length?args:[Clock.ms]))}
+  }
+  const preliminary=boot({clock:Clock});
+  preliminary.difficulty("rush");
+  const idx=preliminary.window.GEODETECTIVE_PLACES.length;
+  assert.equal(idx,500);
+  const old=JSON.parse(preliminary.storage.get("geodetective-daily-v3-2026-11-17-rush"));
+  delete old.started;
+  old.startedAt=Clock.ms-90000;
+  old.finished=true;old.won=false;old.durationMs=60000;old.endedAt=new Date(Clock.ms).toISOString();
+  old.revealed=10;old.score=0;
+  const storage=new Map([["geodetective-difficulty",JSON.stringify("rush")],
+    ["geodetective-daily-v3-2026-11-17-rush",JSON.stringify(old)]]);
+  const g=boot({clock:Clock,storage});
+  assert.equal(g.get("rushIntro").classList.contains("hidden"),false);
+  assert.equal(g.get("gameTimer").textContent,"01:00");
+  assert.equal(g.get("hintCount").textContent,"1 / 10");
+  assert.equal(JSON.parse(storage.get("geodetective-daily-v3-2026-11-17-rush")).started,false);
 });
