@@ -281,7 +281,7 @@ test("Start card displays actual mode and finite attempts in Normal and Hard",()
     const expected=level==="normal"?"6":level==="hard"?"4":null;
     assert.ok($("rushIntroEyebrow").textContent.includes(level==="rush"?"RUSH":"DAILY")||
       $("rushIntroEyebrow").textContent.includes(level==="rush"?"Rush":"DAILY CASE"));
-    assert.equal($("rushIntroTitle").textContent,level==="rush"?"Rush":level==="hard"?"Hard":"Normal");
+    assert.equal($("rushIntroTitle").textContent,level==="rush"?"Rush mode":level==="hard"?"Hard":"Normal");
     if(expected){
       assert.equal($("rushIntroText").textContent,"Attempts left: "+expected);
       assert.equal($("attemptCount").textContent,expected+" / "+expected);
@@ -322,14 +322,14 @@ test("Completed ranked free case permits another free case and changing to Daily
   $("rushStartBtn").click();
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal($("rushIntro").classList.contains("hidden"),true);
-  assert.match($("modeCaption").textContent,/Free/i);
+  assert.equal($("freeBtn").classList.contains("active"),true);
   g.select("Brazil");$("guessBtn").click();
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal($("resultCard").classList.contains("hidden"),false);
   $("reportNextBtn").click();
   assert.equal($("reportDialog").open,false);
   assert.equal($("rushIntro").classList.contains("hidden"),false);
-  assert.match($("modeCaption").textContent,/Free/i);
+  assert.equal($("freeBtn").classList.contains("active"),true);
   $("rushStartBtn").click();
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(starts,2);
@@ -340,13 +340,13 @@ test("Completed ranked free case permits another free case and changing to Daily
   assert.equal($("guessBtn").disabled,false);
   $("dailyBtn").click();
   await new Promise(resolve=>setImmediate(resolve));
-  assert.match($("modeCaption").textContent,/Daily/i);
+  assert.equal($("dailyBtn").classList.contains("active"),true);
   assert.equal($("rushIntro").classList.contains("hidden"),false);
   $("rushStartBtn").click();
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(starts,3);
   assert.equal($("rushIntro").classList.contains("hidden"),true);
-  assert.match($("modeCaption").textContent,/Daily/i);
+  assert.equal($("dailyBtn").classList.contains("active"),true);
 });
 test("Normal, Hard, and Rush all require explicit Start before revealing clues",()=>{
   for(const level of ["normal","hard","rush"]){
