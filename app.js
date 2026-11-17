@@ -692,7 +692,7 @@
     updateMapLanguage();
     syncMapFiltersUI();
     document.querySelectorAll("[data-i18n]").forEach(element=>{element.textContent=t(element.dataset.i18n)});
-    $("citySearch").placeholder=t("searchPlaceholder");
+    $("citySearch").placeholder=t(isRush()?"rushSearchPlaceholder":"searchPlaceholder");
     $("helpBtn").setAttribute("aria-label",t("help"));
     syncAtlasLanguage();
     $("resetViewBtn").title=t("reset");
@@ -760,7 +760,7 @@
     toast(tc(message,{cost:number(cost)}));
   }
   function nextHintCost(){
-    if(!game||game.finished||game.revealed>=EVIDENCE_COUNT)return 0;
+    if(!game||game.finished||isRush()||game.revealed>=EVIDENCE_COUNT)return 0;
     const clue=cluesFor(game.index,difficulty)[game.revealed];
     return pricedCost(HINT_PRICES[clue?.key]??HINT_COST);
   }
@@ -803,12 +803,13 @@
       }
       row.append(idx,body);list.append(row);
     });
-    $("revealBtn").disabled=game.finished||revealed>=EVIDENCE_COUNT;
+    $("revealBtn").disabled=game.finished||isRush()||revealed>=EVIDENCE_COUNT;
     $("revealCost").textContent=game.finished||revealed>=EVIDENCE_COUNT
       ?"":"−"+number(nextHintCost());
-    $("revealBtn").classList.toggle("hidden",game.finished);
+    $("revealBtn").classList.toggle("hidden",game.finished||isRush());
   }
   function guessMetricText(g){
+    if(isRush())return g.countryCode===COUNTRY_CODES[game.index]?"✓":"×";
     // Hide both distance and bearing if the displayed result rounds to 0 km.
     if(Math.round(g.distance)===0)return "";
     return number(g.distance)+" km"+(difficulty==="hard"?"":" · "+direction(g.bearing));
@@ -829,6 +830,9 @@
       const label=document.createElement("span");
       const idx=document.createElement("span");idx.className="history-number";idx.textContent=String(i+1).padStart(2,"0");
       label.append(idx,document.createTextNode(g.label||g.lat.toFixed(2)+"°, "+g.lng.toFixed(2)+"°"));
+      const stamp=document.createElement("time");stamp.className="guess-timestamp";
+      if(g.at)stamp.setAttribute("datetime",g.at);
+      stamp.textContent=guessTimestamp(g);label.append(stamp);
       row.append(label);
       const metricText=guessMetricText(g);
       if(metricText){
@@ -840,6 +844,7 @@
     }
   }
   function bestGuess(){
+    if(isRush())return game.guesses.find(g=>g.countryCode===COUNTRY_CODES[game.index])||null;
     if(!game.guesses.length)return null;
     let best=game.guesses[0];
     for(let i=1;i<game.guesses.length;i++){
@@ -1129,7 +1134,7 @@
     const place=cityAt(game.index);
     $("reportCode").textContent=caseCode();
     $("reportVerdict").textContent=t(game.won?"caseSolved":"caseClosed");
-    $("reportHeading").textContent=cityName(place);
+    $("reportHeading").textContent=isRush()?countryName(game.index):cityName(place);
     $("reportCountry").textContent=countryName(game.index);
     const iso=COUNTRY_CODES[game.index],details=COUNTRY_INSIGHTS[iso];
     const flagImage=$("reportFlag"),flagFallback=$("reportFlagFallback");
@@ -1152,8 +1157,8 @@
     $("reportStamp").textContent=t(game.won?"reportSuccess":"reportFailure");
     $("reportMode").textContent=t(game.mode==="daily"?"daily":"free");
     $("reportDifficulty").textContent=t(difficulty);
-    $("reportAttempts").textContent=game.guesses.length+" / "+maximum();
-    $("reportBest").textContent=best?number(best.distance)+" km":"—";
+    $("reportAttempts").textContent=isRush()?String(game.guesses.length):game.guesses.length+" / "+maximum();
+    $("reportBest").textContent=isRush()?"—":best?number(best.distance)+" km":"—";
     $("reportHints").textContent=number(Number.isInteger(game.paidHints)
       ?game.paidHints:Math.round(game.penalty/HINT_COST));
     $("reportScore").textContent=number(game.score)+" / 5,000";
@@ -1168,6 +1173,9 @@
       const n=document.createElement("span");n.className="report-log-index";n.textContent=String(i+1).padStart(2,"0");
       const label=document.createElement("span");label.className="report-log-place";
       label.textContent=g.label||g.lat.toFixed(3)+"°, "+g.lng.toFixed(3)+"°";
+      const stamp=document.createElement("time");stamp.className="guess-timestamp";
+      if(g.at)stamp.setAttribute("datetime",g.at);
+      stamp.textContent=guessTimestamp(g);label.append(stamp);
       row.append(n,label);
       const metricText=guessMetricText(g);
       if(metricText){
@@ -1212,12 +1220,14 @@
     renderCaseNavigation();
     $("resultCard").classList.toggle("hidden",!game.finished);
     if(!game.finished)return;
-    const name=cityName(cityAt(game.index))+", "+countryName(game.index);
+    const name=isRush()?countryName(game.index):cityName(cityAt(game.index))+", "+countryName(game.index);
     $("resultKicker").textContent=t(game.won?"solved":"closed");
     $("resultTitle").textContent=name;
-    $("resultDetail").textContent=game.won
-      ?t("foundText",{city:name,count:game.guesses.length,km:number(bestGuess().distance)})
-      :t("lostText",{city:name});
+    $("resultDetail").textContent=isRush()
+      ?t(game.won?"rushFound":"rushLost",{country:name,count:game.guesses.length,
+        time:formatElapsed(game.durationMs??elapsedMs())})
+      :game.won?t("foundText",{city:name,count:game.guesses.length,
+        km:number(bestGuess().distance)}):t("lostText",{city:name});
     $("finalScore").textContent=number(game.score);
     renderDossier();
   }
@@ -1225,7 +1235,9 @@
     const el=$("feedback");
     if(!game.guesses.length||game.finished){el.classList.add("hidden");return}
     const last=game.guesses.at(-1);
-    el.textContent=difficulty==="hard" ?t("hardDistance",{km:number(last.distance)}) :t("feedback",{km:number(last.distance),dir:direction(last.bearing)});
+    el.textContent=isRush()?t("rushWrong"):
+      difficulty==="hard"?t("hardDistance",{km:number(last.distance)}) :
+      t("feedback",{km:number(last.distance),dir:direction(last.bearing)});
     el.className="feedback";
   }
   function render(){
@@ -1235,29 +1247,33 @@
     $("dailyBtn").setAttribute("aria-pressed",String(daily));$("freeBtn").setAttribute("aria-pressed",String(!daily));
     $("difficultySelect").value=difficulty;
     $("mapToolbar").classList.toggle("is-hard",difficulty==="hard");
+    $("mapToolbar").classList.toggle("is-rush",isRush());
+    document.body.classList.toggle("rush-mode",isRush());
     $("mapTitle").textContent=t("map")+" - "+t(difficulty);
     const code=caseCode();
     $("caseCode").textContent=code;
     $("caseNumber").textContent=t("caseWord")+" "+code;
     $("modeCaption").textContent=t(daily?"modeDaily":"modeFree");
-    $("caseTitle").textContent=game.finished?cityName(cityAt(game.index)):t("unknown");
+    $("caseTitle").textContent=game.finished?(isRush()?countryName(game.index):cityName(cityAt(game.index))):t("unknown");
     $("caseStatus").textContent=t(game.finished?(game.won?"solved":"closed"):"active");
     $("caseStatus").classList.toggle("closed",game.finished);
-    $("attemptCount").textContent=remaining+" / "+max;
-    $("guessCounter").textContent=game.guesses.length+" / "+max;
+    $("attemptCount").textContent=isRush()?t("rushUnlimited"):remaining+" / "+max;
+    $("guessCounter").textContent=isRush()?String(game.guesses.length):game.guesses.length+" / "+max;
     const dots=$("attemptDots");dots.replaceChildren();
     dots.style.setProperty("--attempt-total",max);
-    for(let i=0;i<max;i++){const dot=document.createElement("i");dot.classList.toggle("live",i<remaining);dots.append(dot)}
+    if(!isRush())for(let i=0;i<max;i++){const dot=document.createElement("i");dot.classList.toggle("live",i<remaining);dots.append(dot)}
     $("placeCount").textContent=String(PLACES.length);
     renderClues();renderHistory();renderResult();feedback();
     $("guessBtn").disabled=game.finished||!selected;
     $("citySearch").disabled=game.finished;
+    $("citySearch").placeholder=t(isRush()?"rushSearchPlaceholder":"searchPlaceholder");
+    $("searchLabel").textContent=t(isRush()?"rushSearchLabel":"searchLabel");
     $("citySearch").value="";
     $("suggestions").classList.add("hidden");
     $("selection").classList.toggle("hidden",game.finished);
     $("selectedText").textContent=selected?(selected.label||selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°"):t("noSelection");
-    $("mapHint").textContent=t(game.finished?"mapRevealed":"mapHint");
-    renderMap();
+    $("mapHint").textContent=t(game.finished?"mapRevealed":isRush()?"rushMapHint":"mapHint");
+    updateClock();renderMap();
   }
   function makeMarker(text,style){
     // The wrapper includes both the circle and the pointed tail. Its bottom edge
@@ -1567,15 +1583,13 @@
     drawContinentOutline();
     const target=cityCoords(game.index);
     const best=game.finished?bestGuess():null;
-    game.guesses.forEach((g,i)=>addMarker(g.lat,g.lng,i+1,g===best?"best":"past"));
+    if(!isRush())game.guesses.forEach((g,i)=>addMarker(g.lat,g.lng,i+1,g===best?"best":"past"));
     if(game.finished){
       const adjustedLng=best?target[1]+360*Math.round((best.lng-target[1])/360):target[1];
       addMarker(target[0],adjustedLng,"★","target",cityName(cityAt(game.index))+" · "+countryName(game.index));
-      if(best){
-        addResultLine([best.lng,best.lat],[adjustedLng,target[0]]);
-      }
-      frameResult(best,target);
-    }else if(selected){
+      if(best&&!isRush())addResultLine([best.lng,best.lat],[adjustedLng,target[0]]);
+      frameResult(isRush()?null:best,target);
+    }else if(selected&&!isRush()){
       marker=addMarker(selected.lat,selected.lng,"+","current");
     }
     $("coordinates").textContent=game.finished
@@ -1586,7 +1600,7 @@
     if(map&&!game.finished)map.easeTo({center:[8,15],zoom:1.7,duration:350});
   }
   function selectPoint(lat,lng,label){
-    if(game.finished)return;
+    if(game.finished||isRush())return;
     selected={lat:Number(lat),lng:Number(lng),label:label||""};
     // A map click only places the pin; city search may recenter without forcing zoom during a drag.
     if(map&&label)map.easeTo({center:[selected.lng,selected.lat],zoom:Math.max(map.getZoom(),4),duration:350});
@@ -1596,7 +1610,7 @@
     renderMap();
   }
   function reveal(){
-    if(game.finished||game.revealed>=EVIDENCE_COUNT)return;
+    if(game.finished||isRush()||game.revealed>=EVIDENCE_COUNT)return;
     const cost=nextHintCost();
     if(!cost)return;
     if(!Number.isInteger(game.paidHints))
