@@ -833,3 +833,87 @@ test("mobile clue scrolling keeps the entire most recent card above its footer",
   assert.equal(latest.getBoundingClientRect().bottom,188);
   assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),true);
 });
+
+
+test("Lesotho has a valid geographic reference and Normal reveals its star result pin on mobile",()=>{
+  const catalogue=boot(),index=countryIndex(catalogue,"LS");
+  assert.ok(index>=0,"Lesotho must be available as a country");
+  const expected=catalogue.window.CartigmaCountries[index];
+  assert.equal(expected.code,"LS");
+  assert.ok(expected.lat < -28 && expected.lat > -32);
+  assert.ok(expected.lng > 27 && expected.lng < 30);
+  const g=boot({map:true,mobile:true,randomValue:(index+.5)/195}),$=g.get;
+  $("freeBtn").click();
+  const resultPin=()=>g.mapState.markers.find(m=>
+    m.element.children[0]?.textContent==="★");
+  assert.equal(resultPin(),undefined,"Do not reveal the country during a game");
+  g.select("Lesotho");
+  assert.equal(resultPin(),undefined,"Unconfirmed selection must not reveal result");
+  $("guessBtn").click();
+  assert.equal($("reportDialog").open,true);
+  assert.equal($("reportHeading").textContent,"Lesotho");
+  const pin=resultPin();
+  assert.ok(pin,"Normal-mode Lesotho must have a result pin");
+  assert.deepEqual(Array.from(pin.coordinate),[expected.lng,expected.lat]);
+  assert.ok(g.mapState.markers.some(m=>m.element.children[0]?.textContent==="1"),
+    "The confirmed guess pin must remain available");
+  g.mapState.events["style.load"]();
+  assert.equal(resultPin(),pin,"Map redraw must not discard the result pin");
+  $("reportMapBtn").click();
+  assert.equal($("reportDialog").open,false);
+  const camera=g.mapState.eases.at(-1);
+  assert.deepEqual(Array.from(camera.center),[expected.lng,expected.lat]);
+  assert.ok(camera.zoom>=4,"Center and zoom so small countries are discoverable");
+  assert.equal(resultPin(),pin,"Opening the map must preserve the result pin");
+  $("freeBtn").click();
+  assert.equal(resultPin(),undefined,"A new case should clear the previous answer pin");
+});
+
+test("Normal and Hard reveal the result pin on victory AND after failed attempts",()=>{
+  const marker=(game,label)=>game.mapState.markers.find(m=>
+    m.element.children[0]?.textContent===label);
+  const country=boot(),index=countryIndex(country,"LS");
+  for(const difficulty of ["normal","hard"]){
+    const g=boot({map:true,randomValue:(index+.5)/195}),$=g.get;
+    g.difficulty(difficulty);
+    $("freeBtn").click();
+    assert.equal(marker(g,"★"),undefined);
+    for(let i=0;i<(difficulty==="normal"?6:4);i++){
+      const wrong=g.window.CartigmaCountries.find(c=>c.code!=="LS");
+      g.select(wrong.name);
+      $("guessBtn").click();
+      if(i<(difficulty==="normal"?5:3))
+        assert.equal(marker(g,"★"),undefined, "Result must remain hidden before completion");
+    }
+    assert.equal($("reportDialog").open,true);
+    assert.equal($("reportHeading").textContent,"Lesotho");
+    assert.equal($("finalScore").textContent,"0");
+    const pin=marker(g,"★");
+    assert.ok(pin,difficulty+" must reveal answer on loss");
+    assert.deepEqual(Array.from(pin.coordinate),[28.5,-29.5]);
+    assert.equal(g.mapState.markers.filter(m=>
+      /^\d+$/.test(m.element.children[0]?.textContent)).length,
+      difficulty==="normal"?6:4,"Previous guesses remain visible");
+    $("reportMapBtn").click();
+    assert.deepEqual(Array.from(g.mapState.eases.at(-1).center),[28.5,-29.5]);
+    g.mapState.events["style.load"]();
+    assert.equal(marker(g,"★"),pin);
+  }
+});
+
+test("result marker appears for every country, not just Lesotho or Rush",()=>{
+  const all=boot().window.CartigmaCountries;
+  for(const code of ["BR","LS","VA","KI","RU"]){
+    const index=all.findIndex(c=>c.code===code);
+    assert.ok(index>=0);
+    const g=boot({map:true,randomValue:(index+.5)/195}),$=g.get;
+    $("freeBtn").click();
+    const target=g.window.CartigmaCountries[index];
+    g.select(target.name);
+    $("guessBtn").click();
+    assert.equal($("reportDialog").open,true);
+    const pin=g.mapState.markers.find(m=>m.element.children[0]?.textContent==="★");
+    assert.ok(pin,"Missing result pin for "+code);
+    assert.deepEqual(Array.from(pin.coordinate),[target.lng,target.lat]);
+  }
+});
