@@ -35,14 +35,16 @@ Set these with `wrangler secret put`, never in source control:
 - POST `/v1/games/guess`, `/v1/games/reveal`, `/v1/games/finish`
 - POST `/v1/games/save` (requires authenticated account)
 
-For each difficulty and UTC day, an account may save just one completed daily
-challenge. Freeplay cannot enter the ranking. Only the server sees target
+For each difficulty and UTC day, an account may begin one ranked attempt,
+independently of daily/free mode. Logged-in players start ranked automatically;
+without an account, the original browser-only game runs with no API. Only the server sees target
 countries and computes scores.
 
 ### Spam/cooldown behavior
-Leaderboard GET has an IP-based approximate 1 request / 60s limiter via Cloudflare
-Rate Limiting binding. HTTP 429 includes Retry-After. Browser client stores a
-5-minute cache and reuses it during cooldown, on 429, and while offline. This
+Leaderboard GET has an IP-based approximate 1 request / 60s burst limiter via Cloudflare
+Rate Limiting binding. A D1 transaction enforces an additional 180-second window per hashed IP.
+HTTP 429 includes Retry-After. Browser client stores a
+15-minute cache and reuses it during cooldown, on 429, and while offline. This
 reduces **normal client** calls but does not prevent malicious requests from
 reaching the Worker. The limiter runs within the Worker and those rejected
 invocations still count toward the 100k/day free tier. To protect that budget
