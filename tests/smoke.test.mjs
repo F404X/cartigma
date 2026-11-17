@@ -981,7 +981,7 @@ test("five city-specific evidence types are sourced, dated, and conditional",()=
     return {play,clues:revealAll(play)};
   };
   const sao=full(places.findIndex(p=>p[0]==="São Paulo"));
-  assert.ok(sao.clues.some(x=>/^[<>] [\\d,]+ inhabitants \\(est\\. 2025\\)$/.test(x)),
+  assert.ok(sao.clues.some(x=>/^[<>] [\d,]+ inhabitants \(est\. 2025\)$/.test(x)),
     "São Paulo: verified 2025 population must appear as a bounded inequality");
   assert.ok(sao.clues.some(x=>x==="≈ 875 km from the capital"),
     "São Paulo: capital distance without the city's name or calculation year");
@@ -993,7 +993,7 @@ test("five city-specific evidence types are sourced, dated, and conditional",()=
   assert.ok(!goiania.clues.some(x=>x.includes("inhabitants (est. 2025)")),
     "No city census may be invented from country or old metropolitan figures");
   const mumbai=full(places.findIndex(p=>p[0]==="Mumbai"));
-  assert.ok(mumbai.clues.some(x=>/^[<>] [\\d,]+ inhabitants \\(est\\. 2025\\)$/.test(x)));
+  assert.ok(mumbai.clues.some(x=>/^[<>] [\d,]+ inhabitants \(est\. 2025\)$/.test(x)));
   assert.ok(files["app.js"].includes("numericBoundary(urban.density"),
     "UN 2025 urban density must use the same truthful inequality system");
   const papeete=full(places.findIndex(p=>p[0]==="Papeete"));
@@ -2178,4 +2178,114 @@ test("indexed city search handles accents and English aliases without changing r
   assert.ok(results("tokyo").some(name=>name.includes("Tóquio")),"Results must be translated at display time");
   assert.match(files["app.js"],/const LOCAL_SEARCH_INDEX = PLACES\.map/);
   assert.doesNotMatch(files["app.js"],/PLACES\.indexOf\(p\)/);
+});
+
+
+test("five statistical clue types render valid rounded lower or upper bounds",()=>{
+  const g=boot(),$=g.get,w=g.window;
+  const base=files["app.js"].match(/const COUNTRY_CODES = "([^"]+)"/)[1].split(" ");
+  const seen=new Set();
+  $("atlasBtn").handlers.click();
+  const cards=$("atlasOptions").children;
+  for(let i=0;i<500;i++){
+    const button=cards.find(x=>x.dataset.index===String(i));
+    button.handlers.click();
+    const code=i<74?base[i]:w.GeoExtendedPlaceMetadata[i-74].countryCode;
+    const country=w.GeoCountryInsights[code],city=w.CartigmaUrban2025[i]||{};
+    for(const level of ["Normal","Hard"]){
+      for(const row of $("atlas"+level+"Evidence").children){
+        const text=row.children[1].textContent;
+        let type,source;
+        if(text.startsWith("Population (")){type="countryPopulation";source=country.population}
+        else if(text.startsWith("GDP per capita (")){type="countryGDP";source=country.gdpPerCapita}
+        else if(text.startsWith("Country / territory area:")){type="countryArea";source=country.area}
+        else if(/^[<>] [\d,]+ inhabitants \(est\. 2025\)$/.test(text)){
+          type="cityPopulation";source=city.population;
+        }else if(/^[<>] [\d,]+ people\/km² \(est\. 2025\)$/.test(text)){
+          type="cityDensity";source=city.density;
+        }else continue;
+        const match=text.match(/([<>])\s+([\d,]+)/);
+        assert.ok(match,"Missing numeric comparison: "+text);
+        const bound=Number(match[2].replaceAll(",",""));
+        assert.ok(Number.isFinite(source)&&source>0,type+" missing sourced value at "+i);
+        assert.ok(match[1]===">"?source>bound:source<bound,
+          type+" must be strictly true at city "+i+": "+text+" vs "+source);
+        const relativeGap=Math.abs(source-bound)/source;
+        assert.ok(relativeGap<.45,type+" bound must remain reasonably close");
+        seen.add(type);
+      }
+    }
+  }
+  assert.deepEqual([...seen].sort(),
+    ["cityDensity","cityPopulation","countryArea","countryGDP","countryPopulation"].sort());
+  for(const [lang,p] of Object.entries(w.GeoCountryClueI18n))
+    for(const key of ["countryPopulation","countryGDP","countryArea"])
+      assert.ok(p[key].includes("{comparison}"),lang+" "+key);
+  for(const [lang,p] of Object.entries(w.CartigmaCityClueI18n))
+    for(const key of ["cityPopulation","cityDensity"])
+      assert.ok(p.templates[key].includes("{comparison}"),lang+" "+key);
+});
+
+test("Rush targets countries, unlocks hints every six seconds and timestamps guesses",()=>{
+  class Clock extends Date{
+    static ms=Date.UTC(2026,10,17,12,0,0);
+    static now(){return Clock.ms}
+    constructor(...args){super(...(args.length?args:[Clock.ms]))}
+  }
+  const places=boot().window.GEODETECTIVE_PLACES;
+  const index=places.findIndex(x=>x[0]==="São Paulo");
+  const g=boot({clock:Clock,randomValue:(index+.25)/places.length}),$=g.get;
+  g.difficulty("rush");
+  $("freeBtn").handlers.click();
+  assert.equal($("gameTimer").textContent,"01:00");
+  assert.equal($("hintCount").textContent,"1 / 10");
+  assert.equal($("revealBtn").classList.contains("hidden"),true);
+  assert.equal($("attemptCount").textContent,"Unlimited");
+  assert.equal($("mapTitle").textContent,"World map - Rush");
+  assert.equal($("mapToolbar").classList.contains("is-rush"),true);
+  assert.match($("timerScore").textContent,/5,000/);
+  Clock.ms+=30000;g.tick();
+  assert.equal($("gameTimer").textContent,"00:30");
+  assert.equal($("hintCount").textContent,"6 / 10");
+  assert.match($("timerScore").textContent,/2,500/);
+  g.select("Mexico");$("guessBtn").handlers.click();
+  assert.equal($("guessHistory").children.length,1);
+  assert.match($("guessHistory").children[0].children[0].children[2].textContent,/\+00:30/);
+  assert.equal($("feedback").textContent,"Wrong country. Try another.");
+  g.select("Brazil");$("guessBtn").handlers.click();
+  assert.equal($("finalScore").textContent,"2,500");
+  assert.equal($("reportDialog").open,true);
+  assert.equal($("reportHeading").textContent,"Brazil");
+  assert.equal($("reportTimeline").children.length,2);
+  assert.match($("reportTimeline").children[1].children[1].children[0].textContent,/\+00:30/);
+  assert.equal($("timerLabel").textContent,"Elapsed");
+  assert.equal($("gameTimer").textContent,"00:30");
+});
+
+test("Rush daily has a separate saved case and expires after sixty wall-clock seconds",()=>{
+  class Clock extends Date{
+    static ms=Date.UTC(2026,10,17,12,0,0);
+    static now(){return Clock.ms}
+    constructor(...args){super(...(args.length?args:[Clock.ms]))}
+  }
+  const storage=new Map(),g=boot({clock:Clock,storage}),$=g.get;
+  g.difficulty("rush");
+  const key="geodetective-daily-v3-2026-11-17-rush";
+  const before=JSON.parse(storage.get(key));
+  assert.equal(before.difficulty,"rush");
+  assert.equal(before.guesses.length,0);
+  Clock.ms+=60000;g.tick();
+  assert.equal($("gameTimer").textContent,"01:00");
+  // The finished timer switches to elapsed time.
+  assert.equal($("reportDialog").open,true);
+  const expired=JSON.parse(storage.get(key));
+  assert.equal(expired.finished,true);
+  assert.equal(expired.won,false);
+  assert.equal(expired.score,0);
+  assert.equal(expired.durationMs,60000);
+  assert.equal(expired.revealed,10);
+  const reopened=boot({clock:Clock,storage});
+  assert.equal(reopened.get("difficultySelect").value,"rush");
+  assert.equal(reopened.get("resultCard").classList.contains("hidden"),false);
+  assert.equal(JSON.parse(storage.get(key)).finished,true);
 });
