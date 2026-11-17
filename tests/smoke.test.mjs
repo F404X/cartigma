@@ -597,3 +597,65 @@ test("Rush success shows the answer pin and preserves the winning guess pin",()=
   assert.equal(g.mapState.markers.length,markerCount,
     "Repeated renders must not duplicate result markers");
 });
+
+
+test("A historical fact is not duplicated as Did you know? in the Kiribati dossier",()=>{
+  const reference=boot();
+  const index=countryIndex(reference,"KI");
+  assert.ok(index>=0);
+  const g=boot({randomValue:(index+.25)/195}),$=g.get;
+  $("freeBtn").click();
+  g.language("pt");
+  g.select("Kiribati");$("guessBtn").click();
+  assert.equal($("reportDialog").open,true);
+  assert.equal($("reportHistory").textContent,
+    "Kiribati conquistou a independência em 1979.");
+  assert.equal($("reportFact").textContent,"");
+  assert.equal($("reportFactSection").classList.contains("hidden"),true);
+  assert.match(files["index.html"],/id="reportFactSection"/);
+});
+
+test("Dossier shows genuinely distinct trivia and hides duplicate or empty trivia",()=>{
+  const g=boot(),$=g.get;
+  $("freeBtn").click();
+  const country=g.window.CartigmaCountries[Math.floor(.42*195)];
+  const detail=g.window.GeoCountryInsights[country.code];
+  const originalTrivia=detail.trivia;
+  try{
+    const history=detail.history.en;
+    assert.ok(history);
+    detail.trivia={en:"An independent fact about the country's geography."};
+    g.select(country.name);$("guessBtn").click();
+    assert.equal($("reportDialog").open,true);
+    assert.equal($("reportFactSection").classList.contains("hidden"),false);
+    assert.equal($("reportFact").textContent,detail.trivia.en);
+    assert.equal($("reportHistory").textContent,history);
+
+    detail.trivia={en:"   "+history.toUpperCase().replaceAll("."," ! ")+"  "};
+    $("reportOpenBtn").click(); // Refresh dossier with source-like duplicate.
+    assert.equal($("reportFactSection").classList.contains("hidden"),true);
+    assert.equal($("reportFact").textContent,"");
+
+    detail.trivia={en:" "};
+    $("reportOpenBtn").click();
+    assert.equal($("reportFactSection").classList.contains("hidden"),true);
+  }finally{
+    if(originalTrivia===undefined)delete detail.trivia;
+    else detail.trivia=originalTrivia;
+  }
+});
+
+test("None of the 195 source profiles reuse history as separate trivia",()=>{
+  const g=boot();
+  for(const [code,info] of Object.entries(g.window.GeoCountryInsights)){
+    const trivia=info.trivia;
+    const history=info.history;
+    if(!trivia)continue;
+    for(const lang of ["en","pt"]){
+      const value=typeof trivia==="string"?trivia:trivia[lang];
+      const source=history?.[lang]||history?.en||"";
+      if(value)assert.notEqual(value.trim().toLocaleLowerCase(),
+        source.trim().toLocaleLowerCase(),code+" has duplicated "+lang+" trivia");
+    }
+  }
+});
