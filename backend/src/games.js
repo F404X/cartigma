@@ -40,7 +40,7 @@ function state(g,includeToken=false){
   const elapsed=Math.max(0,Date.now()-g.created_at*1000);
   const guesses=JSON.parse(g.guesses_json);
   const isFinished=g.finished_at!==null&&g.finished_at!==undefined;
-  const accessible=g.difficulty==="rush"
+  const accessible=isFinished?10:g.difficulty==="rush"
     ?Math.min(10,INITIAL.rush+Math.floor(elapsed/6000)):g.revealed;
   const clues=clueSet(countryByCode.get(g.target_code));
   const response={
