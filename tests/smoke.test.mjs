@@ -770,3 +770,47 @@ test("On desktop, both original evidence and guess panels remain available",()=>
   $("mobileGuessBtn").click();
   assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),false);
 });
+
+
+test("mobile Rush evidence follows newest unlocked clue and is fully scrollable",()=>{
+  const Clock=fakeClock();
+  const g=boot({mobile:true,clock:Clock,map:true}),$=g.get;
+  const list=$("clueList");
+  Object.defineProperty(list,"scrollHeight",{get(){
+    return this.children.filter(row=>!row.classList.contains("locked")).length*64;
+  }});
+  list.scrollTop=0;
+  g.difficulty("rush");
+  $("rushStartBtn").click();
+  assert.equal($("hintCount").textContent,"1 / 10");
+  assert.equal(list.scrollTop,64);
+  assert.equal(list.children[0].classList.contains("latest"),true);
+  Clock.ms+=18000;g.tick();
+  assert.equal($("hintCount").textContent,"4 / 10");
+  assert.equal(list.scrollTop,256);
+  assert.equal(list.children[3].classList.contains("latest"),true);
+  assert.equal(list.children[4].classList.contains("latest"),false);
+  $("mobileEvidenceBtn").click(); // Close to browse the map.
+  list.scrollTop=14;
+  Clock.ms+=12000;g.tick();
+  assert.equal($("hintCount").textContent,"6 / 10");
+  assert.equal(list.scrollTop,14,"Closed popovers must not be scrolled");
+  $("mobileEvidenceBtn").click();
+  assert.equal(list.scrollTop,384,"Reopening follows the newest revealed clue");
+  assert.equal(list.children[5].classList.contains("latest"),true);
+  assert.equal(list.children[5].classList.contains("locked"),false);
+});
+
+test("the full-sized desktop evidence list never auto-scrolls on new clues",()=>{
+  const g=boot({map:true}),$=g.get;
+  const list=$("clueList");
+  Object.defineProperty(list,"scrollHeight",{get(){return 500}});
+  list.scrollTop=42;
+  $("freeBtn").click();
+  assert.equal(list.scrollTop,42);
+  const target=g.window.CartigmaCountries[Math.floor(.42*195)];
+  const other=g.window.CartigmaCountries.find(c=>c.code!==target.code);
+  g.select(other.name);$("guessBtn").click();
+  assert.equal($("hintCount").textContent,"3 / 10");
+  assert.equal(list.scrollTop,42);
+});
