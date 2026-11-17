@@ -1666,15 +1666,18 @@
     const best=game.finished?bestGuess():null;
     if(!isRush())game.guesses.forEach((g,i)=>addMarker(g.lat,g.lng,i+1,g===best?"best":"past"));
     if(game.finished){
-      const adjustedLng=best?target[1]+360*Math.round((best.lng-target[1])/360):target[1];
-      addMarker(target[0],adjustedLng,"★","target",cityName(cityAt(game.index))+" · "+countryName(game.index));
-      if(best&&!isRush())addResultLine([best.lng,best.lat],[adjustedLng,target[0]]);
-      frameResult(isRush()?null:best,target);
+      if(!isCountryGame()){
+        const adjustedLng=best?target[1]+360*Math.round((best.lng-target[1])/360):target[1];
+        addMarker(target[0],adjustedLng,"★","target",
+          cityName(cityAt(game.index))+" · "+countryName(game.index));
+        if(best)addResultLine([best.lng,best.lat],[adjustedLng,target[0]]);
+        frameResult(best,target);
+      }
     }else if(selected){
       marker=addMarker(selected.lat,selected.lng,isRush()?"✓":"+","current");
     }
     $("coordinates").textContent=game.finished
-      ?target[0].toFixed(3)+"°, "+target[1].toFixed(3)+"°"
+      ?(isCountryGame()?countryName(game.index):target[0].toFixed(3)+"°, "+target[1].toFixed(3)+"°")
       :selected?selected.lat.toFixed(3)+"°, "+selected.lng.toFixed(3)+"°":t("noSelection");
   }
   function resetMapView(){
@@ -1731,14 +1734,15 @@
       .find(code=>typeof code==="string"&&COUNTRY_INSIGHTS[code]&&
         COUNTRY_CODES.includes(code))||null;
   }
-  async function selectRushPoint(lat,lng){
+  async function selectCountryPoint(lat,lng){
     const session=game,request=++rushCountryRequest;
     selected=null;
     $("guessBtn").disabled=true;
     $("selectedText").textContent=t("rushCheckingMap");
     try{
       const features=await rushCountryFeatures();
-      if(game!==session||!isRush()||game.finished||!game.started||
+      if(game!==session||!isCountryGame()||game.finished||
+        (isRush()&&!game.started)||
         request!==rushCountryRequest)return;
       clockTick();
       if(game.finished)return;
@@ -1763,9 +1767,9 @@
   }
   function selectPoint(lat,lng,label){
     if(game.finished)return;
-    if(isRush()){
-      if(!game.started)return;
-      selectRushPoint(Number(lat),Number(lng));
+    if(isCountryGame()){
+      if(isRush()&&!game.started)return;
+      selectCountryPoint(Number(lat),Number(lng));
       return;
     }
     selected={lat:Number(lat),lng:Number(lng),label:label||""};
@@ -1797,7 +1801,7 @@
     game.guesses.push({lat:selected.lat,lng:selected.lng,label:selected.label,
       countryCode:selected.countryCode||null,at:new Date(now).toISOString(),
       elapsedMs:elapsed,distance:Math.round(distance),bearing:Math.round(heading(pos,to))});
-    game.won=isRush()?selected.countryCode===COUNTRY_CODES[game.index]:distance<=WIN_RADIUS;
+    game.won=isCountryGame()?selected.countryCode===COUNTRY_CODES[game.index]:distance<=WIN_RADIUS;
     if(game.won||game.guesses.length>=maximum()){
       game.finished=true;game.revealed=EVIDENCE_COUNT;
       game.endedAt=new Date(now).toISOString();
@@ -1805,7 +1809,9 @@
       game.score=game.won
         ?isRush()
           ?Math.max(0,Math.round(5000*(1-Math.min(RUSH_DURATION_MS,elapsed)/RUSH_DURATION_MS))-(game.sectorMapPenalty||0))
-          :Math.max(0,Math.max(250,Math.round(5000*Math.pow(.78,game.guesses.length-1)*Math.max(.76,1-distance/425)-game.penalty))-(game.sectorMapPenalty||0))
+          :Math.max(0,Math.max(250,Math.round(5000*Math.pow(.78,game.guesses.length-1)*
+            (isCountryGame()?1:Math.max(.76,1-distance/425))-game.penalty))-
+            (game.sectorMapPenalty||0))
         :0;
     }else if(!isRush())game.revealed=Math.min(EVIDENCE_COUNT,
       Math.max(game.revealed,DIFFICULTIES[difficulty].initial+game.guesses.length));
@@ -1815,7 +1821,7 @@
   }
   function searchLocal(term){
     const q=norm(term),results=[];
-    if(isRush()){
+    if(isCountryGame()){
       for(const code of [...new Set(COUNTRY_CODES)].sort((a,b)=>
         displayRegion(a).localeCompare(displayRegion(b),locale()))){
         const name=displayRegion(code);
@@ -1858,7 +1864,7 @@
     list.classList.remove("hidden");
   }
   async function searchRemote(term){
-    if(term.length<3||game.finished||isRush())return;
+    if(term.length<3||game.finished||isCountryGame())return;
     // Local matches were already rendered by the input handler.
     const local=searchLocal(term);
     if(controller)controller.abort();
@@ -1879,7 +1885,7 @@
     }catch(e){if(e.name!=="AbortError"&&!local.length)suggestions([])}
   }
   async function share(){
-    const symbols=game.guesses.map(g=>isRush()?(g.countryCode===COUNTRY_CODES[game.index]?"✓":"×"):g.distance<=WIN_RADIUS?"🟨":g.distance<500?"🟧":"⬛").join("");
+    const symbols=game.guesses.map(g=>isCountryGame()?(g.countryCode===COUNTRY_CODES[game.index]?"✓":"×"):g.distance<=WIN_RADIUS?"🟨":g.distance<500?"🟧":"⬛").join("");
     const txt="Cartigma "+caseCode()
       +"\n"+(game.won?"✓ "+game.guesses.length+"/"+maximum():"×")+" · "+number(game.score)+" pts\n"+symbols
       +"\nhttps://f404x.github.io/cartigma/";
@@ -2218,9 +2224,9 @@
       const term=e.target.value.trim();
       if(controller)controller.abort();
       clearTimeout(debounce);
-      if(term.length<(isRush()?1:3)){$("suggestions").classList.add("hidden");return}
+      if(term.length<(isCountryGame()?1:3)){$("suggestions").classList.add("hidden");return}
       suggestions(searchLocal(term));
-      if(!isRush())debounce=setTimeout(()=>searchRemote(term),450);
+      if(!isCountryGame())debounce=setTimeout(()=>searchRemote(term),450);
     });
     $("citySearch").addEventListener("keydown",e=>{
       if(e.key==="Escape")$("suggestions").classList.add("hidden");
