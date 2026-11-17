@@ -1408,14 +1408,19 @@
   function drawLatitudeBeltOverlay(){
     if(!map||!mapStyleReady||!game?.sectorReveals?.includes("zone")||
       !cluesFor(game.index,difficulty).some(clue=>clue.key==="zone"))return;
-    const belt=latitudeZoneKey(cityAt(game.index)[3]);
-    // Web Mercator cannot display exact poles: clip polar rectangles to
-    // 85.05 degrees. Split at 60-degree longitude intervals to avoid wraps.
-    const coordinates=LATITUDE_BELT_LIMITS[belt].flatMap(([south,north])=>
-      Array.from({length:6},(_,i)=>
-        sectorRectangle(-180+i*60,south,-120+i*60,north)));
+    const countryEdition=game.evidenceVersion>=4;
+    const belts=countryEdition?countryBelts(game.index).zones:
+      [latitudeZoneKey(cityAt(game.index)[3])];
+    // A country crossing several latitude belts highlights ALL of them.
+    // Detached overseas territories do not imply intervening latitude belts.
+    // Web Mercator clips poles to 85.05° and splits strips to prevent seams.
+    const coordinates=belts.flatMap(belt=>
+      LATITUDE_BELT_LIMITS[belt].flatMap(([south,north])=>
+        Array.from({length:6},(_,i)=>
+          sectorRectangle(-180+i*60,south,-120+i*60,north))));
     const id="case-latitude-belt";
-    map.addSource(id,{type:"geojson",data:{type:"Feature",properties:{belt},
+    map.addSource(id,{type:"geojson",data:{type:"Feature",properties:{
+      belt:countryEdition?countryBelts(game.index).primary:belts[0],belts},
       geometry:{type:"MultiPolygon",coordinates}}});
     map.addLayer({id,type:"fill",source:id,
       paint:{"fill-color":"#ffd449","fill-opacity":0.10,
