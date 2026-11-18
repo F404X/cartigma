@@ -40,17 +40,20 @@ independently of daily/free mode. Logged-in players start ranked automatically;
 without an account, the original browser-only game runs with no API. Only the server sees target
 countries and computes scores.
 
-### Spam/cooldown behavior
-Leaderboard GET has an IP-based approximate 1 request / 60s burst limiter via Cloudflare
-Rate Limiting binding. A D1 transaction enforces an additional 180-second window per hashed IP.
-HTTP 429 includes Retry-After. Browser client stores a
-15-minute cache and reuses it during cooldown, on 429, and while offline. This
-reduces **normal client** calls but does not prevent malicious requests from
-reaching the Worker. The limiter runs within the Worker and those rejected
-invocations still count toward the 100k/day free tier. To protect that budget
-against hostile traffic, add a Cloudflare WAF rate-limiting rule **before**
-the Worker (subject to zone/plan availability). The limiter is approximate
-per data center and shared-NAT users can be throttled together.
+### Leaderboard access and request economy
+The leaderboard has **no IP cooldown or Worker-side rate limit**. A blocked
+request would still consume a Workers Free invocation. The browser keeps the
+public board in localStorage for 15 minutes and reuses it while offline or
+when the API is unavailable, without polling or a manual refresh button.
+Authentication and game mutation endpoints still have separate, stricter
+abuse protection. To protect the Workers quota itself, configure Cloudflare
+WAF rules in front of the Worker on the production hostname.
+
+### Password rules
+New passwords (registration and reset) require **at least 8 characters**,
+including a lowercase letter, an uppercase letter and a digit, using only
+ASCII letters and digits. Existing passwords are still accepted at login.
+The salted, peppered password hashing method is unchanged.
 
 ## Authentication hardening
 The password KDF uses HMAC-SHA-256 with a private server-side pepper followed
