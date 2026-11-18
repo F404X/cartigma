@@ -473,7 +473,8 @@
       });
       if(game!==current)return;
       applyRankedState(response);
-      selected=null;
+      // Buying clues/overlays must preserve the current guess, like offline.
+      if(action==="guess")selected=null;
       if(isMobileScreen())mobilePanel=game.finished?null:"clues";
       render();
       if(game.finished)showReport();
