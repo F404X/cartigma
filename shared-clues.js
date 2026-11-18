@@ -10,6 +10,7 @@
     countryPopulation:300,countryGDP:350,countryArea:300,
     countryLandlocked:200,countryBorders:300
   });
+  const OVERLAY_PRICES=Object.freeze({hemisphere:250,continent:500,longitude:1000});
   const MAX_CLUES=10;
   const EXCLUDED=Object.freeze(["zone","latitude","utmZone","utmBand",
     "latitudeBand","countryLatitudeZone"]);
@@ -39,6 +40,19 @@
   function clueCost(clue,difficulty){
     const base=PRICES[clue?.key]??300;
     return difficulty==="hard"?Math.ceil(base*1.5/50)*50:base;
+  }
+  function overlayCost(key,difficulty){
+    const base=OVERLAY_PRICES[key]||0;
+    return difficulty==="hard"?Math.ceil(base*1.5/50)*50:base;
+  }
+  function scoreFor({difficulty,guesses,penalty=0,sectorMapPenalty=0,elapsedMs=0,won}){
+    if(!won)return 0;
+    if(difficulty==="rush"){
+      return Math.max(0,Math.round(5000*(1-Math.min(60000,elapsedMs)/60000))-
+        sectorMapPenalty);
+    }
+    return Math.max(0,Math.max(250,Math.round(5000*Math.pow(.78,guesses-1)-
+      penalty))-sectorMapPenalty);
   }
   function buildClues(country,info,difficulty,denominations={}){
     if(!country||!country.code||!info)throw Error("Missing country metadata");
@@ -90,8 +104,8 @@
       throw Error("Invalid clue selection for "+code);
     return clues;
   }
-  const api=Object.freeze({buildClues,clueCost,numericBoundary,hash,
-    MAX_CLUES,EXCLUDED,PRICES});
+  const api=Object.freeze({buildClues,clueCost,overlayCost,scoreFor,numericBoundary,hash,
+    MAX_CLUES,EXCLUDED,PRICES,OVERLAY_PRICES});
   if(typeof window!=="undefined")window.CartigmaClueEngine=api;
   if(typeof globalThis!=="undefined")globalThis.CartigmaClueEngine=api;
 })();
