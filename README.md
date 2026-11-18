@@ -32,7 +32,7 @@ Every guess is timestamped and its elapsed time is displayed in the guess histor
 
 ### Evidence
 
-Each new investigation has **6–10 clues**. It starts with the continent, followed by map-readable facts such as subregion, longitude of the country's reference point, sea access, land borders and area ranges. Early clues are ordered by how much they narrow the set of possible countries. Hard narrows that set more gradually, and Rush reveals its clues on the clock.
+Each new investigation has **6–10 clues**. It starts with a continent or a named geographic region, followed by map-readable facts such as subregion, longitude of the country's reference point, sea access, land borders and area ranges. **Caribbean countries start with the dedicated "Region: Caribbean" clue (13 countries); Canada, the United States, Mexico, and the seven Central American countries start with "Region: North/Central America" (10 countries). The Caribbean is never called a continent.** The draw still samples the same six continental pools fairly, and existing ranked cases keep their original clue decks. Early clues are ordered by how much they narrow the set of possible countries. Hard narrows that set more gradually, and Rush reveals its clues on the clock.
 
 Flag color, language family, population, GDP per capita and shared currency denominations add context later when the catalogue has those facts. Population and GDP clues display the source year. Previous cases retain their original evidence order and prices. The same engine drives the browser game and the ranking Worker, with parity tested for the full catalogue.
 
