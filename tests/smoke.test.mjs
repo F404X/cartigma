@@ -1247,7 +1247,7 @@ test("the ranking opens all nine boards and refreshes an open panel after saving
   tabs[1].onclick();
   await new Promise(resolve=>setImmediate(resolve));
   const historyButton=get("rank-history-list").children[0].children[0];
-  assert.equal(historyButton.children[0].textContent,"Brasil");
+  assert.equal(historyButton.children[0].textContent,"Brasil - Vitória");
   await historyButton.onclick();
   assert.deepEqual(opened,dossier);
 });
