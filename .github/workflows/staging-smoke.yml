@@ -64,7 +64,26 @@ jobs:
               assert.equal(start.mode,'free');
               assert.equal(start.finished,false);
               assert.equal(start.clues.length,2);
+              assert.ok(start.clueCount>=6&&start.clueCount<=10);
+              assert.equal(['continent','hemisphere'].includes(start.clues[0].key),true);
+              assert.equal(start.clues.some(c=>['utmZone','utmBand','zone','latitude'].includes(c.key)),false);
               assert.equal('target' in start,false);
+              const initialCost=start.nextHintCost;
+              assert.ok(initialCost>0);
+              const revealed=await ok('/v1/games/reveal',{id:start.id,playToken:start.playToken});
+              assert.equal(revealed.clues.length,3);
+              assert.equal(revealed.penalty,initialCost);
+              assert.equal(revealed.nextHintCost>0,true);
+              // The map overlay cost is validated by the same price engine as offline.
+              const locationKey=start.clues[0].key;
+              const overlay=await ok('/v1/games/overlay',{
+                id:start.id,playToken:start.playToken,key:locationKey
+              });
+              assert.ok(overlay.overlays.includes(locationKey));
+              assert.equal(overlay.sectorMapPenalty,locationKey==='continent'?500:250);
+              assert.equal((await req('/v1/games/overlay',{
+                id:start.id,playToken:start.playToken,key:locationKey
+              })).status,409);
               const state=await ok('/v1/games/state',{id:start.id,playToken:start.playToken});
               assert.equal(state.finished,false);
               assert.equal('target' in state,false);
