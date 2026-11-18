@@ -101,3 +101,10 @@ CREATE TABLE IF NOT EXISTS game_overlays (
   clue_key TEXT NOT NULL CHECK(clue_key IN ('continent','hemisphere','longitude')),
   PRIMARY KEY(game_id,clue_key)
 );
+
+-- Rules and a precise start time for new sessions. Existing games use v7.
+CREATE TABLE IF NOT EXISTS game_rules (
+  game_id TEXT PRIMARY KEY REFERENCES game_sessions(id) ON DELETE CASCADE,
+  version INTEGER NOT NULL,
+  started_at_ms INTEGER NOT NULL
+);

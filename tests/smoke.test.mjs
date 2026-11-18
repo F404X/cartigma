@@ -221,7 +221,7 @@ test("All countries have valid evidence without latitude belts or UTM and no con
   for(const [level,code] of [["normal","BR"],["hard","TR"],["rush","VA"]]){
     const country=g.window.CartigmaCountries.find(c=>c.code===code);
     const clues=g.window.CartigmaClueEngine.buildClues(country,
-      g.window.GeoCountryInsights[code],level,g.window.GeoCurrencyDenominations);
+      g.window.GeoCountryInsights[code],level,g.window.GeoCurrencyDenominations,g.window.CartigmaCountries);
     const keys=clues.map(x=>x.key);
     assert.equal(keys.includes("continent")&&keys.includes("hemisphere"),false);
     assert.equal(keys.some(x=>["zone","utmZone","utmBand","latitude"].includes(x)),false);
@@ -379,12 +379,16 @@ test("Normal and Hard accept country names, with correct attempts and results",(
     const wrong=g.window.CartigmaCountries.find(x=>x.code!==target.code).name;
     g.select(wrong);$("guessBtn").click();
     assert.equal($("guessHistory").children.length,1);
-    assert.equal($("feedback").textContent,"Wrong country. Try another.");
+    assert.match($("feedback").textContent,/km/);
+    assert.equal(/[↑↗→↘↓↙←↖]/.test($("feedback").textContent),level==="normal");
+    $("countrySearch").value=wrong;
+    $("countrySearch").handlers.input({target:$("countrySearch")});
+    assert.equal($("suggestions").children[0]?.className,"suggestion-empty");
     g.select(target.name);
     $("guessBtn").click();
     assert.equal($("reportDialog").open,true);
     assert.equal($("reportCoordinates").textContent,"—");
-    assert.equal($("reportBest").textContent,"—");
+    assert.equal($("reportBest").textContent,"✓");
     assert.equal($("reportHeading").textContent,target.name);
     assert.equal($("finalScore").textContent,"3,900");
   }
@@ -524,10 +528,9 @@ test("Rush pins show selected names, map-click positions and numbered guess hist
   if(target.code!=="BR"){
     g.mapState.events.click({lngLat:{lat:-15,lng:-50}});
     await new Promise(resolve=>setImmediate(resolve));
-    assert.ok(g.mapState.markers.some(m=>
-      m.coordinate[0]===-50&&m.coordinate[1]===-15&&
-      m.element.children[0].textContent==="+"),
-      "A map click must also display the unconfirmed Rush pin");
+    assert.ok(!g.mapState.markers.some(m=>m.element.children[0].textContent==="+"),
+      "Clicking a country already guessed must leave the guess unselected");
+    assert.equal($("guessBtn").disabled,true);
   }
   g.tick();
   assert.ok(g.mapState.markers.some(m=>m.element.children[0].textContent==="1"));
@@ -1012,9 +1015,9 @@ test("Normal and Hard reveal the result pin on victory AND after failed attempts
     g.difficulty(difficulty);
     $("freeBtn").click();
     assert.equal(marker(g,"★"),undefined);
+    const wrongGuesses=g.window.CartigmaCountries.filter(c=>c.code!=="LS");
     for(let i=0;i<(difficulty==="normal"?6:4);i++){
-      const wrong=g.window.CartigmaCountries.find(c=>c.code!=="LS");
-      g.select(wrong.name);
+      g.select(wrongGuesses[i].name);
       $("guessBtn").click();
       if(i<(difficulty==="normal"?5:3))
         assert.equal(marker(g,"★"),undefined, "Result must remain hidden before completion");
@@ -1098,8 +1101,8 @@ test("Mobile failed Hard case also keeps history and Case-file navigation",()=>{
   g.difficulty("hard");
   $("freeBtn").click();
   const target=g.window.CartigmaCountries[Math.floor(.42*195)];
-  const other=g.window.CartigmaCountries.find(c=>c.code!==target.code);
-  for(let i=0;i<4;i++){g.select(other.name);$("guessBtn").click()}
+  const wrongGuesses=g.window.CartigmaCountries.filter(c=>c.code!==target.code).slice(0,4);
+  for(const other of wrongGuesses){g.select(other.name);$("guessBtn").click()}
   assert.equal($("reportDialog").open,true);
   $("reportMapBtn").click();
   assert.equal($("reportDialog").open,false);

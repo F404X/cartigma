@@ -31,14 +31,14 @@ Set these with `wrangler secret put`, never in source control:
 - POST `/v1/auth/request-reset`, `/v1/auth/reset`, `/v1/auth/delete`
 
 ### Game routes
-- POST `/v1/games/start` (guest allowed; provides a one-time play token)
-- POST `/v1/games/guess`, `/v1/games/reveal`, `/v1/games/finish`
-- POST `/v1/games/save` (requires authenticated account)
+All game routes require a signed-in account.
 
-For each difficulty and UTC day, an account may begin one ranked attempt,
-independently of daily/free mode. Logged-in players start ranked automatically;
-without an account, the original browser-only game runs with no API. Only the server sees target
-countries and computes scores.
+- POST `/v1/games/start` reserves the day's attempt for a difficulty.
+- POST `/v1/games/resume` looks up the signed-in player's case by current UTC day, mode and difficulty.
+- POST `/v1/games/state`, `/v1/games/guess`, `/v1/games/reveal`, `/v1/games/overlay` and `/v1/games/finish` take the game ID and validate its owner.
+- POST `/v1/games/save` is idempotent. New completions save the result and update the leaderboard in the same database transaction.
+
+An account has one ranked attempt per difficulty and UTC day across Daily and Freeplay. A completed Freeplay attempt can be followed by unlimited local practice. Visitors without an account play locally. The server selects the target and calculates the score, with the same evidence, feedback and prices as the browser. Applying the schema adds the new rules version and millisecond start time to new sessions. Existing sessions retain their original clue order.
 
 ### Leaderboard access and request economy
 The leaderboard has **no IP cooldown or Worker-side rate limit**. A blocked

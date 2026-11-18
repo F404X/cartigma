@@ -4,7 +4,7 @@ import {gameRoute} from "./games.js";
 import {leaderboard,myStats} from "./ranking.js";
 const authPaths=new Set(["/v1/auth/register","/v1/auth/login","/v1/auth/logout",
   "/v1/auth/me","/v1/auth/request-reset","/v1/auth/reset","/v1/auth/delete"]);
-const gamePaths=new Set(["/v1/games/start","/v1/games/guess",
+const gamePaths=new Set(["/v1/games/start","/v1/games/resume","/v1/games/guess",
   "/v1/games/reveal","/v1/games/overlay","/v1/games/finish","/v1/games/save","/v1/games/state"]);
 export default {
   async fetch(request,env){

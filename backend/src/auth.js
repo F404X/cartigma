@@ -144,7 +144,12 @@ export async function authRoute(request,env,path){
     if(typeof body.password!=="string")fail(400,"password_required");
     const secret=await env.DB.prepare("SELECT password_hash,password_salt FROM users WHERE id=?").bind(user.id).first();
     if(!await verifyPassword(body.password,secret,env))fail(403,"invalid_credentials");
-    await env.DB.prepare("DELETE FROM users WHERE id=?").bind(user.id).run();
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM game_results WHERE user_id=?").bind(user.id),
+      env.DB.prepare("DELETE FROM game_sessions WHERE id IN (SELECT game_id FROM ranked_reservations WHERE user_id=?)")
+        .bind(user.id),
+      env.DB.prepare("DELETE FROM users WHERE id=?").bind(user.id)
+    ]);
     return json({ok:true},200,{"set-cookie":cookie("",0)});
   }
   fail(404,"not_found");

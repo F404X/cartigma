@@ -20,7 +20,7 @@ Country selection by map uses Natural Earth admin-0 polygons (50m with a 110m fa
 | Hard | 4 | 1 | Country name or map click; clues and map aids cost more |
 | Rush | Unlimited | **0 before Start**, 1 after | Explicit Start; identify the country within **60 seconds**. Another clue unlocks every **6 seconds** after the first. Score decreases over time |
 
-All modes target **the country**, not a city or its coordinates. Wrong guesses reveal further evidence in Normal and Hard. Rush never shows a clue (including its category) before **Start** is pressed. The 60-second countdown begins at Start and is based on the wall clock; hiding the tab does not pause it.
+All modes target **the country**, not a city or its coordinates. Wrong guesses reveal one additional available clue in Normal and Hard, including after a clue purchase. The game reports a distance range between country reference points and gives a compass direction in Normal. Each country can be guessed once per case. Rush never shows a clue (including its category) before **Start** is pressed. The 60-second countdown begins at Start and is based on the wall clock; hiding the tab does not pause it.
 
 Every guess is timestamped and its elapsed time is displayed in the guess history and report. Results show the correct country, flag, history, guesses and score, but never disclose a nonexistent city target. **Rush shows an immediate selection pin after a map click or country-name suggestion, and numbered pins remain for every confirmed guess**, even after a wrong answer.
 
@@ -32,17 +32,13 @@ Every guess is timestamped and its elapsed time is displayed in the guess histor
 
 ### Evidence
 
-Each investigation has **6–10 clues**, depending on how much country-level source data exists. Clues include **continent OR north/south hemisphere** (never both in one case), 30° longitude sectors, currency denomination, language family, verified flag color, dated country population, GDP per capita, territorial area, access to the sea and number of land-border neighbours. **Latitude belts, latitude sectors and UTM zones/bands are not clue types.** The Normal, Hard and Rush modes draw from the same validated clue engine.
+Each new investigation has **6–10 clues**. It starts with the continent, followed by map-readable facts such as subregion, longitude of the country's reference point, sea access, land borders and area ranges. Early clues are ordered by how much they narrow the set of possible countries. Hard narrows that set more gradually, and Rush reveals its clues on the clock.
 
-**Landscape (“Paisagem”) is not an evidence type.** National-capital status, distance to a capital and distance to a coast are also excluded from gameplay, as are city population and density. These old city-only facts do not appear in the country archive either.
-
-Numerical evidence uses a strictly valid rounded bound, such as `> 100,000,000` or `< 2,000,000 km²`. Source values and years remain available in the country dossier where verified. Missing economic data is never substituted with invented values.
-
-Missing economic or flag-color data are not substituted with invented values. The game shows fewer than ten clues when that is the only accurate option. Clue order is deterministic per country/difficulty and is verified against the ranking server in tests.
+Flag color, language family, population, GDP per capita and shared currency denominations add context later when the catalogue has those facts. Population and GDP clues display the source year. Previous cases retain their original evidence order and prices. The same engine drives the browser game and the ranking Worker, with parity tested for the full catalogue.
 
 ### Optional map aids
 
-The game has an interactive MapLibre vector map with an OpenStreetMap/Leaflet fallback. Where supported, paid overlays can show a longitude sector, equator/hemisphere or continent outline. Both the browser and the ranked server validate the same available overlays and prices. Normal and Hard retain their existing hint price and score systems; Hard's assisted information is more expensive. Rush automatically unlocks hints over time, with no manual Reveal button.
+The game has an interactive MapLibre vector map with an OpenStreetMap/Leaflet fallback. Paid overlays can show a longitude sector or a continent outline. Earlier cases can still have an equator/hemisphere overlay. Both the browser and the ranked server validate the same available overlays and prices. Normal and Hard retain their existing hint price and score systems; Hard's assisted information is more expensive. Rush automatically unlocks hints over time, with no manual Reveal button.
 
 **Rush** disables all purchased evidence overlays and hides their buttons. Its clues unlock automatically, and map pins for guesses and results remain usable.
 
@@ -58,6 +54,7 @@ The UI supports **19 languages**: English, Brazilian Portuguese, Spanish, Simpli
 
 ## Data provenance and limits
 
+- Subregions: [UN Statistics Division M49](https://unstats.un.org/unsd/methodology/m49/overview).
 - Country names, basic country/territory metadata, representative coordinates, administrative information, flag emojis, currencies and areas: [mledoze/countries](https://github.com/mledoze/countries).
 - The 193 UN membership list and two observer states: [United Nations membership](https://research.un.org/en/unmembers/currentmembers) and [UN observer states](https://research.un.org/en/unmembers/observers).
 - Latitude-band intersections and map hit testing: [Natural Earth admin-0 borders](https://www.naturalearthdata.com/downloads/110m-cultural-vectors/), with latitude-reference fallbacks for states omitted from its low-resolution maps.
@@ -75,7 +72,7 @@ The site uses plain HTML, CSS and JavaScript without an account, a server-side A
 | --- | --- |
 | `country-catalog.js` | The **195 unique countries**, geography and ISO codes |
 | `country-insights.js` | Country facts, ISO flags, source years and historical summaries |
-| `app.js` | Case state, country clues, country search, Rush, shuffle bag, map overlays and dossiers |
+| `app.js` | Case state, country clues, country search, Rush, map overlays and dossiers |
 | `shared-clues.js` | Shared source of truth for offline and ranked evidence selection, hint costs, overlays and scores |
 | `atlas-i18n.js` | Translated country-archive labels in 19 languages |
 | `clues-i18n.js` / `country-clues-i18n.js` | Geographical and country-data clue translations |

@@ -12,19 +12,17 @@ test("catalogue and country codes are unique",()=>{
   assert.equal(countries.length,195);
   assert.equal(new Set(countries.map(x=>x.code)).size,195);
   assert.ok(countryByCode.has("LS"));
-  let continentClues=0,hemisphereClues=0;
   for(const c of countries)for(const level of ["normal","hard","rush"]){
     const clues=clueSet(c,level);
     assert.ok(clues.length>=6&&clues.length<=10,c.code+" "+level);
     const keys=clues.map(c=>c.key);
     assert.equal(new Set(keys).size,clues.length,c.code);
-    assert.equal(keys.includes("continent")||keys.includes("hemisphere"),true);
-    assert.equal(keys.includes("continent")&&keys.includes("hemisphere"),false);
-    assert.equal(keys.some(k=>["zone","utmZone","utmBand","latitude"].includes(k)),false);
-    if(keys.includes("continent"))continentClues++;
-    else hemisphereClues++;
+    assert.equal(keys[0],"continent");
+    assert.equal(keys.some(k=>["hemisphere","zone","utmZone","utmBand","latitude"].includes(k)),false);
+    assert.ok(clues.slice(0,4).every(clue=>["continent","countrySubregion",
+      "countryLandlocked","longitude","countryAreaBand","countryBorders"].includes(clue.key)));
+    assert.ok(clues.every(clue=>clue.key!=="countryCurrency"||clue.family));
   }
-  assert.ok(continentClues>0&&hemisphereClues>0);
 });
 test("week starts on UTC Monday, including year boundary",()=>{
   assert.deepEqual(periodKeys("2026-11-17"),{week:"2026-11-16",month:"2026-11"});
@@ -63,7 +61,7 @@ test("shared source snapshots and clue payloads match the browser for all 195 co
   for(const country of front.CartigmaCountries){
     const server=countryByCode.get(country.code);
     assert.ok(server,"Missing server country "+country.code);
-    for(const field of ["code","continent","lat","lng","borders"])
+    for(const field of ["code","continent","lat","lng","borders","area","landlocked"])
       assert.equal(server[field],country[field],country.code+" "+field);
     const source=front.GeoCountryInsights[country.code];
     const backend=insights[country.code];
@@ -72,7 +70,7 @@ test("shared source snapshots and clue payloads match the browser for all 195 co
       assert.equal(backend[field],source[field],country.code+" "+field);
     for(const difficulty of ["normal","hard","rush"]){
       const sourceClues=globalThis.CartigmaClueEngine.buildClues(
-        country,source,difficulty,front.GeoCurrencyDenominations);
+        country,source,difficulty,front.GeoCurrencyDenominations,front.CartigmaCountries);
       const serverClues=clueSet(server,difficulty);
       assert.deepEqual(JSON.parse(JSON.stringify(serverClues)),
         JSON.parse(JSON.stringify(sourceClues)),country.code+" "+difficulty);
@@ -97,4 +95,20 @@ test("server score and overlay prices match offline shared formulas",()=>{
   }
   assert.equal(engine.clueCost({key:"countryCurrency"},"normal"),250);
   assert.equal(engine.clueCost({key:"countryCurrency"},"hard"),400);
+});
+
+test("new misses always unlock one more available clue, even after a purchase",()=>{
+  const engine=globalThis.CartigmaClueEngine;
+  assert.equal(engine.revealAfterMiss(3,"normal",1,8,8),4);
+  assert.equal(engine.revealAfterMiss(3,"normal",1,8,7),3);
+  assert.equal(engine.revealAfterMiss(8,"normal",1,8,8),8);
+});
+
+test("guess feedback uses reference points and omits the direction in Hard",()=>{
+  const engine=globalThis.CartigmaClueEngine;
+  const from=countryByCode.get("IE"),target=countryByCode.get("GB");
+  assert.deepEqual(engine.guessFeedback(from,target,"normal"),{min:250,max:500,direction:2});
+  assert.deepEqual(engine.guessFeedback(from,target,"hard"),{min:250,max:500});
+  assert.equal(engine.guessFeedback(from,target,"rush"),null);
+  assert.equal(engine.guessFeedback(target,target,"normal"),null);
 });

@@ -19,19 +19,14 @@
   const REPORT_I18N = window.GeoReportI18n || {};
   const COMPASS_I18N = window.GeoCompassI18n || {};
   const CONTINENT_BORDERS = window.GeoContinentBorders || {};
-  const DIFFICULTIES = {normal:{attempts:6,initial:2},hard:{attempts:4,initial:1},rush:{attempts:Infinity,initial:1}};
+  const {DIFFICULTIES,RULES_VERSION,RUSH_DURATION_MS,RUSH_CLUE_INTERVAL_MS}=CLUE_ENGINE;
   const SERIAL_PREFIX = "geodetective-case-counter-";
-  const EVIDENCE_COUNT = 10;
-  const WIN_RADIUS = 100, HINT_COST = 300, DAILY_KEY = "cartigma-country-daily-v7-";
+  const EVIDENCE_COUNT = CLUE_ENGINE.MAX_CLUES;
+  const HINT_COST = 300, DAILY_KEY = "cartigma-country-daily-v7-";
   // 300 is preserved only for loading older saved games. New charges reflect
   // information gain; the price for the NEXT clue is always shown before purchase.
   // Overlay costs differ by how tightly each display constrains the target.
   const MAP_OVERLAY_COSTS=CLUE_ENGINE.OVERLAY_PRICES;
-  // Hard charges 50% more for clues AND every map aid, rounding to 50 points.
-  // Stored purchases retain their original cost when a daily case is reopened.
-  const HARD_COST_FACTOR=1.5;
-  const pricedCost=(base)=>difficulty==="hard"
-    ?Math.ceil(base*HARD_COST_FACTOR/50)*50:base;
   const overlayCost=(key)=>CLUE_ENGINE.overlayCost(key,difficulty);
   // Europe and North America are fully/almost entirely in the Northern
   // Hemisphere. The others have meaningful populations on BOTH sides of 0°.
@@ -39,20 +34,8 @@
   const $ = id => document.getElementById(id);
   const hash = input => {let h=2166136261;for(const char of input){h ^=char.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0;};
   const norm = s => String(s).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
-  const rad = n => n*Math.PI/180;
-  const dist = (a,b) => {
-    const la=rad(b[0]-a[0]),lo=rad(b[1]-a[1]);
-    const h=Math.sin(la/2)**2+Math.cos(rad(a[0]))*Math.cos(rad(b[0]))*Math.sin(lo/2)**2;
-    return 6371.0088*2*Math.atan2(Math.sqrt(h),Math.sqrt(Math.max(0,1-h)));
-  };
-  const heading = (a,b) => {
-    const y=Math.sin(rad(b[1]-a[1]))*Math.cos(rad(b[0]));
-    const x=Math.cos(rad(a[0]))*Math.sin(rad(b[0]))-Math.sin(rad(a[0]))*Math.cos(rad(b[0]))*Math.cos(rad(b[1]-a[1]));
-    return (Math.atan2(y,x)*180/Math.PI+360)%360;
-  };
   const DIRECTION_ARROWS=Object.freeze(["↑","↗","→","↘","↓","↙","←","↖"]);
-  const direction = bearing => {
-    const idx=Math.round(bearing/45)%8;
+  const direction = idx => {
     const labels=COMPASS_I18N[lang]?.names||COMPASS_I18N.en?.names||["N","NE","E","SE","S","SW","W","NW"];
     return labels[idx]+" "+DIRECTION_ARROWS[idx];
   };
@@ -67,10 +50,10 @@
   let difficulty = DIFFICULTIES[savedDifficulty] ? savedDifficulty : "normal";
   let game=null,selected=null,map=null,marker=null,guessMarkers=[],resultMarker=null;
   let markerCase=null,markerMap=null;
-  let activeLine=false, mapStyleReady=false, lastDragAt=0, pointerDown=null, pointerMoved=false;
+  let mapStyleReady=false, lastDragAt=0, pointerDown=null, pointerMoved=false;
   let fallbackSwitching=false, mapStyleTimeout=null, mapSwitching=false, mapPointerController=null;
   let activeMapStyle=window.maplibregl?.isFallback?"osm":"vector";
-  let controller = null, debounce = null, toastTimer = null;
+  let toastTimer = null;
   let rushCountryRequest=0, countryShapesPromise=null;
   // Mobile-only compact evidence and hypothesis windows.
   let mobilePanel="clues";
@@ -159,6 +142,48 @@
       COUNTRY_CLUE_I18N.en?.[key] ?? key;
     return template.replace(/\{(\w+)\}/g,(_,name)=>String(variables[name]??""));
   }
+  // Region label and reference-point label for the same locales as the map.
+  const GEOGRAPHY_LABELS={
+    en:["Subregion","country reference point"],
+    pt:["Sub-região","ponto de referência do país"],
+    es:["Subregión","punto de referencia del país"],
+    zh:["次区域","国家参考点"],
+    ja:["小地域","国の基準点"],
+    ru:["Субрегион","опорная точка страны"],
+    fr:["Sous-région","point de référence du pays"],
+    de:["Unterregion","Referenzpunkt des Landes"],
+    it:["Sottoregione","punto di riferimento del paese"],
+    nl:["Subregio","referentiepunt van het land"],
+    pl:["Podregion","punkt odniesienia kraju"],
+    sv:["Delregion","landets referenspunkt"],
+    tr:["Alt bölge","ülkenin referans noktası"],
+    ar:["المنطقة الفرعية","النقطة المرجعية للبلد"],
+    he:["תת־אזור","נקודת הייחוס של המדינה"],
+    ko:["하위 지역","국가 기준점"],
+    th:["อนุภูมิภาค","จุดอ้างอิงของประเทศ"],
+    vi:["Tiểu vùng","điểm tham chiếu của quốc gia"],
+    id:["Subwilayah","titik acuan negara"]
+  };
+  const DEDUCTION_TEXT={
+    en:{
+      guessFeedback:"From your guess to the answer: {value}",
+      alreadyGuessed:"You already tried this country.",
+      playOffline:"Play offline",rankUnavailable:"Ranked play is unavailable. Try again or play offline.",
+      rankedAttempt:"Daily and Freeplay share one ranked attempt per difficulty each UTC day.",
+      practice:"Practice"
+    },
+    pt:{
+      guessFeedback:"Do seu palpite até a resposta: {value}",
+      alreadyGuessed:"Você já tentou esse país.",
+      playOffline:"Jogar offline",rankUnavailable:"Ranqueada indisponível. Tente de novo ou jogue offline.",
+      rankedAttempt:"O Caso do dia e o Jogo livre compartilham uma tentativa ranqueada por dificuldade a cada dia UTC.",
+      practice:"Treino"
+    }
+  };
+  function deductionText(key,variables={}){
+    const template=DEDUCTION_TEXT[lang]?.[key]||DEDUCTION_TEXT.en[key];
+    return template.replace(/\{(\w+)\}/g,(_,name)=>String(variables[name]??""));
+  }
   function locale() {return LANGS[lang] || "en";}
   function number(value){return Math.round(value).toLocaleString(locale())}
   // Each published inequality is strictly true for the source value. The
@@ -202,7 +227,7 @@
   }
 
   function countryName(index){return displayRegion(COUNTRY_CODES[index])}
-  function continentKey(index){return COUNTRIES[index]?.continent||"asia"}
+  function continentKey(index){return CLUE_ENGINE.clueContinent(COUNTRIES[index])}
   function continentName(index){
     const labels=CLUE_I18N[lang]?.continents||CLUE_I18N.en?.continents||{};
     if(COUNTRY_CODES[index]==="TR")
@@ -224,76 +249,14 @@
     const buttons=$("mapStylePicker");
     if(buttons)buttons.setAttribute("aria-label",pack.mapStyle);
   }
-  function latitudeZoneKey(latitude){
-    const a=Math.abs(latitude);
-    return a<10?"equatorial":a<23.5?"tropical":a<35?"subtropical":
-      a<55?"temperate":a<66.5?"subpolar":"polar";
-  }
-  function latitudeZone(latitude) {
-    const key=latitudeZoneKey(latitude);
-    return CLUE_I18N[lang]?.zones?.[key] || CLUE_I18N.en?.zones?.[key] || key;
-  }
-  // Verified latitude-band intersections by country/territory. Generated from
-  // Natural Earth low-resolution sovereign geometries; PF and SG are supplied
-  // from their island extents. Each entry is primary-band index:6-bit mask.
-  const COUNTRY_BELT_NAMES=Object.freeze(
-    ["equatorial","tropical","subtropical","temperate","subpolar","polar"]);
-  function countryBelts(index){
-    const country=COUNTRIES[index];
-    if(!country)throw Error("Unknown country latitude coverage: "+index);
-    return {code:country.code,
-      primary:COUNTRY_BELT_NAMES[country.primary],
-      zones:COUNTRY_BELT_NAMES.filter((_,n)=>country.mask&(1<<n))};
-  }
-  function countryLatitudeZone(index){
-    const {primary,zones}=countryBelts(index);
-    const name=CLUE_I18N[lang]?.zones?.[primary]||
-      CLUE_I18N.en?.zones?.[primary]||primary;
-    return name+(zones.length>1?
-      " "+t(zones.length===2?"latitudeOtherOne":"latitudeOtherMany"):"");
-  }
-  // Latitude belts describe angular position, not meteorological climate.
-  // All non-equatorial belts occur in both hemispheres. Keep both visible,
-  // since a latitude clue alone must not disclose the target's hemisphere.
-  const LATITUDE_BELT_LIMITS=Object.freeze({
-    equatorial:[[-10,10]],
-    tropical:[[-23.5,-10],[10,23.5]],
-    subtropical:[[-35,-23.5],[23.5,35]],
-    temperate:[[-55,-35],[35,55]],
-    subpolar:[[-66.5,-55],[55,66.5]],
-    polar:[[-85.05,-66.5],[66.5,85.05]]
-  });
   function countryAt(index){return COUNTRY_REFS[index]}
-  function countryCoords(index){return [COUNTRY_REFS[index][3],COUNTRY_REFS[index][4]]}
-  function utmZone(latitude,longitude){
-    if(latitude>=56&&latitude<64&&longitude>=3&&longitude<12)return 32;
-    if(latitude>=72&&latitude<84&&longitude>=0&&longitude<42){
-      return longitude<9?31:longitude<21?33:longitude<33?35:37;
-    }
-    return Math.max(1,Math.min(60,Math.floor((longitude+180)/6)+1));
-  }
-  function utmLatitudeBand(latitude){
-    return "CDEFGHJKLMNPQRSTUVWX"[Math.min(19,Math.max(0,Math.floor((latitude+80)/8)))];
-  }
-  function coordinateClue(index,level){
-    const p=countryAt(index);
-    if(level==="hard")return {key:"utmZone",zone:utmZone(p[3],p[4])};
-    const from=Math.floor(p[4]/30)*30;
-    return {key:"longitude",from,to:from+30};
-  }
-  function latitudeGridClue(index,level){
-    const latitude=countryAt(index)[3];
-    if(level==="hard")return {key:"utmBand",band:utmLatitudeBand(latitude)};
-    const from=Math.floor(latitude/15)*15;
-    return {key:"latitude",from,to:from+15};
-  }
-  function cluesFor(index,level){
+  function cluesFor(index,level,version=game?.evidenceVersion??RULES_VERSION){
     const country=COUNTRIES[index];
     if(!country)throw Error("Unknown country "+index);
-    const key=country.code+":"+level+":shared-v7";
+    const key=country.code+":"+level+":"+version;
     if(!clueCache.has(key)){
       clueCache.set(key,CLUE_ENGINE.buildClues(country,COUNTRY_INSIGHTS[country.code],
-        level,CURRENCY_DENOMINATIONS));
+        level,CURRENCY_DENOMINATIONS,COUNTRIES,version));
     }
     return clueCache.get(key);
   }
@@ -309,6 +272,15 @@
     }
     if(clue.key==="hemisphere")
       return tc("hemisphere",{value:tc(clue.hemisphere)});
+    const [subregionLabel,referenceLabel]=GEOGRAPHY_LABELS[lang]||GEOGRAPHY_LABELS.en;
+    if(clue.key==="countrySubregion")return subregionLabel+": "+displayRegion(clue.region);
+    if(clue.key==="longitude"&&clue.reference)return tc("longitude",clue)+" ("+referenceLabel+")";
+    if(clue.key==="countryAreaBand"){
+      const comparison=clue.min===0?"<":clue.max===null?"≥":"";
+      const value=clue.min===0?number(clue.max):clue.max===null?number(clue.min):
+        number(clue.min)+"–"+number(clue.max);
+      return tc("countryArea",{comparison,value}).replace(/ {2,}/g," ");
+    }
     if(clue.key==="countryLandlocked")
       return tc(clue.landlocked?"countryLandlockedYes":"countryLandlockedNo");
     const props={...clue};
@@ -351,7 +323,7 @@
       started:false,
       startedAt:null,endedAt:null,durationMs:null,
       revealed:0,penalty:0,paidHints:0,
-      sectorMapPenalty:0,sectorReveals:[],evidenceVersion:7,targetKind:"country",
+      sectorMapPenalty:0,sectorReveals:[],evidenceVersion:RULES_VERSION,targetKind:"country",
       finished:false,won:false,score:0};
   }
   function isRush(){return difficulty==="rush"}
@@ -359,12 +331,11 @@
   function caseCode(){
     return "#"+difficulty[0].toUpperCase()+"-"+game.date.replaceAll("-","")+"-"+String(game.serial).padStart(2,"0");
   }
-  const RUSH_DURATION_MS=60000, RUSH_CLUE_INTERVAL_MS=6000;
   function elapsedMs(){
     if(!game)return 0;
     if(game.finished&&Number.isFinite(game.durationMs))return game.durationMs;
     if(isRush()&&!game.started)return 0;
-    return Math.max(0,Date.now()-(Number.isFinite(game.startedAt)?game.startedAt:Date.now()));
+    return Math.max(0,Date.now()-(game.clockStart??game.startedAt??Date.now()));
   }
   function formatElapsed(ms){
     const seconds=Math.floor(Math.max(0,ms)/1000);
@@ -383,11 +354,13 @@
   }
   // All three modes use the existing Rush map start gate. A signed-in
   // player's first attempt is automatically verified and saved by the API.
-  function startCase(){
+  function startCase(offline=false){
     if(!game||game.finished||game.started||game.pending)return;
     const current=game;
     const startOffline=()=>{
       current.started=true;
+      current.rankError=null;
+      current.practice=Boolean(window.CartigmaRanking?.mayRank?.());
       current.startedAt=Date.now();
       current.revealed=DIFFICULTIES[difficulty].initial;
       mobilePanel="clues";
@@ -396,12 +369,13 @@
     };
     // Preserve instant offline play and existing Rush behavior; only a
     // remembered signed-in account needs a network round-trip.
-    if(!window.CartigmaRanking?.mayRank?.()){
+    if(offline||!window.CartigmaRanking?.mayRank?.()){
       startOffline();
       return;
     }
     current.pending=true;
     $("rushStartBtn").disabled=true;
+    $("offlineStartBtn").disabled=true;
     window.CartigmaRanking.beginRanked({mode:game.mode,difficulty}).then(ranked=>{
       if(game!==current)return;
       if(!ranked){startOffline();return;}
@@ -414,13 +388,13 @@
     }).catch(error=>{
       if(game===current){
         toast(error.message||"Não foi possível iniciar.");
-        $("rushIntroText").textContent=error.message||"Não foi possível iniciar.";
+        current.rankError=error.message||deductionText("rankUnavailable");
       }
     }).finally(()=>{
       if(game===current){
         current.pending=false;
         $("rushStartBtn").disabled=false;
-        if(current.started)render();
+        render();
       }
     });
   }
@@ -435,6 +409,10 @@
     game.rankedId=response.id;
     game.started=true;
     game.startedAt=response.startedAt;
+    game.evidenceVersion=response.rulesVersion??7;
+    if(Number.isFinite(response.elapsedMs)){
+      game.clockStart=Date.now()-response.elapsedMs;
+    }
     game.revealed=response.revealed;
     game.penalty=response.penalty||0;
     game.paidHints=response.hints||0;
@@ -450,16 +428,15 @@
         lat:point?.lat??coords?.lat??0,lng:point?.lng??coords?.lng??0,
         label:point?.label||displayRegion(code),countryCode:code,
         at:new Date(response.startedAt+(item.elapsedMs||0)).toISOString(),
-        elapsedMs:item.elapsedMs||0
+        elapsedMs:item.elapsedMs||0,feedback:item.feedback
       };
     });
-    if(response.saveError)toast(response.saveError);
     if(game.finished){
       const index=COUNTRY_CODES.indexOf(response.target);
       if(index<0)throw Error("Resposta inválida do servidor");
       game.index=index;
       game.endedAt=new Date().toISOString();
-      game.durationMs=Date.now()-game.startedAt;
+      game.durationMs=response.elapsedMs??elapsedMs();
       game.revealed=game.rankedClueCount;
     }else game.index=-1; // do not disclose the target through local game state
   }
@@ -467,24 +444,41 @@
     if(!game?.ranked||game.pending||game.finished)return;
     const current=game;
     current.pending=true;
+    if(action!=="state"){
+      $("guessBtn").disabled=true;
+      $("revealBtn").disabled=true;
+    }
     try{
       const response=await window.CartigmaRanking.gameAction(action,{
-        ...payload,mode:current.mode,difficulty:current.difficulty
+        ...payload,id:current.rankedId,mode:current.mode,difficulty:current.difficulty
       });
       if(game!==current)return;
       applyRankedState(response);
       // Buying clues/overlays must preserve the current guess, like offline.
       if(action==="guess")selected=null;
-      if(isMobileScreen())mobilePanel=game.finished?null:"clues";
-      render();
+      if(isMobileScreen()&&(action!=="state"||game.finished)){
+        mobilePanel=game.finished?null:"clues";
+      }
+      if(action==="state"&&!game.finished){
+        renderClues();updateClock();
+      }
       if(game.finished)showReport();
     }catch(error){
-      if(game===current)toast(error.message||"Erro na partida online");
+      if(game===current){
+        current.nextPollAt=Date.now()+(error.code==="cooldown"?error.retry*1000:5000);
+        toast(error.message||deductionText("rankUnavailable"));
+        if(error.code==="game_state_conflict"&&action!=="state"){
+          current.pending=false;
+          await rankedAction("state");
+        }
+      }
     }finally{
-      if(game===current){current.pending=false;render();}
+      if(game===current){
+        current.pending=false;
+        if(action!=="state"||game.finished)render();
+      }
     }
   }
-  let nextRankedRushStatus=0,rankedRushTimeoutPending=false;
   function updateClock(){
     if(!game)return;
     const rush=isRush(),waiting=rush&&!game.started&&!game.finished;
@@ -506,17 +500,10 @@
     updateClock();
     if(!isRush()||game.finished||!game.started)return;
     if(game.ranked){
-      if(game.pending)return;
-      if(rushRemaining()===0){
-        if(!rankedRushTimeoutPending){
-          rankedRushTimeoutPending=true;
-          rankedAction("finish").finally(()=>{rankedRushTimeoutPending=false;});
-        }
-        return;
-      }
-      const bucket=Math.floor(elapsedMs()/RUSH_CLUE_INTERVAL_MS);
-      if(bucket>0&&bucket>nextRankedRushStatus){
-        nextRankedRushStatus=bucket;
+      if(game.pending||Date.now()<(game.nextPollAt??0))return;
+      const available=DIFFICULTIES.rush.initial+Math.floor(elapsedMs()/RUSH_CLUE_INTERVAL_MS);
+      if(rushRemaining()===0||available>game.revealed&&game.revealed<game.rankedClueCount){
+        game.nextPollAt=Date.now()+1000;
         rankedAction("state");
       }
       return;
@@ -535,7 +522,7 @@
     const saved=store.get(dailyStorageKey());
     if(!saved||saved.mode!=="daily"||saved.date!==today()||
        saved.difficulty!==difficulty||saved.index!==dailyIndex()||
-       saved.targetKind!=="country"||saved.evidenceVersion!==7||
+       saved.targetKind!=="country"||![7,RULES_VERSION].includes(saved.evidenceVersion)||
        !Array.isArray(saved.guesses)||saved.guesses.length>maximum()||
        !Number.isFinite(saved.revealed))return null;
     if(isRush()&&!saved.started){
@@ -543,7 +530,7 @@
     }
     return saved;
   }
-  function save(){if(game?.mode==="daily")store.set(dailyStorageKey(),game)}
+  function save(){if(game?.mode==="daily"&&!game.ranked)store.set(dailyStorageKey(),game)}
   // Every Freeplay roll independently samples all 195 countries with an
   // equal chance. Never remember used countries or exclude recent answers.
   function chooseFree(){
@@ -556,8 +543,7 @@
     mobilePanel="clues";
     rushCountryRequest++;
     const cached=savedDaily();
-    game=(window.CartigmaRanking?.mayRank?.()?null:cached)||
-      newGame("daily",dailyIndex());
+    game=cached||newGame("daily",dailyIndex());
     maybeRestoreRanked(game);
     if(!Number.isInteger(game.serial)||game.serial<1){
       game.serial=nextCaseNumber(game.date);
@@ -581,8 +567,9 @@
     api.resumeRanked(mode,level).then(response=>{
       // Never overwrite the selected mode with a round from another mode.
       // Completed free-play sessions are not restored for a new free case.
-      if(!response||response.mode!==mode||game!==snapshot||snapshot.started||
+      if(!response||response.mode!==mode||game!==snapshot||snapshot.pending||snapshot.started||
          (mode==="free"&&response.finished))return;
+      selected=null;
       snapshot.ranked=true;
       applyRankedState(response);
       render();
@@ -620,13 +607,12 @@
   }
   // Reuse the clue-category lookup instead of rebuilding it for every row.
   const CLUE_CATEGORY_KEYS=Object.freeze({
-    continent:"clueRegion",zone:"clueClimate",hemisphere:"clueRegion",
-    longitude:"clueRegion",latitude:"clueRegion",utmZone:"clueRegion",
-    utmBand:"clueRegion",countryCurrency:"clueCivic",
+    continent:"clueRegion",hemisphere:"clueRegion",longitude:"clueRegion",
+    countryCurrency:"clueCivic",
     countryLanguageFamily:"clueCivic",countryFlagColor:"clueCivic",
     countryPopulation:"clueCivic",countryGDP:"clueCivic",
     countryArea:"clueRegion",countryLandlocked:"clueRegion",
-    countryBorders:"clueRegion"
+    countryBorders:"clueRegion",countrySubregion:"clueRegion",countryAreaBand:"clueRegion"
   });
   function revealGeographyOnMap(clue){
     if(isRush()||!game.started||game.finished||game.pending||!map||!mapStyleReady)return;
@@ -720,11 +706,15 @@
     $("revealBtn").classList.toggle("hidden",game.finished||isRush());
     syncMobilePanels();
   }
+  function distanceText(feedback){
+    const {min,max}=feedback;
+    return (min===0?"< "+number(max):max===null?"≥ "+number(min):number(min)+"–"+number(max))+" km";
+  }
   function guessMetricText(g){
-    if(isCountryGame())return g.countryCode===COUNTRY_CODES[game.index]?"✓":"×";
-    // Hide both distance and bearing if the displayed result rounds to 0 km.
-    if(Math.round(g.distance)===0)return "";
-    return number(g.distance)+" km"+(difficulty==="hard"?"":" · "+direction(g.bearing));
+    if(g.countryCode===COUNTRY_CODES[game.index])return "✓";
+    if(!g.feedback)return "×";
+    const {direction:sector}=g.feedback;
+    return distanceText(g.feedback)+(sector===undefined?"":" · "+direction(sector));
   }
   function renderHistory(){
     const list=$("guessHistory");list.replaceChildren();
@@ -756,14 +746,11 @@
     }
   }
   function bestGuess(){
-    if(isCountryGame())return game.guesses.find(g=>g.countryCode===COUNTRY_CODES[game.index])||null;
-    if(!game.guesses.length)return null;
-    let best=game.guesses[0];
-    for(let i=1;i<game.guesses.length;i++){
-      const candidate=game.guesses[i];
-      if(candidate.distance<best.distance)best=candidate;
-    }
-    return best;
+    const correct=game.guesses.find(g=>g.countryCode===COUNTRY_CODES[game.index]);
+    if(correct)return correct;
+    const measured=game.guesses.filter(g=>g.feedback);
+    return measured.reduce((closest,guess)=>!closest||guess.feedback.min<closest.feedback.min
+      ?guess:closest,null);
   }
   function factFor(index){
     // Trivia is optional and independent of the country history.
@@ -848,13 +835,12 @@
       cell.append(dt,dd);list.append(cell);
     }
     add("continent",continentName(index));
-    add("climateZone",countryLatitudeZone(index));
     add("nationalCapital",country.capital);
     add("landlocked",tc(country.landlocked?"countryLandlockedYes":"countryLandlockedNo"));
   }
   function atlasEvidence(index,level,target){
     const list=$(target);list.replaceChildren();
-    cluesFor(index,level).forEach((clue,i)=>{
+    cluesFor(index,level,RULES_VERSION).forEach((clue,i)=>{
       const row=document.createElement("li");row.className="report-evidence-row";
       const count=document.createElement("span");count.textContent=String(i+1).padStart(2,"0");
       const value=document.createElement("span");value.textContent=clueText(clue,index);
@@ -1036,7 +1022,7 @@
     $("reportMode").textContent=t(game.mode==="daily"?"daily":"free");
     $("reportDifficulty").textContent=t(difficulty);
     $("reportAttempts").textContent=isRush()?String(game.guesses.length):game.guesses.length+" / "+maximum();
-    $("reportBest").textContent=isCountryGame()?"—":best?number(best.distance)+" km":"—";
+    $("reportBest").textContent=game.won?"✓":best?.feedback?distanceText(best.feedback):"—";
     $("reportHints").textContent=number(Number.isInteger(game.paidHints)
       ?game.paidHints:Math.round(game.penalty/HINT_COST));
     $("reportScore").textContent=number(game.score)+" / 5,000";
@@ -1114,12 +1100,16 @@
     renderDossier();
   }
   function feedback(){
-    const el=$("feedback");
-    if(!game.guesses.length||game.finished){el.classList.add("hidden");return}
+    const el=$("feedback"),mobile=$("mobileGuessFeedback");
     const last=game.guesses.at(-1);
-    el.textContent=isCountryGame()?t("rushWrong"):
-      difficulty==="hard"?t("hardDistance",{km:number(last.distance)}) :
-      t("feedback",{km:number(last.distance),dir:direction(last.bearing)});
+    mobile.classList.toggle("hidden",!last?.feedback||game.finished);
+    mobile.textContent=last?.feedback?guessMetricText(last):"";
+    if(!last||game.finished){el.classList.add("hidden");return}
+    const metric=guessMetricText(last);
+    el.textContent=last.feedback?(DEDUCTION_TEXT[lang]
+      ?deductionText("guessFeedback",{value:metric})
+      :t("rushWrong")+" "+metric):t("rushWrong");
+    if(last.feedback)el.title=GEOGRAPHY_LABELS[lang]?.[1]||GEOGRAPHY_LABELS.en[1];
     el.className="feedback";
   }
   function render(){
@@ -1135,7 +1125,8 @@
     const code=caseCode();
     $("caseCode").textContent=code;
     $("caseNumber").textContent=t("caseWord")+" "+code;
-    $("modeCaption").textContent=t(daily?"modeDaily":"modeFree")+(game.ranked?" / RANKED":"");
+    const playLabel=game.ranked?" / RANKED":game.practice?" / "+deductionText("practice"):"";
+    $("modeCaption").textContent=t(daily?"modeDaily":"modeFree")+playLabel;
     $("caseTitle").textContent=game.finished?countryName(game.index):t("unknown");
     $("caseStatus").textContent=t(game.finished?(game.won?"solved":"closed"):"active");
     $("caseStatus").classList.toggle("closed",game.finished);
@@ -1163,9 +1154,17 @@
     $("rushIntroEyebrow").textContent="CARTIGMA / "+(
       isRush()?t("rushIntroTitle"):t(daily?"daily":"free")).toLocaleUpperCase(locale());
     $("rushIntroTitle").textContent=isRush()?t("rushIntroTitle"):t(difficulty);
-    $("rushIntroText").textContent=isRush()?t("rushIntroText"):
-      t("remaining")+": "+maximum();
+    $("rushIntroText").textContent=game.rankError||(isRush()?t("rushIntroText"):
+      t("remaining")+": "+maximum());
     $("rushStartBtn").textContent=t("rushStart");
+    $("rushStartBtn").disabled=Boolean(game.pending&&!game.started);
+    const rankNote=$("rankStartNote");
+    const showRankNote=!game.started&&!game.rankError&&Boolean(window.CartigmaRanking?.mayRank?.());
+    rankNote.classList.toggle("hidden",!showRankNote);
+    rankNote.textContent=showRankNote?deductionText("rankedAttempt"):"";
+    $("offlineStartBtn").textContent=deductionText("playOffline");
+    $("offlineStartBtn").classList.toggle("hidden",!game.rankError);
+    $("offlineStartBtn").disabled=Boolean(game.pending);
     updateClock();renderMap();
     syncMobilePanels();
   }
@@ -1197,16 +1196,12 @@
   function clearMapOverlays(){
     // Do NOT clear the guess markers when redrawing clue overlays.
     if(!map||!mapStyleReady)return;
-    if(map.getLayer("case-distance-line"))map.removeLayer("case-distance-line");
-    if(map.getSource("case-distance-line"))map.removeSource("case-distance-line");
-    // The symbol layer depends on the Equator line source: remove it first.
-    for(const id of ["case-sector-longitude","case-sector-latitude",
-      "case-latitude-belt","case-utm-annotations","case-utm-grid","case-utm-zone","case-utm-band",
-      "case-hemisphere-arrows","case-hemisphere-line","case-continent-outline"]){
+    // The arrow layer depends on the Equator line source: remove it first.
+    for(const id of ["case-sector-longitude","case-hemisphere-arrows",
+      "case-hemisphere-line","case-continent-outline"]){
       if(map.getLayer(id))map.removeLayer(id);
       if(map.getSource(id))map.removeSource(id);
     }
-    activeLine=false;
   }
   // Full geographic strips, not a marker for the hidden city.
   function sectorRectangle(west,south,east,north){
@@ -1216,10 +1211,7 @@
     if(!map||!mapStyleReady||!Array.isArray(game.sectorReveals))return;
     for(const clue of (game.ranked?game.rankedClues:cluesFor(game.index,difficulty))){
       if(!game.sectorReveals.includes(clue.key)||clue.key!=="longitude")continue;
-      const geometry=clue.key==="longitude"
-        ?{type:"Polygon",coordinates:sectorRectangle(clue.from,-85,clue.to,85)}
-        :{type:"MultiPolygon",coordinates:Array.from({length:6},(_,i)=>
-          sectorRectangle(-180+i*60,clue.from,-120+i*60,clue.to))};
+      const geometry={type:"Polygon",coordinates:sectorRectangle(clue.from,-85,clue.to,85)};
       const id="case-sector-"+clue.key;
       map.addSource(id,{type:"geojson",data:{type:"Feature",properties:{},geometry}});
       map.addLayer({id,type:"fill",source:id,
@@ -1228,124 +1220,6 @@
         paint:{"fill-color":"#ffd449","fill-opacity":0.10,
           "fill-antialias":false}});
     }
-  }
-  function drawLatitudeBeltOverlay(){
-    if(!map||!mapStyleReady||!game?.sectorReveals?.includes("zone")||
-      !cluesFor(game.index,difficulty).some(clue=>clue.key==="zone"))return;
-    const countryEdition=game.evidenceVersion>=4;
-    const belts=countryEdition?countryBelts(game.index).zones:
-      [latitudeZoneKey(countryAt(game.index)[3])];
-    // A country crossing several latitude belts highlights ALL of them.
-    // Detached overseas territories do not imply intervening latitude belts.
-    // Web Mercator clips poles to 85.05° and splits strips to prevent seams.
-    const coordinates=belts.flatMap(belt=>
-      LATITUDE_BELT_LIMITS[belt].flatMap(([south,north])=>
-        Array.from({length:6},(_,i)=>
-          sectorRectangle(-180+i*60,south,-120+i*60,north))));
-    const id="case-latitude-belt";
-    map.addSource(id,{type:"geojson",data:{type:"Feature",properties:{
-      belt:countryEdition?countryBelts(game.index).primary:belts[0],belts},
-      geometry:{type:"MultiPolygon",coordinates}}});
-    map.addLayer({id,type:"fill",source:id,
-      paint:{"fill-color":"#ffd449","fill-opacity":0.10,
-        "fill-antialias":false}});
-  }
-  // UTM grid spans 80°S–84°N. Bands C–W are 8° high; X is 12°.
-  // Norway's 32V and Svalbard's 31X/33X/35X/37X boundaries are irregular.
-  const UTM_BANDS="CDEFGHJKLMNPQRSTUVWX";
-  const UTM_LONGITUDE_CUTS=Object.freeze(
-    [...new Set([...Array.from({length:61},(_,i)=>-180+i*6),
-      3,9,12,21,33,42])].sort((a,b)=>a-b));
-  function utmBandBounds(letter){
-    const index=UTM_BANDS.indexOf(letter);
-    if(index<0)throw Error("Unknown UTM latitude band "+letter);
-    const south=-80+index*8;
-    return [south,index===UTM_BANDS.length-1?84:south+8];
-  }
-  function utmBandRows(){
-    return [...UTM_BANDS].map(band=>{
-      const [south,north]=utmBandBounds(band);
-      return {band,south,north,latitude:(south+north)/2};
-    });
-  }
-  function utmIntervals(zone,latitude){
-    const ranges=[];
-    for(let i=0;i<UTM_LONGITUDE_CUTS.length-1;i++){
-      const left=UTM_LONGITUDE_CUTS[i],right=UTM_LONGITUDE_CUTS[i+1];
-      if(utmZone(latitude,(left+right)/2)!==zone)continue;
-      if(ranges.length&&ranges.at(-1)[1]===left)ranges.at(-1)[1]=right;
-      else ranges.push([left,right]);
-    }
-    return ranges;
-  }
-  function utmZonePolygons(zone){
-    return utmBandRows().flatMap(row=>utmIntervals(zone,row.latitude)
-      .map(([west,east])=>sectorRectangle(west,row.south,east,row.north)));
-  }
-  function drawUtmOverlays(){
-    const purchased=game?.sectorReveals||[];
-    if(!map||!mapStyleReady||
-      !["utmZone","utmBand"].some(key=>purchased.includes(key)))return;
-    const clues=cluesFor(game.index,difficulty);
-    const zoneClue=clues.find(clue=>clue.key==="utmZone");
-    const bandClue=clues.find(clue=>clue.key==="utmBand");
-    const addShape=(id,geometry,opacity)=>{
-      map.addSource(id,{type:"geojson",data:{type:"Feature",properties:{},geometry}});
-      map.addLayer({id,type:"fill",source:id,
-        paint:{"fill-color":"#ffd449","fill-opacity":opacity,
-          "fill-antialias":false}});
-    };
-    if(purchased.includes("utmZone")&&zoneClue)
-      addShape("case-utm-zone",{type:"MultiPolygon",coordinates:
-        utmZonePolygons(zoneClue.zone)},.10);
-    if(purchased.includes("utmBand")&&bandClue){
-      const [south,north]=utmBandBounds(bandClue.band);
-      addShape("case-utm-band",{type:"MultiPolygon",coordinates:
-        Array.from({length:6},(_,i)=>
-          sectorRectangle(-180+i*60,south,-120+i*60,north))},.085);
-    }
-    // Draw only actual UTM boundaries, including the Norway and Svalbard
-    // exceptions. Splitting the vertical lines by band avoids false 6° zones.
-    const lines=[];
-    for(const row of utmBandRows()){
-      for(const lon of UTM_LONGITUDE_CUTS.slice(1,-1)){
-        if(utmZone(row.latitude,lon-0.001)===utmZone(row.latitude,lon+0.001))
-          continue;
-        lines.push([[lon,row.south],[lon,row.north]]);
-      }
-      lines.push([[-179.8,row.south],[179.8,row.south]]);
-    }
-    lines.push([[-179.8,84],[179.8,84]]);
-    map.addSource("case-utm-grid",{type:"geojson",data:{type:"Feature",
-      properties:{},geometry:{type:"MultiLineString",coordinates:lines}}});
-    map.addLayer({id:"case-utm-grid",type:"line",source:"case-utm-grid",
-      paint:{"line-color":"#ffd449","line-width":0.65,
-        "line-opacity":0.18,"line-dasharray":[2,3]}});
-    // Numbered zones and lettered latitude bands make the overlay a readable
-    // geographic ruler, rather than an unlabeled highlighted rectangle.
-    const annotations=[];
-    if(purchased.includes("utmZone")){
-      for(let zone=1;zone<=60;zone++){
-        const longitude=-180+(zone-.5)*6;
-        annotations.push({type:"Feature",properties:{label:String(zone)},
-          geometry:{type:"Point",coordinates:[longitude,-4]}});
-      }
-    }
-    if(purchased.includes("utmBand")){
-      for(const row of utmBandRows())
-        for(const longitude of [-150,-90,-30,30,90,150])
-          annotations.push({type:"Feature",properties:{label:row.band},
-            geometry:{type:"Point",coordinates:[longitude,row.latitude]}});
-    }
-    map.addSource("case-utm-annotations",{type:"geojson",
-      data:{type:"FeatureCollection",features:annotations}});
-    map.addLayer({id:"case-utm-annotations",source:"case-utm-annotations",
-      type:"symbol",minzoom:2.5,
-      layout:{"text-field":["get","label"],"text-size":10,
-        "text-font":["Open Sans Regular","Arial Unicode MS Regular"],
-        "text-allow-overlap":false,"text-optional":true},
-      paint:{"text-color":"#ffe28a","text-halo-color":"#122017",
-        "text-halo-width":1.3}});
   }
   function drawContinentOutline(){
     if(!map||!mapStyleReady||!game.sectorReveals?.includes("continent"))return;
@@ -1397,39 +1271,6 @@
       pin.setPopup(new window.maplibregl.Popup({offset:22}).setDOMContent(text));
     }
     return pin;
-  }
-  function addResultLine(from,to){
-    if(!mapStyleReady)return;
-    map.addSource("case-distance-line",{type:"geojson",data:{
-      type:"Feature",properties:{},geometry:{type:"LineString",coordinates:[from,to]}
-    }});
-    map.addLayer({id:"case-distance-line",type:"line",source:"case-distance-line",layout:{"line-join":"round","line-cap":"round"},
-      paint:{"line-color":"#ffd449","line-width":2,"line-opacity":0.85,"line-dasharray":[2,3]}});
-    activeLine=true;
-  }
-  function frameResult(best,target){
-    if(!map)return;
-    const targetLng=best
-      ?target[1]+360*Math.round((best.lng-target[1])/360)
-      :target[1];
-    if(!best){
-      map.easeTo({center:[targetLng,target[0]],zoom:4,duration:450});
-      return [targetLng,target[0]];
-    }
-    const gap=dist([best.lat,best.lng],target);
-    const maxZoom=gap<50?6.2:gap<200?5.5:gap<750?4.8:gap<2000?4.1:gap<5000?3.2:2.6;
-    const bounds=[
-      [Math.min(best.lng,targetLng),Math.min(best.lat,target[0])],
-      [Math.max(best.lng,targetLng),Math.max(best.lat,target[0])]
-    ];
-    const root=$("map");
-    const xPadding=Math.max(24,Math.min(90,Math.round((root.clientWidth||700)*0.11)));
-    const yPadding=Math.max(26,Math.min(90,Math.round((root.clientHeight||500)*0.14)));
-    // fitBounds centres the camera between the closest attempt and the target,
-    // while dynamic caps and viewport padding prevent extreme zoom jumps.
-    map.fitBounds(bounds,{padding:{top:yPadding,bottom:yPadding,left:xPadding,right:xPadding},
-      maxZoom,duration:450,bearing:0,pitch:0});
-    return [targetLng,target[0]];
   }
   function labelMinZoom(layer){
     if(layer.type!=="symbol" || layer.layout?.["text-field"]===undefined)return null;
@@ -1595,9 +1436,13 @@
       const feature=features.find(item=>
         codeForCountryFeature(item)&&pointInCountry(lng,lat,item.geometry));
       const countryCode=feature&&codeForCountryFeature(feature);
-      if(!countryCode){
+      if(!countryCode||alreadyGuessed(countryCode)){
+        selected=null;
         $("selectedText").textContent=t("noSelection");
-        toast(t("rushNoCountry"));return;
+        $("countrySearch").value="";
+        $("guessBtn").disabled=true;
+        renderMap();
+        toast(countryCode?deductionText("alreadyGuessed"):t("rushNoCountry"));return;
       }
       selected={lat,lng,label:displayRegion(countryCode),countryCode};
       $("selectedText").textContent=selected.label;
@@ -1642,8 +1487,15 @@
     game.paidHints++;
     save();renderClues();toast(t("hintUsed",{cost:number(cost)}));
   }
+  function alreadyGuessed(code){
+    return game.guesses.some(guess=>guess.countryCode===code);
+  }
   function guess(){
-    if(!game?.started||game.pending)return;
+    if(!game?.started||game.finished||game.pending||!selected?.countryCode)return;
+    if(alreadyGuessed(selected.countryCode)){
+      toast(deductionText("alreadyGuessed"));
+      return;
+    }
     if(game.ranked){
       if(!selected?.countryCode)return;
       rankedAction("guess",{code:selected.countryCode});return;
@@ -1652,8 +1504,10 @@
     if(!selected||game.finished||!selected.countryCode)return;
     const now=Date.now(),elapsed=Math.max(0,now-game.startedAt);
     if(isRush()&&elapsed>=RUSH_DURATION_MS){clockTick();return}
+    const feedback=game.evidenceVersion===7?null:CLUE_ENGINE.guessFeedback(
+      COUNTRIES[COUNTRY_CODES.indexOf(selected.countryCode)],COUNTRIES[game.index],difficulty);
     game.guesses.push({lat:selected.lat,lng:selected.lng,label:selected.label,
-      countryCode:selected.countryCode,at:new Date(now).toISOString(),elapsedMs:elapsed});
+      countryCode:selected.countryCode,at:new Date(now).toISOString(),elapsedMs:elapsed,feedback});
     game.won=selected.countryCode===COUNTRY_CODES[game.index];
     if(game.won||game.guesses.length>=maximum()){
       game.finished=true;game.revealed=cluesFor(game.index,difficulty).length;
@@ -1663,8 +1517,8 @@
         sectorMapPenalty:game.sectorMapPenalty||0,elapsedMs:elapsed,won:game.won
       });
     }else if(!isRush()){
-      game.revealed=Math.min(cluesFor(game.index,difficulty).length,
-        Math.max(game.revealed,DIFFICULTIES[difficulty].initial+game.guesses.length));
+      game.revealed=CLUE_ENGINE.revealAfterMiss(game.revealed,difficulty,game.guesses.length,
+        cluesFor(game.index,difficulty).length,game.evidenceVersion);
     }
     save();selected=null;
     if(isMobileScreen()){
@@ -1678,6 +1532,7 @@
     const q=norm(term),results=[];
     for(const code of COUNTRY_CODES.slice().sort((a,b)=>
       displayRegion(a).localeCompare(displayRegion(b),locale()))){
+      if(alreadyGuessed(code))continue;
       const name=displayRegion(code);
       if(!norm(name).includes(q)&&!norm(code).includes(q)&&
         !norm(COUNTRIES[COUNTRY_CODES.indexOf(code)].name).includes(q))continue;
@@ -1706,7 +1561,7 @@
     button.scrollIntoView?.({block:"nearest"});
   }
   function chooseSuggestion(item,confirm=false){
-    if(game.finished||(isRush()&&!game.started))return;
+    if(game.finished||!game.started||game.pending||alreadyGuessed(item.countryCode))return;
     selected={lat:item.lat,lng:item.lon,label:item.name,countryCode:item.countryCode};
     $("guessBtn").disabled=false;
     $("selectedText").textContent=item.name;
@@ -1749,9 +1604,10 @@
     else $("countrySearch").setAttribute("aria-activedescendant","");
   }
   async function share(){
-    const symbols=game.guesses.map(g=>isCountryGame()?(g.countryCode===COUNTRY_CODES[game.index]?"✓":"×"):g.distance<=WIN_RADIUS?"🟨":g.distance<500?"🟧":"⬛").join("");
+    const symbols=game.guesses.map(g=>g.countryCode===COUNTRY_CODES[game.index]?"✓":"×").join("");
+    const attempts=isRush()?String(game.guesses.length):game.guesses.length+"/"+maximum();
     const txt="Cartigma "+caseCode()
-      +"\n"+(game.won?"✓ "+game.guesses.length+"/"+maximum():"×")+" · "+number(game.score)+" pts\n"+symbols
+      +"\n"+(game.won?"✓ "+attempts:"×")+" · "+number(game.score)+" pts\n"+symbols
       +"\nhttps://f404x.github.io/cartigma/";
     try{
       if(navigator.share){await navigator.share({text:txt});return}
@@ -1916,7 +1772,7 @@
       clearCasePins();
       if(map){try{map.remove()}catch(error){console.warn(error)}}
       $("map").replaceChildren();
-      map=null;mapStyleReady=false;activeLine=false;
+      map=null;mapStyleReady=false;
       pointerDown=null;pointerMoved=false;lastDragAt=Date.now();
       window.maplibregl=engine;
       activeMapStyle=style;
@@ -2060,7 +1916,8 @@
     window.addEventListener?.("geodetective:themechange",updateMapTheme);
     $("revealBtn").addEventListener("click",reveal);
     $("guessBtn").addEventListener("click",guess);
-    $("rushStartBtn").addEventListener("click",startCase);
+    $("rushStartBtn").addEventListener("click",()=>startCase());
+    $("offlineStartBtn").addEventListener("click",()=>startCase(true));
     $("mobileEvidenceBtn").addEventListener("click",()=>setMobilePanel("clues"));
     $("mobileGuessBtn").addEventListener("click",()=>setMobilePanel("guess"));
     $("mobileReportBtn").addEventListener("click",()=>{
@@ -2110,8 +1967,6 @@
     $("helpDialog").addEventListener("click",e=>{if(e.target===$("helpDialog"))$("helpDialog").close()});
     $("countrySearch").addEventListener("input",e=>{
       const term=e.target.value.trim();
-      if(controller)controller.abort();
-      clearTimeout(debounce);
       if(term.length<1){hideSuggestions();suggestionOptions=[];return}
       suggestions(searchLocal(term));
       // Local country catalogue only; no city geocoder or network search.
