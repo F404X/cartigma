@@ -1,0 +1,58 @@
+name: Staging account recovery
+on:
+  push:
+    branches: [feature/ranking]
+    paths: ['.github/workflows/staging-account-recovery.yml']
+permissions:
+  contents: read
+jobs:
+  issue:
+    if: github.repository == 'F404X/cartigma' && github.run_attempt == 1 && github.event.before == 'c8737b0e88149a9375a6f5182a271570fbac6e72'
+    runs-on: ubuntu-latest
+    environment: ranking-staging
+    timeout-minutes: 4
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Issue a single expiring recovery grant
+        run: |
+          node --input-type=module <<'JS'
+          import {publicEncrypt} from "node:crypto";
+          const account=process.env.CLOUDFLARE_ACCOUNT_ID;
+          const apiToken=process.env.CLOUDFLARE_API_TOKEN;
+          if(!account||!apiToken)throw Error("Staging credentials unavailable");
+          const base="https://api.cloudflare.com/client/v4/accounts/"+account+"/d1/database";
+          async function call(path,query){
+            const response=await fetch(base+path,{
+              method:query?"POST":"GET",headers:{
+                "Authorization":"Bearer "+apiToken,"Content-Type":"application/json"
+              },body:query?JSON.stringify(query):undefined,signal:AbortSignal.timeout(15000)
+            });
+            const data=await response.json();
+            if(!response.ok||!data.success)throw Error("D1 request failed ("+response.status+")");
+            return data.result;
+          }
+          const databases=await call("?per_page=100");
+          const db=databases.find(item=>item.name==="cartigma-ranking-staging");
+          const dbId=db?.uuid||db?.id||"";
+          if(!/^[0-9a-f-]{36}$/.test(dbId))throw Error("Staging database unavailable");
+          const path="/"+dbId+"/query";
+          const [search]=await call(path,{
+            sql:"SELECT id,email FROM users WHERE username=? COLLATE NOCASE AND deleted_at IS NULL",
+            params:["F404X"]
+          });
+          if(search.results?.length!==1)throw Error("Account could not be matched");
+          const user=search.results[0];
+          const expiresAt=Math.min(1795021661,Math.floor(Date.now()/1000)+900);
+          if(expiresAt<=Math.floor(Date.now()/1000))throw Error("Recovery grant expired");
+          const [write]=await call(path,{
+            sql:"INSERT INTO password_resets(token_hash,user_id,expires_at) SELECT ?,id,? FROM users WHERE id=? AND email=? AND deleted_at IS NULL ON CONFLICT(token_hash) DO NOTHING",
+            params:["1f0556ac3b7a4ce77319ad4ff042b59d3d1fd2379f060b398b3696cdc573ccc1",String(expiresAt),user.id,user.email]
+          });
+          if(write.meta?.changes!==1)throw Error("Recovery grant was not created");
+          const proof=publicEncrypt({
+            key:Buffer.from("MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAusiZmRJnDReyLAMKzBAZSLNV7FXkwj7e/rCTC9lHSpdPkfc2HEjf6AU3rCXw4iK3d/oD3HAGR86DLo7AT/nKV9nzV5/jhCIN5sriPwcJNMF70AnUHWLrXWqNDL+ZWr111uT1ST8Jeooncjq6Bz08YNSxggfuTdqjCvE9AMDEBT3R8Fv+0Heax+EXoRX77LvAnljbld3zNgfGj5IiPrVoZTTJ2drtfnYEClwG6vCnf/DkyM9ofcJlphdJv7O7h8mT1FeVccyDV5mMqqNFqswUtsowvF6vyQRtJWXNpIsnof6u96tVN8GYprqVgXhQYmH9JAx0ffsznVkLA2WZ3Cj0vwIDAQAB","base64"),format:"der",type:"spki",oaepHash:"sha256"
+          },Buffer.from(user.email));
+          console.log("Verified account envelope: "+proof.toString("base64url"));
+          JS
