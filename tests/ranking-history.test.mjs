@@ -10,7 +10,7 @@ test("Account match history clearly labels country - Vitória/Derrota",()=>{
   assert.ok(begin>=0&&end>begin,"Expected match history renderer");
   const renderSource=source.slice(begin,end);
 
-  const list={children:[],replaceChildren(){this.children=[]}};
+  const list={children:[],replaceChildren(){this.children=[]},append(...items){this.children.push(...items)}};
   const more={hidden:false,textContent:""};
   const elements={"rank-history-list":list,"rank-history-more":more};
   const mockDocument={
