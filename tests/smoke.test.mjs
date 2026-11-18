@@ -146,7 +146,7 @@ function boot({storage=new Map(),map=false,randomValue=0.42,mobile=false,clock=D
 }
 
 
-const CATALOG_KEY="cartigma-country-daily-v6-";
+const CATALOG_KEY="cartigma-country-daily-v7-";
 const FREE_BAG_KEY="cartigma-freeplay-country-bag-v1";
 function clueTexts(g){
   return g.get("clueList").children.map(row=>row.children[1].children[1].textContent);
@@ -193,8 +193,8 @@ test("A searchable country dossier lists all 195 unique countries",()=>{
   brazil.click();
   assert.equal($("atlasCountryName").textContent,"Brazil");
   assert.equal($("atlasCountryCode").textContent,"BR");
-  assert.equal($("atlasNormalEvidence").children.length,10);
-  assert.equal($("atlasHardEvidence").children.length,10);
+  assert.ok($("atlasNormalEvidence").children.length>=6);
+  assert.ok($("atlasHardEvidence").children.length>=6);
   assert.ok($("atlasHistory").textContent.length>10);
   assert.ok($("atlasCountryStats").children.length>=4);
   $("atlasSearch").value="Vatican";
@@ -203,7 +203,7 @@ test("A searchable country dossier lists all 195 unique countries",()=>{
   $("atlasOptions").children[0].click();
   assert.equal($("atlasCountryCode").textContent,"VA");
 });
-test("Each country and difficulty always gets ten sourced non-landscape clues",()=>{
+test("All countries have valid evidence without latitude belts or UTM and no continent/hemisphere overlap",()=>{
   const g=boot(),$=g.get;
   $("atlasBtn").click();
   const buttons=$("atlasOptions").children;
@@ -211,32 +211,21 @@ test("Each country and difficulty always gets ten sourced non-landscape clues",(
     buttons.find(b=>b.dataset.index===String(i)).click();
     for(const level of ["Normal","Hard"]){
       const rows=$("atlas"+level+"Evidence").children;
-      assert.equal(rows.length,10,"Missing evidence at country "+i+" / "+level);
-      const text=rows.map(x=>x.children[1].textContent);
-      assert.equal(new Set(text).size,10,"Duplicate clue at "+i+" / "+level);
-      assert.ok(text.every(x=>!/(landscape|paisagem|national capital:|distance to coast|distance to capital|latitude sector:)/i.test(x)),
-        "Forbidden city/landscape clue "+i+" / "+text.join(" | "));
+      assert.ok(rows.length>=6&&rows.length<=10,"Available facts at country "+i+" / "+level);
+      const values=rows.map(x=>x.children[1].textContent);
+      assert.equal(new Set(values).size,values.length,"Duplicate clue at "+i+" / "+level);
+      assert.ok(values.every(x=>!/(latitude belt|latitude band|utm zone|utm latitude band|landscape|national capital:|distance to coast|distance to capital)/i.test(x)),
+        "Forbidden clue at country "+i+" / "+values.join(" | "));
     }
   }
-});
-test("Country-spanning latitude hints show a representative band plus more",()=>{
-  const g=boot(),$=g.get;
-  $("atlasBtn").click();
-  const values=code=>{
-    $("atlasOptions").children.find(b=>b.children[1].children[1].textContent===code).click();
-    return $("atlasNormalEvidence").children.map(x=>x.children[1].textContent);
-  };
-  assert.ok(values("MX").some(t=>t==="Latitude belt: Subtropical +another"));
-  assert.ok(values("BR").some(t=>t==="Latitude belt: Tropical +others"));
-  assert.ok(values("CA").some(t=>t==="Latitude belt: Subpolar +others"));
-  g.language("pt");
-  const br=$("atlasOptions").children.find(b=>
-    b.children[1].children[1].textContent==="BR");
-  br.click();
-  assert.ok($("atlasNormalEvidence").children.some(row=>
-    row.children[1].textContent.includes(" +outras")));
-  assert.ok(!$("atlasNormalEvidence").children.some(row=>
-    /\(\+\d+\)/.test(row.children[1].textContent)));
+  for(const [level,code] of [["normal","BR"],["hard","TR"],["rush","VA"]]){
+    const country=g.window.CartigmaCountries.find(c=>c.code===code);
+    const clues=g.window.CartigmaClueEngine.buildClues(country,
+      g.window.GeoCountryInsights[code],level,g.window.GeoCurrencyDenominations);
+    const keys=clues.map(x=>x.key);
+    assert.equal(keys.includes("continent")&&keys.includes("hemisphere"),false);
+    assert.equal(keys.some(x=>["zone","utmZone","utmBand","latitude"].includes(x)),false);
+  }
 });
 test("Signed-in account automatically uses the native map in ranked mode",async()=>{
   const events=[];
@@ -244,7 +233,7 @@ test("Signed-in account automatically uses the native map in ranked mode",async(
     id:"b1592f31-fc31-4189-aebf-1d2ee615d877",
     mode:"daily",day:"2026-11-17",difficulty:"normal",
     startedAt:Date.parse("2026-11-17T12:00:00Z"),
-    clues:[{key:"continent",label:"Continente",value:"América do Sul"}],
+    clues:[{key:"continent",continents:["southAmerica"]}],clueCount:10,nextHintCost:300,
     revealed:1,guesses:[],finished:false,won:false,score:null,
     penalty:0,hints:0,saved:false
   };
@@ -255,7 +244,7 @@ test("Signed-in account automatically uses the native map in ranked mode",async(
     gameAction:async(name,payload)=>{
       events.push(name+":"+(payload.code||""));
       return {...state,guesses:[{code:"BR",elapsedMs:1000}],
-        clues:[...state.clues,{key:"hemisphere",label:"Hemisfério",value:"Sul"}],
+        clues:[...state.clues,{key:"countryBorders",value:3}],
         revealed:10,finished:true,won:true,score:5000,saved:true,target:"BR"};
     }
   };
@@ -265,7 +254,7 @@ test("Signed-in account automatically uses the native map in ranked mode",async(
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal($("rushIntro").classList.contains("hidden"),true);
   assert.equal($("caseTitle").textContent,"Unknown location");
-  assert.equal($("hintCount").textContent,"1 / 10");
+  assert.equal($("hintCount").textContent,"1 / "+$("clueList").children.length);
   g.select("Brazil");
   assert.equal($("guessBtn").disabled,false);
   $("guessBtn").click();
@@ -300,7 +289,7 @@ test("Completed ranked free case permits another free case and changing to Daily
   const initial={
     id:"b1592f31-fc31-4189-aebf-1d2ee615d877",mode:"free",difficulty:"normal",
     day:"2026-11-17",startedAt:origin,
-    clues:[{key:"continent",label:"Continente",value:"América do Sul"}],
+    clues:[{key:"continent",continents:["southAmerica"]}],clueCount:10,nextHintCost:300,
     revealed:1,guesses:[],finished:false,won:false,score:null,
     penalty:0,hints:0,saved:false
   };
@@ -372,8 +361,10 @@ test("Normal, Hard, and Rush all require explicit Start before revealing clues",
     assert.equal($("countrySearch").disabled,true);
     $("rushStartBtn").click();
     assert.equal($("rushIntro").classList.contains("hidden"),true);
-    assert.equal($("clueList").children.length,10);
-    assert.equal($("hintCount").textContent,level==="rush"?"1 / 10":level==="hard"?"1 / 10":"2 / 10");
+    const total=$("clueList").children.length;
+    assert.ok(total>=6&&total<=10);
+    assert.equal($("hintCount").textContent,
+      (level==="normal"?2:1)+" / "+total);
   }
 });
 test("Normal and Hard accept country names, with correct attempts and results",()=>{
@@ -413,11 +404,12 @@ test("Rush reveals nothing before Start, including categories and first hint",()
   assert.equal($("clueList").children.length,0);
   $("rushStartBtn").click();
   assert.equal($("rushIntro").classList.contains("hidden"),true);
-  assert.equal($("hintCount").textContent,"1 / 10");
+  const total=$("clueList").children.length;
+  assert.ok(total>=6);
+  assert.equal($("hintCount").textContent,"1 / "+total);
   assert.equal($("clueList").classList.contains("hidden"),false);
-  assert.equal($("clueList").children.length,10);
   Clock.ms+=12000;g.tick();
-  assert.equal($("hintCount").textContent,"3 / 10");
+  assert.equal($("hintCount").textContent,"3 / "+total);
   Clock.ms+=48000;g.tick();
   assert.equal($("reportDialog").open,true);
   assert.equal($("finalScore").textContent,"0");
@@ -434,7 +426,7 @@ test("Rush daily waiting state survives reload without hint leaks",()=>{
   assert.equal(g("rushIntro").classList.contains("hidden"),false);
   assert.equal(g("gameTimer").textContent,"01:00");
   g("rushStartBtn").click();
-  assert.equal(g("hintCount").textContent,"1 / 10");
+  assert.equal(g("hintCount").textContent,"1 / "+g("clueList").children.length);
   assert.equal(JSON.parse(storage.get(key)).revealed,1);
 });
 test("Freeplay independently samples from every country without persistent history",()=>{
@@ -540,28 +532,17 @@ test("Rush pins show selected names, map-click positions and numbered guess hist
   g.tick();
   assert.ok(g.mapState.markers.some(m=>m.element.children[0].textContent==="1"));
 });
-test("No latitude-sector clue is used alongside country latitude belt in any locale",()=>{
-  const g=boot(),$=g.get;
-  $("atlasBtn").click();
-  const options=$("atlasOptions").children;
-  for(const level of ["Normal","Hard"]){
-    for(let index=0;index<195;index++){
-      options.find(b=>b.dataset.index===String(index)).click();
-      const clues=$("atlas"+level+"Evidence").children.map(row=>row.children[1].textContent);
-      assert.equal(clues.length,10);
-      assert.ok(clues.some(v=>v.startsWith("Latitude belt:")));
-      assert.ok(clues.every(v=>!v.startsWith("Latitude sector:")));
-    }
+test("Every locale keeps border-count localization while evidence omits latitude and UTM",()=>{
+  const g=boot(),$=g.get;$("atlasBtn").click();
+  for(const lang of ["en","pt","fr","de","ja"]){
+    g.language(lang);
+    const row=$("atlasNormalEvidence").children;
+    assert.ok(row.length>=6&&row.length<=10);
+    assert.equal(row.some(x=>/\bUTM\b/i.test(x.children[1].textContent)),false);
   }
-  for(const [lang,pack] of Object.entries(g.window.GeoI18n.PACKS)){
-    assert.ok(pack.latitudeOtherOne&&pack.latitudeOtherMany,lang);
-  }
-  for(const [lang,pack] of Object.entries(g.window.GeoCountryClueI18n)){
+  for(const [lang,pack] of Object.entries(g.window.GeoCountryClueI18n))
     assert.ok(pack.countryBorders.includes("{value}"),lang);
-  }
 });
-
-
 test("Confirmed Rush pins keep their identity across guesses, map redraws, and timeout",()=>{
   const Clock=fakeClock();
   const g=boot({clock:Clock,map:true}),$=g.get;
@@ -836,8 +817,8 @@ test("Rush has no purchasable evidence overlays, including on old saved cases",(
     "Old saved Rush overlays must not be rendered");
   Clock.ms+=54000;reloaded.tick();
   const $r=reloaded.get;
-  assert.equal($r("hintCount").textContent,"10 / 10");
-  assert.equal($r("clueList").children.length,10);
+  const total=$r("clueList").children.length;
+  assert.equal($r("hintCount").textContent,total+" / "+total);
   assert.ok($r("clueList").children.every(row=>
     !row.children[1]?.children?.some(child=>
       child.className?.includes("sector-map-btn"))));
@@ -860,7 +841,7 @@ test("Mobile controls toggle compact evidence/guess windows and update counts",(
   assert.equal($("mobileEvidenceBtn").attributes["aria-expanded"],"true");
   assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),true);
   assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),false);
-  assert.equal($("mobileEvidencePreview").textContent,"2 / 10");
+  assert.equal($("mobileEvidencePreview").textContent,"2 / "+$("clueList").children.length);
   assert.equal($("mobileGuessPreview").textContent,"0 / 6");
   $("mobileGuessBtn").click();
   assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),false);
@@ -875,7 +856,7 @@ test("Mobile controls toggle compact evidence/guess windows and update counts",(
   g.select(wrong.name);
   $("guessBtn").click();
   assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),true);
-  assert.equal($("mobileEvidencePreview").textContent,"3 / 10");
+  assert.equal($("mobileEvidencePreview").textContent,"3 / "+$("clueList").children.length);
   assert.equal($("mobileGuessPreview").textContent,"1 / 6");
 });
 
@@ -894,9 +875,9 @@ test("Mobile Rush reveals no clues before Start and shows evidence popup after S
   $("rushStartBtn").click();
   assert.equal($("mobileEvidenceBtn").disabled,false);
   assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),true);
-  assert.equal($("mobileEvidencePreview").textContent,"1 / 10");
+  assert.equal($("mobileEvidencePreview").textContent,"1 / "+$("clueList").children.length);
   Clock.ms+=6000;g.tick();
-  assert.equal($("mobileEvidencePreview").textContent,"2 / 10");
+  assert.equal($("mobileEvidencePreview").textContent,"2 / "+$("clueList").children.length);
   $("mobileGuessBtn").click();
   assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),true);
   const saved=JSON.parse(g.storage.get(CATALOG_KEY+"2026-11-17-rush"));
@@ -935,18 +916,18 @@ test("mobile Rush evidence follows newest unlocked clue and is fully scrollable"
   list.scrollTop=0;
   g.difficulty("rush");
   $("rushStartBtn").click();
-  assert.equal($("hintCount").textContent,"1 / 10");
+  assert.equal($("hintCount").textContent,"1 / "+$("clueList").children.length);
   assert.equal(list.scrollTop,64);
   assert.equal(list.children[0].classList.contains("latest"),true);
   Clock.ms+=18000;g.tick();
-  assert.equal($("hintCount").textContent,"4 / 10");
+  assert.equal($("hintCount").textContent,"4 / "+$("clueList").children.length);
   assert.equal(list.scrollTop,256);
   assert.equal(list.children[3].classList.contains("latest"),true);
   assert.equal(list.children[4].classList.contains("latest"),false);
   $("mobileEvidenceBtn").click(); // Close to browse the map.
   list.scrollTop=14;
   Clock.ms+=12000;g.tick();
-  assert.equal($("hintCount").textContent,"6 / 10");
+  assert.equal($("hintCount").textContent,"6 / "+$("clueList").children.length);
   assert.equal(list.scrollTop,14,"Closed popovers must not be scrolled");
   $("mobileEvidenceBtn").click();
   assert.equal(list.scrollTop,384,"Reopening follows the newest revealed clue");
@@ -964,7 +945,7 @@ test("the full-sized desktop evidence list never auto-scrolls on new clues",()=>
   const target=g.window.CartigmaCountries[Math.floor(.42*195)];
   const other=g.window.CartigmaCountries.find(c=>c.code!==target.code);
   g.select(other.name);$("guessBtn").click();
-  assert.equal($("hintCount").textContent,"3 / 10");
+  assert.equal($("hintCount").textContent,"3 / "+$("clueList").children.length);
   assert.equal(list.scrollTop,42);
 });
 
@@ -1098,7 +1079,7 @@ test("Mobile Normal can return from View map to guesses, clues and the case file
   $("mobileEvidenceBtn").click();
   assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),false);
   assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),true);
-  assert.equal($("clueList").children.length,10);
+  assert.ok($("clueList").children.length>=6);
   $("mobileReportBtn").click();
   assert.equal($("reportDialog").open,true);
   assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),false);
