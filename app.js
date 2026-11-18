@@ -270,6 +270,10 @@
   function continentKey(index){return CLUE_ENGINE.clueContinent(COUNTRIES[index])}
   function continentName(index,key=continentKey(index)){
     const labels=CLUE_I18N[lang]?.continents||CLUE_I18N.en?.continents||{};
+    // Caribbean countries belong to the Americas, but their playable
+    // geographic region is the Caribbean, not North/Central America.
+    if(CLUE_ENGINE.geographicRegion(COUNTRIES[index])==="caribbean")
+      return labels.americas||CLUE_I18N.en?.continents?.americas||"Americas";
     if(COUNTRY_CODES[index]==="TR")
       return [labels.europe||"Europe",labels.asia||"Asia"].join(" / ");
     return labels[key]||CLUE_I18N.en?.continents?.[key]||key;
@@ -311,6 +315,11 @@
     }
     if(clue.key==="hemisphere")
       return tc("hemisphere",{value:tc(clue.hemisphere)});
+    if(clue.key==="countryRegion"){
+      const regions=CLUE_I18N[lang]?.regions||CLUE_I18N.en?.regions||{};
+      const name=regions[clue.region]||CLUE_I18N.en?.regions?.[clue.region];
+      return tc("countryRegion",{value:name||clue.region});
+    }
     const [subregionLabel,referenceLabel]=GEOGRAPHY_LABELS[lang]||GEOGRAPHY_LABELS.en;
     if(clue.key==="countrySubregion")return subregionLabel+": "+subregionName(clue.region);
     if(clue.key==="longitude"&&clue.reference)return tc("longitude",clue)+" ("+referenceLabel+")";
@@ -576,7 +585,7 @@
     const saved=store.get(dailyStorageKey());
     if(!saved||saved.mode!=="daily"||saved.date!==today()||
        saved.difficulty!==difficulty||saved.ranked||!matchesDailyDraw(saved,difficulty)||
-       saved.targetKind!=="country"||![7,RULES_VERSION].includes(saved.evidenceVersion)||
+       saved.targetKind!=="country"||![7,8,RULES_VERSION].includes(saved.evidenceVersion)||
        !Array.isArray(saved.guesses)||saved.guesses.length>maximum()||
        !Number.isFinite(saved.revealed))return null;
     if(isRush()&&!saved.started){
@@ -664,7 +673,7 @@
     countryLanguageFamily:"clueCivic",countryFlagColor:"clueCivic",
     countryPopulation:"clueCivic",countryGDP:"clueCivic",
     countryArea:"clueRegion",countryLandlocked:"clueRegion",
-    countryBorders:"clueRegion",countrySubregion:"clueRegion",countryAreaBand:"clueRegion"
+    countryBorders:"clueRegion",countrySubregion:"clueRegion",countryAreaBand:"clueRegion",countryRegion:"clueRegion"
   });
   function revealGeographyOnMap(clue){
     if(isRush()||!game.started||game.finished||game.pending||!map||!mapStyleReady)return;
@@ -845,7 +854,10 @@
       ?tc(value?"yes":"no"):null;
     add("iso",code);
     const index=COUNTRY_CODES.indexOf(code);
-    add("region",continentName(index,profile?.continent));
+    const region=CLUE_ENGINE.geographicRegion(COUNTRIES[index]);
+    const localized=CLUE_I18N[lang]?.regions||CLUE_I18N.en?.regions||{};
+    add("region",region?localized[region]||CLUE_I18N.en?.regions?.[region]:
+      continentName(index,profile?.continent));
     add("capital",profile?.capital??COUNTRIES[index]?.capital??"—");
     add("currency",currencyName(info?.currency,info?.currencyName));
     if(info?.languageFamily)add("language",lang==="pt"
