@@ -56,12 +56,17 @@ async function setup(t){
     }),env);
     return {status:response.status,data:await response.json()};
   }
+  async function get(path,user="first"){
+    const headers=tokens[user]?{Cookie:"__Host-cartigma_session="+tokens[user]}:{};
+    const response=await worker.fetch(new Request(origin+"/v1"+path,{headers}),env);
+    return {status:response.status,data:await response.json()};
+  }
   async function leaderboard(){
     const response=await worker.fetch(new Request(origin+"/v1/leaderboards"),env);
     assert.equal(response.status,200);
     return (await response.json()).boards;
   }
-  return {sql,call,leaderboard};
+  return {sql,call,get,leaderboard};
 }
 
 test("a ranked case resumes for its owner, unlocks evidence after purchases, and saves exactly once",async t=>{
@@ -230,4 +235,79 @@ test("equal points use the lower total solve time on all boards and faster repla
   sql.exec(schema);
   sql.exec(schema);
   await assertBoards(expected);
+});
+
+test("match history preserves complete dossiers privately, past live expiry and later matches",async t=>{
+  const {sql,call,get}=await setup(t);
+  const path="/me/games";
+  const mode={mode:"free",difficulty:"normal"};
+  const {data:start}=await call("start",{...mode,caseNumber:17});
+  const detail=path+"/"+start.id;
+  assert.equal(start.caseNumber,17);
+  assert.equal(start.profile,undefined);
+  assert.equal((await get(path,null)).status,401);
+  assert.equal((await get(detail)).status,404);
+  assert.deepEqual((await get(path)).data,{games:[],nextCursor:null});
+
+  const {target_code}=sql.prepare("SELECT target_code FROM game_sessions WHERE id=?").get(start.id);
+  await call("overlay",{id:start.id,key:"continent"});
+  await call("reveal",{id:start.id});
+  const wrong=target_code==="BR"?"AR":"BR";
+  await call("guess",{id:start.id,code:wrong});
+  const {data:win}=await call("guess",{id:start.id,code:target_code});
+  assert.equal(win.won,true);
+  assert.equal((await get(detail,"second")).status,404);
+  assert.deepEqual((await get(path,"second")).data.games,[]);
+
+  const {data:next}=await call("start",mode);
+  await call("finish",{id:next.id});
+  const list=(await get(path)).data;
+  assert.equal(list.games.length,2);
+  assert.deepEqual(new Set(list.games.map(game=>game.id)),new Set([start.id,next.id]));
+  assert.ok(list.games.every(game=>!("clues" in game)&&!("profile" in game)));
+  assert.equal(sql.prepare("SELECT COUNT(*) AS count FROM game_results").get().count,1);
+
+  sql.prepare("UPDATE game_sessions SET created_at=created_at-259200 WHERE id=?").run(start.id);
+  assert.equal((await call("state",{id:start.id})).status,410);
+  const {data:{game:archived}}=await get(detail);
+  assert.deepEqual(archived.clues,win.clues);
+  assert.deepEqual(archived.guesses,win.guesses);
+  assert.deepEqual(archived.overlays,["continent"]);
+  assert.equal(archived.caseNumber,17);
+  assert.equal(archived.hints,1);
+  assert.equal(archived.score,win.score);
+  assert.equal(archived.elapsedMs,win.elapsedMs);
+  assert.ok(archived.profile.details.history.pt);
+  assert.ok(archived.profile.capital);
+  assert.equal(archived.playToken,undefined);
+
+  // An already-saved legacy match has enough persisted data to reconstruct
+  // the dossier and preserve it when first opened.
+  sql.prepare("DELETE FROM game_dossiers WHERE game_id=?").run(next.id);
+  const legacy=(await get(path+"/"+next.id)).data.game;
+  assert.ok(legacy.clues.length>0);
+  assert.equal(legacy.won,false);
+  assert.ok(sql.prepare("SELECT profile_json FROM game_dossiers WHERE game_id=?").get(next.id));
+});
+
+test("history pagination stays stable when many cases finish in the same second",async t=>{
+  const {sql,get}=await setup(t);
+  const finishedAt=Math.floor(Date.now()/1000);
+  const day=dayUTC();
+  const game=sql.prepare(`INSERT INTO game_sessions(id,play_hash,day,difficulty,target_code,created_at,finished_at,
+    revealed,saved_user_id) VALUES(?,'hash',?,'normal','BR',?,?,2,'first')`);
+  const match=sql.prepare(`INSERT INTO ranked_matches(game_id,user_id,challenge_day,difficulty,mode,duration_ms,awarded_points)
+    VALUES(?,'first',?,'normal','free',1000,0)`);
+  for(let index=0;index<21;index++){
+    const id="00000000-0000-4000-8000-"+String(index).padStart(12,"0");
+    game.run(id,day,finishedAt-1,finishedAt);
+    match.run(id,day);
+  }
+  const first=(await get("/me/games")).data;
+  const second=(await get("/me/games?before="+encodeURIComponent(first.nextCursor))).data;
+  assert.equal(first.games.length,20);
+  assert.equal(second.games.length,1);
+  assert.equal(second.nextCursor,null);
+  assert.equal(new Set([...first.games,...second.games].map(game=>game.id)).size,21);
+  assert.equal((await get("/me/games?before=invalid")).status,400);
 });

@@ -87,3 +87,20 @@ body:not(.rush-mode) .rush-intro-card .primary-btn{
 @media(max-width:760px) and (pointer:coarse){
  body:not(.rush-mode) .rush-intro{inset:82px 0 calc(146px + env(safe-area-inset-bottom));}
 }
+
+.rank-history{border-top:1px solid #343c48;margin-top:16px;padding-top:12px}
+.rank-history h3{margin:0 0 8px;font-size:15px}
+.rank-history-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.rank-history-case{
+  width:100%;display:grid;gap:2px;padding:8px 10px;min-height:44px;
+  background:#1a232b;color:#edf0f4;text-align:start;border:1px solid #343c48;border-radius:5px;
+}
+.rank-history-case:hover,.rank-history-case:focus-visible{border-color:#f5cf56}
+.rank-history-case span{color:#aeb9c3;font-size:12px}
+dialog.case-report[data-archive][open]{
+  position:fixed;inset:0;margin:auto;width:min(700px,96vw);height:min(88dvh,760px);
+  max-width:96vw;max-height:88dvh;border:1px solid var(--border-strong);border-radius:10px;
+}
+dialog.case-report[data-archive] .report-body{flex:1 1 0;overflow-y:auto;overscroll-behavior:contain}
+dialog.case-report[data-archive] .report-footer{display:flex;justify-content:flex-end}
+dialog.case-report[data-archive] :is(#reportMapBtn,#reportAlternateBtn,#reportNextBtn){display:none!important}

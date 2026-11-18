@@ -205,3 +205,13 @@ FROM game_results CROSS JOIN periods WHERE won=1
 GROUP BY user_id,period_type,period_key,difficulty
 ON CONFLICT(user_id,period_type,period_key,difficulty) DO UPDATE SET solve_time_ms=excluded.solve_time_ms
 WHERE player_solve_times.solve_time_ms<>excluded.solve_time_ms;
+
+-- Preserve the evidence and country profile shown for each case.
+CREATE TABLE IF NOT EXISTS game_dossiers (
+  game_id TEXT PRIMARY KEY REFERENCES game_sessions(id) ON DELETE CASCADE,
+  case_number INTEGER,
+  clues_json TEXT NOT NULL,
+  profile_json TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_game_history
+  ON game_sessions(saved_user_id,finished_at DESC,id DESC) WHERE finished_at IS NOT NULL;

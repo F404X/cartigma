@@ -3,15 +3,17 @@ import {requireUser} from "./auth.js";
 import {countries,countryByCode} from "./catalog.js";
 import {insights,denominations} from "./clue-data.js";
 import "../../shared-clues.js";
+import "../../country-insights.js";
 const EVIDENCE=globalThis.CartigmaClueEngine;
 const {DIFFICULTIES,RULES_VERSION,RUSH_DURATION_MS,RUSH_CLUE_INTERVAL_MS}=EVIDENCE;
 const decks=new Map();
 const pickCountry=EVIDENCE.countryPicker(countries);
 const randomWord=()=>crypto.getRandomValues(new Uint32Array(1))[0];
 const sessionQuery=`SELECT g.*,r.mode,r.user_id AS owner_user_id,r.duration_ms,r.awarded_points,
-  v.version AS rules_version,v.started_at_ms
+  v.version AS rules_version,v.started_at_ms,d.case_number,d.clues_json
   FROM ranked_matches r JOIN game_sessions g ON g.id=r.game_id
-  LEFT JOIN game_rules v ON v.game_id=g.id`;
+  LEFT JOIN game_rules v ON v.game_id=g.id
+  LEFT JOIN game_dossiers d ON d.game_id=g.id`;
 
 export function clueSet(country,level="normal",version=RULES_VERSION){
   const key=country.code+":"+level+":"+version;
@@ -48,7 +50,25 @@ async function targetFor(env,day,level){
 const startTime=g=>g.started_at_ms??g.created_at*1000;
 const elapsedTime=g=>Math.max(0,Date.now()-startTime(g));
 const versionOf=g=>g.rules_version??7;
-const cluesFor=g=>clueSet(countryByCode.get(g.target_code),g.difficulty,versionOf(g));
+const cluesFor=g=>g.clues_json?JSON.parse(g.clues_json):
+  clueSet(countryByCode.get(g.target_code),g.difficulty,versionOf(g));
+function countryProfile(code){
+  const country=countryByCode.get(code);
+  return {
+    capital:country.capital,
+    continent:EVIDENCE.clueContinent(country),
+    details:globalThis.GeoCountryInsights[code]
+  };
+}
+function storeDossier(env,g){
+  return env.DB.prepare(`INSERT INTO game_dossiers(game_id,case_number,clues_json,profile_json)
+    VALUES(?,?,?,?) ON CONFLICT(game_id) DO NOTHING`)
+    .bind(g.id,g.case_number??null,JSON.stringify(cluesFor(g)),JSON.stringify(countryProfile(g.target_code)));
+}
+function feedbackFor(g,code){
+  return versionOf(g)===7?null:EVIDENCE.guessFeedback(
+    countryByCode.get(code),countryByCode.get(g.target_code),g.difficulty);
+}
 function state(g){
   const elapsed=elapsedTime(g);
   const guesses=JSON.parse(g.guesses_json);
@@ -59,22 +79,22 @@ function state(g){
     ?DIFFICULTIES.rush.initial+Math.floor(elapsed/RUSH_CLUE_INTERVAL_MS):g.revealed);
   const nextHintCost=!isFinished&&!rush&&accessible<clues.length
     ?EVIDENCE.clueCost(clues[accessible],g.difficulty):0;
-  const target=countryByCode.get(g.target_code);
   const duration=g.duration_ms??Math.max(0,g.finished_at*1000-startTime(g));
   const response={
     id:g.id,day:g.day,difficulty:g.difficulty,startedAt:startTime(g),
+    caseNumber:g.case_number??null,
     elapsedMs:isFinished?duration:elapsed,
     remainingMs:rush?Math.max(0,RUSH_DURATION_MS-elapsed):null,
     revealed:accessible,clues:clues.slice(0,accessible),rulesVersion:versionOf(g),
     clueCount:clues.length,nextHintCost,mode:g.mode,
     overlays:g._overlays,sectorMapPenalty:purchasedPenalty(g),
-    guesses:guesses.map(({code,elapsedMs})=>({code,elapsedMs,
-      feedback:versionOf(g)===7?null:EVIDENCE.guessFeedback(countryByCode.get(code),target,g.difficulty)})),
+    guesses:guesses.map(({code,elapsedMs,feedback=feedbackFor(g,code)})=>({code,elapsedMs,feedback})),
     finished:isFinished,won:Boolean(g.won),score:isFinished?g.score:null,
     penalty:g.penalty,hints:g.hints_bought,saved:Boolean(g.saved_user_id)
   };
   if(isFinished){
     response.target=g.target_code;
+    response.finishedAt=g.finished_at*1000;
     response.rankingPoints=g.awarded_points??null;
   }
   return response;
@@ -130,7 +150,8 @@ function resultStatements(env,g){
       )`)
       .bind(g.owner_user_id,keys.week,keys.month,now(),g.id),
     env.DB.prepare(`UPDATE game_sessions SET saved_user_id=? WHERE id=? AND saved_user_id IS NULL
-      AND finished_at IS NOT NULL`).bind(g.owner_user_id,g.id)
+      AND finished_at IS NOT NULL`).bind(g.owner_user_id,g.id),
+    ...(!g.clues_json?[storeDossier(env,g)]:[])
   ];
 }
 async function loadSavedResult(env,g){
@@ -183,10 +204,11 @@ export async function gameRoute(request,env,path){
     const code=mode==="daily"?await targetFor(env,day,level):pickCountry(randomWord).code;
     const playToken=randomToken();
     const startedAt=Date.now();
+    const caseNumber=Number.isSafeInteger(body.caseNumber)&&body.caseNumber>0?body.caseNumber:null;
     const g={id:crypto.randomUUID(),day,difficulty:level,mode,owner_user_id:user.id,
       target_code:code,created_at:Math.floor(startedAt/1000),started_at_ms:startedAt,
       rules_version:RULES_VERSION,finished_at:null,guesses_json:"[]",revealed:DIFFICULTIES[level].initial,
-      penalty:0,hints_bought:0,won:0,score:0,saved_user_id:null,_overlays:[]};
+      penalty:0,hints_bought:0,won:0,score:0,saved_user_id:null,case_number:caseNumber,_overlays:[]};
     try{
       await env.DB.batch([
         env.DB.prepare("INSERT INTO game_sessions(id,play_hash,day,difficulty,target_code,created_at,guesses_json,revealed) VALUES(?,?,?,?,?,?,?,?)")
@@ -194,7 +216,8 @@ export async function gameRoute(request,env,path){
         env.DB.prepare("INSERT INTO ranked_matches(user_id,game_id,challenge_day,difficulty,mode) VALUES(?,?,?,?,?)")
           .bind(user.id,g.id,day,level,mode),
         env.DB.prepare("INSERT INTO game_rules(game_id,version,started_at_ms) VALUES(?,?,?)")
-          .bind(g.id,RULES_VERSION,startedAt)
+          .bind(g.id,RULES_VERSION,startedAt),
+        storeDossier(env,g)
       ]);
     }catch(error){
       if(/UNIQUE constraint failed/i.test(String(error)))fail(409,"ranked_attempt_already_started");
@@ -228,7 +251,7 @@ export async function gameRoute(request,env,path){
     const limit=DIFFICULTIES[g.difficulty].attempts;
     if(guesses.length>=limit)fail(409,"too_many_guesses");
     if(guesses.some(guess=>guess.code===code))fail(409,"country_already_guessed");
-    guesses.push({code,elapsedMs:elapsed});
+    guesses.push({code,elapsedMs:elapsed,feedback:feedbackFor(g,code)});
     g.guesses_json=JSON.stringify(guesses);
     const won=code===g.target_code;
     if(won||guesses.length>=limit)finish(g,won,elapsed);
@@ -262,4 +285,38 @@ async function settle(env,g,elapsed=elapsedTime(g)){
     return true;
   }
   return false;
+}
+
+const historyPageSize=20;
+const matchIdPattern=/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+export async function matchHistory(request,env,id){
+  const user=await requireUser(request,env);
+  if(id!==undefined){
+    if(!matchIdPattern.test(id))fail(404,"game_not_found");
+    const g=await env.DB.prepare(sessionQuery+" WHERE g.id=? AND r.user_id=? AND g.saved_user_id=r.user_id AND g.finished_at IS NOT NULL")
+      .bind(id,user.id).first();
+    if(!g)fail(404,"game_not_found");
+    if(!g.clues_json)await storeDossier(env,g).run();
+    const profile=await env.DB.prepare("SELECT profile_json FROM game_dossiers WHERE game_id=?").bind(g.id).first();
+    await loadOverlays(env,g);
+    return json({game:{...state(g),profile:JSON.parse(profile.profile_json)}});
+  }
+  const token=new URL(request.url).searchParams.get("before");
+  const [beforeTime,beforeId]=token?.split(":")??[];
+  if(token!==null&&(!/^\d{1,12}$/.test(beforeTime)||!matchIdPattern.test(beforeId)||token!==beforeTime+":"+beforeId))
+    fail(400,"invalid_history_cursor");
+  const cursor=token===null?[]:[Number(beforeTime),beforeId];
+  const {results}=await env.DB.prepare(`SELECT g.id,g.day,g.difficulty,g.target_code AS target,g.score,g.won,
+    g.finished_at AS finishedAt,r.mode,r.duration_ms AS elapsedMs
+    FROM game_sessions g JOIN ranked_matches r ON g.id=r.game_id AND g.saved_user_id=r.user_id
+    WHERE g.saved_user_id=? AND g.finished_at IS NOT NULL
+    ${cursor.length?"AND (g.finished_at,g.id)<(?,?)":""}
+    ORDER BY g.finished_at DESC,g.id DESC LIMIT ?`)
+    .bind(user.id,...cursor,historyPageSize+1).all();
+  const page=results.slice(0,historyPageSize);
+  const last=page.at(-1);
+  return json({
+    games:page.map(g=>({...g,won:Boolean(g.won),finishedAt:g.finishedAt*1000})),
+    nextCursor:results.length>historyPageSize?last.finishedAt+":"+last.id:null
+  });
 }

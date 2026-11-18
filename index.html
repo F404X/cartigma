@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="styles.css?v=20261117-country195">
   <link rel="stylesheet" href="themes.css?v=20261117-rush-ready-v2">
-  <link rel="stylesheet" href="ranking.css?v=20261118-solve-time">
+  <link rel="stylesheet" href="ranking.css?v=20261118-case-history">
   <link rel="stylesheet" href="mobile.css?v=20261118-deduction-feedback">
 
   <script defer src="shared-clues.js?v=20261118-continental-draw"></script>
@@ -43,8 +43,8 @@
   <script defer src="theme.js"></script>
   <script defer src="map-fallback.js?v=20261117-clean-overlays"></script>
   <script defer src="language-picker.js"></script>
-  <script type="module" src="map-bootstrap.js?v=20261118-continental-draw"></script>
-  <script defer src="ranking-client.js?v=20261118-solve-time"></script>
+  <script type="module" src="map-bootstrap.js?v=20261118-case-history"></script>
+  <script defer src="ranking-client.js?v=20261118-case-history"></script>
 </head>
 <body>
 <div class="app">
@@ -367,7 +367,7 @@
     </div>
     <div class="report-stamp" id="reportStamp" aria-hidden="true">CLOSED</div>
   </div>
-  <div class="report-body">
+  <div class="report-body" id="caseReportBody">
     <section class="report-section">
       <h3 data-i18n="investigationRecord">Investigation record</h3>
       <dl class="report-grid">
@@ -375,6 +375,7 @@
         <div><dt data-i18n="difficulty">Difficulty</dt><dd id="reportDifficulty"></dd></div>
         <div><dt data-i18n="reportAttempts">Guesses</dt><dd id="reportAttempts"></dd></div>
         <div><dt data-i18n="reportBest">Closest guess</dt><dd id="reportBest"></dd></div>
+        <div><dt data-i18n="elapsedTime">Elapsed time</dt><dd id="reportDuration"></dd></div>
         <div><dt data-i18n="reportHints">Extra hints</dt><dd id="reportHints"></dd></div>
         <div><dt data-i18n="score">Score</dt><dd id="reportScore"></dd><small class="rank-result-note" id="reportRanking"></small></div>
         <div><dt data-i18n="reportCoordinates">Coordinates</dt><dd id="reportCoordinates"></dd></div>

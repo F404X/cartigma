@@ -29,6 +29,7 @@ class Element {
   click(){this.handlers.click?.({target:this})}
   focus(){this.focused=true}
   setAttribute(k,v){this.attributes[k]=v}
+  removeAttribute(k){delete this.attributes[k]}
   replaceChildren(...nodes){this.children=nodes}
   append(...nodes){this.children.push(...nodes);for(const node of nodes)node.parentElement=this}
   querySelector(selector){if(selector==="button.suggestion")return this.children.find(x=>x.className==="suggestion")||null;return null}
@@ -1182,10 +1183,17 @@ test("Caribbean evidence resolves both padded and numeric M49 codes",async()=>{
 
 test("the ranking opens all nine boards and refreshes an open panel after saving a result",async()=>{
   class RankElement extends Element {
-    querySelectorAll(){return []}
-    removeAttribute(name){delete this.attributes[name]}
+    querySelectorAll(selector){return selector==="[data-rank-tab]"?tabs:[]}
   }
-  const window={},nodes=new Map(),cache=new Map();
+  const tabs=["boards","account"].map(name=>{
+    const button=new RankElement();
+    button.dataset.rankTab=name;
+    return button;
+  });
+  const dossier={id:"free-match",target:"BR",finished:true};
+  let opened=null;
+  const window={CartigmaCaseArchive:{open(game){opened=game;return true;}}};
+  const nodes=new Map(),cache=new Map();
   const body=new RankElement("body");
   const get=id=>{
     const attached=body.children.find(node=>node.id===id);
@@ -1194,18 +1202,22 @@ test("the ranking opens all nine boards and refreshes an open panel after saving
     return nodes.get(id);
   };
   const document={body,readyState:"complete",getElementById:get,
-    createElement:()=>new RankElement(),querySelectorAll:()=>[],addEventListener(){}};
+    createElement:()=>new RankElement(),querySelectorAll:()=>tabs,addEventListener(){}};
   let score=0,requests=0;
   const valueResponse=data=>({ok:true,json:async()=>data});
   const context={window,document,URL,Date,location:new URL("https://cartigma.workers.dev/"),setInterval(){},
     localStorage:{getItem:key=>cache.get(key),setItem:(key,value)=>cache.set(key,value),removeItem:key=>cache.delete(key)},
     fetch:async url=>{
       if(url.includes("ranking-panel.html"))return {ok:true,text:async()=>""};
-      if(url.endsWith("/auth/me"))return valueResponse({user:{username:"Tester"}});
+      if(url.endsWith("/auth/me"))return valueResponse({user:{id:"account-id",username:"Tester"}});
       if(url.endsWith("/games/guess")){
         score=5000;
         return valueResponse({finished:true,saved:true,rankingPoints:score});
       }
+      if(url.endsWith("/me/games"))return valueResponse({games:[{
+        id:dossier.id,target:"BR",mode:"free",difficulty:"normal",won:true,score:5000,finishedAt:Date.now()
+      }],nextCursor:null});
+      if(url.endsWith("/me/games/"+dossier.id))return valueResponse({game:dossier});
       assert.ok(url.endsWith("/leaderboards"));
       requests++;
       const periods=Object.fromEntries(["week","month","total"].map(period=>[period,[{username:"Tester",points:score,solve_time_ms:score?82345:null}]]));
@@ -1232,4 +1244,41 @@ test("the ranking opens all nine boards and refreshes an open panel after saving
     assert.equal(time.textContent,"1:22,345");
   }
   assert.equal(requests,2);
+  tabs[1].onclick();
+  await new Promise(resolve=>setImmediate(resolve));
+  const historyButton=get("rank-history-list").children[0].children[0];
+  assert.equal(historyButton.children[0].textContent,"Brasil");
+  await historyButton.onclick();
+  assert.deepEqual(opened,dossier);
+});
+
+test("an archived dossier renders the original clues and country profile without changing the current game",()=>{
+  const g=boot({map:true}),$=g.get;
+  const activeCode=$("caseCode").textContent;
+  const archived={
+    id:"00000000-0000-4000-8000-000000000001",caseNumber:7,day:"2026-11-15",
+    difficulty:"hard",mode:"free",finished:true,won:true,saved:true,score:3900,
+    rankingPoints:3900,hints:1,target:"BR",startedAt:Date.parse("2026-11-15T16:00:00Z"),elapsedMs:82000,
+    clues:[{key:"countrySubregion",region:"005"}],
+    guesses:[{code:"AR",elapsedMs:50000,feedback:{min:500,max:1000}},{code:"BR",elapsedMs:82000}],
+    profile:{capital:"Saved capital",continent:"southAmerica",
+      details:{history:{en:"Saved country history."},trivia:{en:"Saved trivia."},population:100,populationYear:2020}}
+  };
+  assert.equal(g.window.CartigmaCaseArchive.open(archived),true);
+  assert.equal($("reportDialog").open,true);
+  assert.equal($("reportDialog").attributes["data-archive"],"");
+  assert.equal($("reportCode").textContent,"#H-20261115-07");
+  assert.equal($("reportHeading").textContent,"Brazil");
+  assert.equal($("reportHistory").textContent,"Saved country history.");
+  assert.equal($("reportFact").textContent,"Saved trivia.");
+  assert.equal($("reportDuration").textContent,"01:22");
+  assert.equal($("reportAttempts").textContent,"2 / 4");
+  assert.equal($("reportTimeline").children.length,2);
+  assert.equal($("reportEvidenceList").children[0].children[1].textContent,"Subregion: South America");
+  assert.equal($("caseCode").textContent,activeCode);
+  $("reportCloseBtn").click();
+  assert.equal($("reportDialog").open,false);
+  assert.equal($("reportDialog").attributes["data-archive"],undefined);
+  assert.equal(Boolean($("countrySearch").disabled),false);
+  assert.equal($("caseCode").textContent,activeCode);
 });

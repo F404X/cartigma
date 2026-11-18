@@ -11,7 +11,14 @@
 </section>
 <section class="rank-body" id="rank-account" aria-label="Sua conta" hidden>
   <div id="rank-user" hidden>
-    <p id="rank-username"></p><button type="button" class="rank-secondary" id="rank-logout">Sair da conta</button>
+    <p id="rank-username"></p>
+    <button type="button" class="rank-secondary" id="rank-logout">Sair da conta</button>
+    <section class="rank-history" aria-labelledby="rank-history-heading">
+      <h3 id="rank-history-heading">Histórico de partidas</h3>
+      <p id="rank-history-status" class="rank-note" role="status"></p>
+      <ul id="rank-history-list" class="rank-history-list"></ul>
+      <button type="button" id="rank-history-more" class="rank-secondary" hidden>Carregar mais partidas</button>
+    </section>
   </div>
   <div id="rank-auth">
     <div class="rank-auth-tabs">

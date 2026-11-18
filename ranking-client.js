@@ -5,6 +5,8 @@
  const CACHE_KEY="cartigma-leaderboard-cache-v3:"+BASE;
  const DIFFICULTIES={normal:"Normal",hard:"Difícil",rush:"Rush"};
  const PERIODS={week:"Semanal",month:"Mensal",total:"Total"};
+ const countryNames=Intl.DisplayNames?new Intl.DisplayNames("pt-BR",{type:"region"}):null;
+ const historyDate=new Intl.DateTimeFormat("pt-BR",{dateStyle:"short",timeStyle:"short"});
  const TABS=["boards","account"];
  const ACCOUNT_MARKER="cartigma-ranked-account-v1";
  const rankResumes=new Map();
@@ -13,6 +15,7 @@
  const state={tab:"boards",boards:null,user:null,meChecked:false,loading:false,visible:false};
  let leaderboardRequest=null,leaderboardRevision=0,lastRefresh=0;
  const announcedGames=new Set();
+ let matchHistory={};
  let turnstileSiteKey=null,turnstileToken=null;
  const $=id=>document.getElementById(id);
  function text(id,value){const el=$(id);if(el)el.textContent=value;}
@@ -31,7 +34,8 @@
    const result=await response.json().catch(()=>({}));
    if(!response.ok){
      const err=Error({
-       login_required:"Entre na sua conta para salvar o placar.",
+       login_required:"Entre na sua conta para acessar suas partidas ranqueadas.",
+       game_not_found:"Partida indisponível.",
        daily_score_already_saved:"Você já salvou uma partida deste dia e dificuldade.",
        game_state_conflict:"Partida alterada em outra aba. Tente novamente.",
        country_already_guessed:"Você já tentou esse país.",
@@ -53,7 +57,7 @@
    const panel=document.createElement("aside");panel.id="rank-panel";panel.className="rank-panel";
    panel.hidden=true;panel.setAttribute("aria-label","Cartigma — ranking competitivo");
    try{
-     const response=await fetch("ranking-panel.html?v=20261118-solve-time");
+     const response=await fetch("ranking-panel.html?v=20261118-case-history");
      if(!response.ok)throw Error("markup unavailable");
      panel.innerHTML=await response.text();
    }catch{console.warn("Cartigma ranking panel unavailable");return;}
@@ -70,6 +74,7 @@
    panel.querySelectorAll("[data-auth-mode]").forEach(b=>b.onclick=()=>setAuthMode(b.dataset.authMode));
    $("rank-form").onsubmit=authenticate;
    $("rank-logout").onclick=logout;
+   $("rank-history-more").onclick=()=>loadMatchHistory(Boolean(matchHistory.nextCursor));
    $("rank-forgot").onclick=requestReset;
    setAuthMode("login");
    setInterval(refreshVisibleBoards,15000);
@@ -81,7 +86,11 @@
    state.visible=true;$("rank-panel").hidden=false;setTab(state.tab);
    if(!state.meChecked){
      state.meChecked=true;
-     try{state.user=(await api("/auth/me")).user;
+     const previousUser=state.user;
+     try{
+       const {user}=await api("/auth/me");
+       if(state.user!==previousUser)return;
+       state.user=user;
        if(state.user)localStorage.setItem(ACCOUNT_MARKER,"1");
        else localStorage.removeItem(ACCOUNT_MARKER);
      }catch{}
@@ -98,7 +107,10 @@
      b.setAttribute("aria-selected",String(b.dataset.rankTab===state.tab));
    });
    if(tab==="boards")loadBoards();
-   if(tab==="account")renderAccount();
+   if(state.tab==="account"){
+     renderAccount();
+     if(state.user)loadMatchHistory();
+   }
  }
  function refreshVisibleBoards(){
    if(state.visible&&state.tab==="boards"&&!document.hidden&&Date.now()-lastRefresh>=CACHE_TTL){
@@ -221,20 +233,20 @@
    }
    return rankResumes.get(key);
  }
- async function beginRanked({mode,difficulty}){
+ async function beginRanked({mode,difficulty,caseNumber}){
    const user=await signedInUser();
    if(!user)return null;
    const pending=rankResumes.get(user.id+":"+mode+":"+difficulty);
    const existing=pending&&(await pending).game;
    if(existing)return existing;
    try{
-     return await api("/games/start",{mode,difficulty});
+     return await api("/games/start",{mode,difficulty,caseNumber});
    }catch(error){
      if(error.code!=="ranked_attempt_already_started")throw error;
      const {game}=await fetchResume(mode,difficulty,user.id);
      if(game)return game;
      // A previous Rush round can expire while reopening Freeplay.
-     if(mode==="free")return api("/games/start",{mode,difficulty});
+     if(mode==="free")return api("/games/start",{mode,difficulty,caseNumber});
      throw error;
    }
  }
@@ -244,6 +256,10 @@
    if(result.finished&&result.saved&&!announcedGames.has(id)){
      announcedGames.add(id);
      invalidateBoards();
+     if(state.user){
+       resetMatchHistory(state.user.id);
+       if(state.visible&&state.tab==="account")loadMatchHistory();
+     }
    }
    return result;
  }
@@ -253,10 +269,86 @@
    const {game}=await fetchResume(mode,difficulty,user.id);
    return game;
  }
+ function resetMatchHistory(owner){
+   matchHistory={owner,games:[],loaded:false,nextCursor:null,request:null,opening:false};
+   $("rank-history-list")?.replaceChildren();
+   text("rank-history-status","");
+   if($("rank-history-more"))$("rank-history-more").hidden=true;
+ }
+ async function loadMatchHistory(append=false){
+   const history=matchHistory;
+   if(!state.user||history.owner!==state.user.id||history.request)return;
+   if(append&&!history.nextCursor)return;
+   const cursor=append?"?before="+encodeURIComponent(history.nextCursor):"";
+   const more=$("rank-history-more");
+   more.disabled=true;
+   text("rank-history-status","Carregando partidas…");
+   history.request=api("/me/games"+cursor);
+   try{
+     const {games,nextCursor}=await history.request;
+     if(history!==matchHistory)return;
+     history.games=append?[...history.games,...games]:games;
+     history.nextCursor=nextCursor;
+     history.loaded=true;
+     renderMatchHistory();
+   }catch(error){
+     if(history!==matchHistory)return;
+     text("rank-history-status",error.message||"Não foi possível carregar o histórico.");
+     more.hidden=false;
+     more.textContent="Tentar novamente";
+   }finally{
+     if(history===matchHistory){
+       history.request=null;
+       more.disabled=false;
+     }
+   }
+ }
+ function renderMatchHistory(){
+   const list=$("rank-history-list"),more=$("rank-history-more");
+   list.replaceChildren();
+   for(const game of matchHistory.games){
+     const row=document.createElement("li"),button=document.createElement("button");
+     const title=document.createElement("strong"),details=document.createElement("span");
+     const summary=document.createElement("span");
+     button.type="button";button.className="rank-history-case";
+     title.textContent=countryNames?.of(game.target)??game.target;
+     details.textContent=(game.mode==="daily"?"Caso do dia":"Jogo livre")+" · "+DIFFICULTIES[game.difficulty];
+     summary.textContent=historyDate.format(game.finishedAt)+" · "+
+       (game.won?"Acertou":"Encerrada")+" · "+game.score.toLocaleString("pt-BR")+" pts";
+     button.append(title,details,summary);
+     button.onclick=()=>openMatch(game.id,button);
+     row.append(button);list.append(row);
+   }
+   text("rank-history-status",matchHistory.games.length?"":"Nenhuma partida concluída.");
+   more.hidden=!matchHistory.nextCursor;
+   more.textContent="Carregar mais partidas";
+ }
+ async function openMatch(id,button){
+   const history=matchHistory;
+   if(history.opening)return;
+   history.opening=true;
+   button.disabled=true;
+   text("rank-history-status","Abrindo ficha…");
+   try{
+     const {game}=await api("/me/games/"+encodeURIComponent(id));
+     if(history!==matchHistory||!state.visible||state.tab!=="account")return;
+     if(!window.CartigmaCaseArchive?.open(game))throw Error("Não foi possível abrir a ficha.");
+     text("rank-history-status","");
+   }catch(error){
+     if(history===matchHistory)text("rank-history-status",error.message);
+   }finally{
+     history.opening=false;
+     button.disabled=false;
+   }
+ }
  function renderAccount(){
    if(!$("rank-user"))return;
    $("rank-user").hidden=!state.user;$("rank-auth").hidden=Boolean(state.user);
-   if(state.user)text("rank-username","Conectado como "+state.user.username);
+   if(matchHistory.owner!==state.user?.id)resetMatchHistory(state.user?.id);
+   if(state.user){
+     text("rank-username","Conectado como "+state.user.username);
+     if(state.visible&&state.tab==="account"&&!matchHistory.loaded)loadMatchHistory();
+   }
    if(state.visible&&state.tab==="boards")renderBoards();
  }
  let authMode="login";

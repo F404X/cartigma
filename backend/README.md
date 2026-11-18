@@ -40,6 +40,11 @@ All game routes require a signed-in account.
 
 An account can play one Daily case and repeated Freeplay rounds per difficulty. Both modes contribute to the best verified score per account, difficulty and UTC day. The ranking adds the improvement over the previous best. Ties on points go to the lower total time of the successful daily results counted in that period. A faster win with the same score can replace that day's result without adding points. Visitors without an account play locally. The server selects the target and calculates the score, with the same evidence, feedback and prices as the browser. Applying the schema adds the new rules version and millisecond start time to new sessions. Existing sessions retain their original clue order.
 
+### Account match history
+
+- GET `/v1/me/games` lists completed matches for the signed-in account, newest first. Follow `nextCursor` with `?before=` to load another page.
+- GET `/v1/me/games/:id` returns the saved dossier for a completed match owned by the account. It includes the evidence and country profile snapshot, original guesses, duration and result even after the live game expires.
+
 ### Leaderboard access and request economy
 The leaderboard has **no IP cooldown or Worker-side rate limit**. A blocked
 request would still consume a Workers Free invocation. The browser can show the last public board immediately. It fetches fresh

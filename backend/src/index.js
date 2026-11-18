@@ -1,6 +1,6 @@
 import {ApiError,json,cors,csrf} from "./lib.js";
 import {authRoute} from "./auth.js";
-import {gameRoute} from "./games.js";
+import {gameRoute,matchHistory} from "./games.js";
 import {leaderboard,myStats} from "./ranking.js";
 const authPaths=new Set(["/v1/auth/register","/v1/auth/login","/v1/auth/logout",
   "/v1/auth/me","/v1/auth/request-reset","/v1/auth/reset","/v1/auth/delete"]);
@@ -23,6 +23,8 @@ export default {
         response=json({turnstileSiteKey:env.TURNSTILE_SITE_KEY||null});
       }else if(path==="/v1/leaderboards"&&request.method==="GET"){
         response=await leaderboard(request,env);
+      }else if(request.method==="GET"&&(path==="/v1/me/games"||path.startsWith("/v1/me/games/"))){
+        response=await matchHistory(request,env,path==="/v1/me/games"?undefined:path.slice("/v1/me/games/".length));
       }else if(path==="/v1/me/stats"&&request.method==="GET"){
         response=await myStats(request,env);
       }else if(authPaths.has(path)&&

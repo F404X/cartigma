@@ -268,11 +268,10 @@
 
   function countryName(index){return displayRegion(COUNTRY_CODES[index])}
   function continentKey(index){return CLUE_ENGINE.clueContinent(COUNTRIES[index])}
-  function continentName(index){
+  function continentName(index,key=continentKey(index)){
     const labels=CLUE_I18N[lang]?.continents||CLUE_I18N.en?.continents||{};
     if(COUNTRY_CODES[index]==="TR")
       return [labels.europe||"Europe",labels.asia||"Asia"].join(" / ");
-    const key=continentKey(index);
     return labels[key]||CLUE_I18N.en?.continents?.[key]||key;
   }
   function updateCompassRose(){
@@ -374,8 +373,9 @@
   }
   function isRush(){return difficulty==="rush"}
   function isCountryGame(){return isRush()||game?.targetKind==="country"}
-  function caseCode(){
-    return "#"+difficulty[0].toUpperCase()+"-"+game.date.replaceAll("-","")+"-"+String(game.serial).padStart(2,"0");
+  function caseCode(record=game){
+    const number=record.serial??record.rankedId.slice(0,8).toUpperCase();
+    return "#"+record.difficulty[0].toUpperCase()+"-"+record.date.replaceAll("-","")+"-"+String(number).padStart(2,"0");
   }
   function elapsedMs(){
     if(!game)return 0;
@@ -422,7 +422,7 @@
     current.pending=true;
     $("rushStartBtn").disabled=true;
     $("offlineStartBtn").disabled=true;
-    window.CartigmaRanking.beginRanked({mode:game.mode,difficulty}).then(ranked=>{
+    window.CartigmaRanking.beginRanked({mode:game.mode,difficulty,caseNumber:current.serial}).then(ranked=>{
       if(game!==current)return;
       if(!ranked){startOffline();return;}
       current.ranked=true;
@@ -442,6 +442,21 @@
         $("rushStartBtn").disabled=false;
         render();
       }
+    });
+  }
+  function rankedGuesses(response,previous=[],pendingPoint=null){
+    const guesses=response.guesses||[];
+    return guesses.map((item,i)=>{
+      const code=item.code,old=previous[i];
+      const coords=COUNTRIES[COUNTRY_CODES.indexOf(code)];
+      const point=old?.countryCode===code?old:
+        i===guesses.length-1&&pendingPoint?.countryCode===code?pendingPoint:null;
+      return {
+        lat:point?.lat??coords?.lat??0,lng:point?.lng??coords?.lng??0,
+        label:point?.label||displayRegion(code),countryCode:code,
+        at:new Date(response.startedAt+(item.elapsedMs||0)).toISOString(),
+        elapsedMs:item.elapsedMs||0,feedback:item.feedback
+      };
     });
   }
   function applyRankedState(response){
@@ -467,18 +482,9 @@
     game.score=response.score||0;
     game.rankingPoints=response.rankingPoints;
     game.rankingSaved=Boolean(response.saved);
-    game.guesses=(response.guesses||[]).map((item,i)=>{
-      const code=item.code,old=previous[i];
-      const coords=COUNTRIES[COUNTRY_CODES.indexOf(code)];
-      const point=old?.countryCode===code?old:
-        i===response.guesses.length-1&&selected?.countryCode===code?selected:null;
-      return {
-        lat:point?.lat??coords?.lat??0,lng:point?.lng??coords?.lng??0,
-        label:point?.label||displayRegion(code),countryCode:code,
-        at:new Date(response.startedAt+(item.elapsedMs||0)).toISOString(),
-        elapsedMs:item.elapsedMs||0,feedback:item.feedback
-      };
-    });
+    game.date=response.day??game.date;
+    game.serial=response.caseNumber??game.serial;
+    game.guesses=rankedGuesses(response,previous,selected);
     if(game.finished){
       const index=COUNTRY_CODES.indexOf(response.target);
       if(index<0)throw Error("Resposta inválida do servidor");
@@ -756,8 +762,8 @@
     const {min,max}=feedback;
     return (min===0?"< "+number(max):max===null?"≥ "+number(min):number(min)+"–"+number(max))+" km";
   }
-  function guessMetricText(g){
-    if(g.countryCode===COUNTRY_CODES[game.index])return "✓";
+  function guessMetricText(g,record=game){
+    if(g.countryCode===COUNTRY_CODES[record.index])return "✓";
     if(!g.feedback)return "×";
     const {direction:sector}=g.feedback;
     return distanceText(g.feedback)+(sector===undefined?"":" · "+direction(sector));
@@ -791,17 +797,17 @@
       list.append(row);
     }
   }
-  function bestGuess(){
-    const correct=game.guesses.find(g=>g.countryCode===COUNTRY_CODES[game.index]);
+  function bestGuess(record=game){
+    const correct=record.guesses.find(g=>g.countryCode===COUNTRY_CODES[record.index]);
     if(correct)return correct;
-    const measured=game.guesses.filter(g=>g.feedback);
+    const measured=record.guesses.filter(g=>g.feedback);
     return measured.reduce((closest,guess)=>!closest||guess.feedback.min<closest.feedback.min
       ?guess:closest,null);
   }
-  function factFor(index){
+  function factFor(details){
     // Trivia is optional and independent of the country history.
     // Previously this returned history verbatim, duplicating the report.
-    const trivia=COUNTRY_INSIGHTS[COUNTRY_CODES[index]]?.trivia;
+    const trivia=details?.trivia;
     const text=typeof trivia==="string"?trivia:
       trivia?.[lang==="pt"?"pt":"en"]||trivia?.en||"";
     return String(text).trim();
@@ -813,7 +819,7 @@
     return comparable(a)===comparable(b);
   }
 
-  function renderCountryProfile(info,code,place,targets={
+  function renderCountryProfile(info,code,profile,targets={
     title:"reportCountryStatsTitle",source:"reportCountryStatsSource",
     list:"reportCountryStats"
   }){
@@ -838,8 +844,9 @@
     const countryWord=value=>typeof value==="boolean"
       ?tc(value?"yes":"no"):null;
     add("iso",code);
-    add("region",continentName(COUNTRY_CODES.indexOf(code)));
-    add("capital",COUNTRIES[COUNTRY_CODES.indexOf(code)]?.capital||"—");
+    const index=COUNTRY_CODES.indexOf(code);
+    add("region",continentName(index,profile?.continent));
+    add("capital",profile?.capital??COUNTRIES[index]?.capital??"—");
     add("currency",currencyName(info?.currency,info?.currencyName));
     if(info?.languageFamily)add("language",lang==="pt"
       ?COUNTRY_FAMILIES_PT[info.languageFamily]||info.languageFamily:info.languageFamily);
@@ -913,7 +920,7 @@
       details.history?.en||atlasText("notAvailable");
     $("atlasHistorySource").textContent=COUNTRY_CLUE_I18N[lang]?.countryHistorySource||
       COUNTRY_CLUE_I18N.en?.countryHistorySource||"";
-    renderCountryProfile(details,code,countryAt(index),{
+    renderCountryProfile(details,code,null,{
       title:"atlasCountryTitle",source:"atlasCountrySource",list:"atlasCountryStats"
     });
     atlasEvidence(index,"normal","atlasNormalEvidence");
@@ -1038,20 +1045,20 @@
     if(switchToDaily)button.textContent=t("daily");
     else if(showOther)button.textContent=t("otherDaily",{difficulty:t(other)});
   }
-  function renderDossier(){
-    if(!game.finished)return;
-    const best=bestGuess();
-    const place=countryAt(game.index);
-    $("reportCode").textContent=caseCode();
-    $("reportVerdict").textContent=t(game.won?"caseSolved":"caseClosed");
-    $("reportHeading").textContent=countryName(game.index);
-    $("reportCountry").textContent=countryName(game.index);
-    const iso=COUNTRY_CODES[game.index],details=COUNTRY_INSIGHTS[iso];
+  function renderDossier(record=game){
+    if(!record.finished)return;
+    const best=bestGuess(record);
+    const place=countryAt(record.index);
+    $("reportCode").textContent=caseCode(record);
+    $("reportVerdict").textContent=t(record.won?"caseSolved":"caseClosed");
+    $("reportHeading").textContent=countryName(record.index);
+    $("reportCountry").textContent=countryName(record.index);
+    const iso=COUNTRY_CODES[record.index],details=record.profile?.details??COUNTRY_INSIGHTS[iso];
     const flagImage=$("reportFlag"),flagFallback=$("reportFlagFallback");
     flagFallback.textContent=details?.flag||"";
     flagFallback.classList.add("hidden");
     flagImage.classList.remove("hidden");
-    flagImage.alt=countryName(game.index);
+    flagImage.alt=countryName(record.index);
     flagImage.onerror=()=>{
       flagImage.classList.add("hidden");
       flagFallback.classList.remove("hidden");
@@ -1064,25 +1071,28 @@
       details?.history?.en||"";
     $("reportHistorySource").textContent=COUNTRY_CLUE_I18N[lang]?.countryHistorySource||
       COUNTRY_CLUE_I18N.en?.countryHistorySource||"CIA World Factbook";
-    $("reportStamp").textContent=t(game.won?"reportSuccess":"reportFailure");
-    $("reportMode").textContent=t(game.mode==="daily"?"daily":"free");
-    $("reportDifficulty").textContent=t(difficulty);
-    $("reportAttempts").textContent=isRush()?String(game.guesses.length):game.guesses.length+" / "+maximum();
-    $("reportBest").textContent=game.won?"✓":best?.feedback?distanceText(best.feedback):"—";
-    $("reportHints").textContent=number(Number.isInteger(game.paidHints)
-      ?game.paidHints:Math.round(game.penalty/HINT_COST));
-    $("reportScore").textContent=number(game.score)+" / 5,000";
-    $("reportRanking").textContent=rankingResult();
-    $("reportCoordinates").textContent=isCountryGame()?"—":place[3].toFixed(4)+"°, "+place[4].toFixed(4)+"°";
-    $("reportContinent").textContent=continentName(game.index);
-    renderCountryProfile(details,iso,place);
-    const trivia=factFor(game.index);
+    $("reportStamp").textContent=t(record.won?"reportSuccess":"reportFailure");
+    $("reportMode").textContent=t(record.mode==="daily"?"daily":"free");
+    $("reportDifficulty").textContent=t(record.difficulty);
+    $("reportAttempts").textContent=record.difficulty==="rush"?String(record.guesses.length):
+      record.guesses.length+" / "+DIFFICULTIES[record.difficulty].attempts;
+    $("reportBest").textContent=record.won?"✓":best?.feedback?distanceText(best.feedback):"—";
+    $("reportHints").textContent=number(Number.isInteger(record.paidHints)
+      ?record.paidHints:Math.round(record.penalty/HINT_COST));
+    $("reportScore").textContent=number(record.score)+" / 5,000";
+    $("reportRanking").textContent=rankingResult(record);
+    $("reportDuration").textContent=Number.isFinite(record.durationMs)?formatElapsed(record.durationMs):"—";
+    $("reportCoordinates").textContent=record.targetKind==="country"?"—":
+      place[3].toFixed(4)+"°, "+place[4].toFixed(4)+"°";
+    $("reportContinent").textContent=continentName(record.index,record.profile?.continent);
+    renderCountryProfile(details,iso,record.profile);
+    const trivia=factFor(details);
     const showTrivia=Boolean(trivia)&&
       !sameReportInformation(trivia,$("reportHistory").textContent);
     $("reportFactSection").classList.toggle("hidden",!showTrivia);
     $("reportFact").textContent=showTrivia?trivia:"";
     const log=$("reportTimeline");log.replaceChildren();
-    for(const [i,g] of game.guesses.entries()){
+    for(const [i,g] of record.guesses.entries()){
       const row=document.createElement("li");row.className="report-log-row";
       if(g===best){row.classList.add("best");row.classList.add("closest");}
       const n=document.createElement("span");n.className="report-log-index";n.textContent=String(i+1).padStart(2,"0");
@@ -1092,7 +1102,7 @@
       if(g.at)stamp.setAttribute("datetime",g.at);
       stamp.textContent=guessTimestamp(g);label.append(stamp);
       row.append(n,label);
-      const metricText=guessMetricText(g);
+      const metricText=guessMetricText(g,record);
       if(metricText){
         const metric=document.createElement("strong");
         metric.textContent=metricText;
@@ -1100,23 +1110,50 @@
       }
       log.append(row);
     }
-    if(!game.guesses.length){
+    if(!record.guesses.length){
       const item=document.createElement("li");item.textContent=t("reportNoGuesses");log.append(item);
     }
     const evidence=$("reportEvidenceList");evidence.replaceChildren();
-    (game.ranked?game.rankedClues:cluesFor(game.index,difficulty)).forEach((clue,i)=>{
+    (record.ranked?record.rankedClues:cluesFor(record.index,record.difficulty,record.evidenceVersion)).forEach((clue,i)=>{
       const item=document.createElement("li");item.className="report-evidence-row";
       const n=document.createElement("span");n.textContent=String(i+1).padStart(2,"0");
       const value=document.createElement("span");value.textContent=clueText(clue);
       item.append(n,value);evidence.append(item);
     });
   }
+  let archivedReport=null;
+  function clearArchivedReport(){
+    archivedReport=null;
+    $("reportDialog").removeAttribute("data-archive");
+  }
+  function openArchivedReport(response){
+    const index=COUNTRY_CODES.indexOf(response.target);
+    if(!response.finished||index<0||!Object.hasOwn(DIFFICULTIES,response.difficulty))return false;
+    const dialog=$("reportDialog");
+    if(dialog.open)closeReport();
+    archivedReport={
+      index,date:response.day,serial:response.caseNumber,rankedId:response.id,
+      difficulty:response.difficulty,mode:response.mode,won:Boolean(response.won),
+      finished:true,ranked:true,rankingSaved:response.saved,rankingPoints:response.rankingPoints,
+      targetKind:"country",profile:response.profile,rankedClues:response.clues,
+      score:response.score,durationMs:response.elapsedMs,paidHints:response.hints,
+      guesses:rankedGuesses(response)
+    };
+    renderDossier(archivedReport);
+    dialog.setAttribute("data-archive","");
+    if(dialog.parentElement!==document.body)document.body.append(dialog);
+    $("caseReportBody").scrollTop=0;
+    dialog.showModal();
+    return true;
+  }
+  window.CartigmaCaseArchive={open:openArchivedReport};
   function closeReport(){
     const dialog=$("reportDialog");
     if(dialog?.open)dialog.close();
+    if(archivedReport)clearArchivedReport();
   }
   function showReport(){
-    if(!game?.finished)return;
+    if(!game?.finished||archivedReport)return;
     renderDossier();
     const dialog=$("reportDialog");
     // Phone dossier lives inside the lower investigation scroller, without
@@ -1132,10 +1169,10 @@
       }else dialog.show();
     }
   }
-  function rankingResult(){
-    if(game.rankingPoints>0)return deductionText("rankAdded",{points:number(game.rankingPoints)});
-    if(game.rankingPoints===0)return deductionText("rankBest");
-    if(game.rankingSaved)return deductionText("rankSaved");
+  function rankingResult(record=game){
+    if(record.rankingPoints>0)return deductionText("rankAdded",{points:number(record.rankingPoints)});
+    if(record.rankingPoints===0&&record===game)return deductionText("rankBest");
+    if(record.rankingSaved)return deductionText("rankSaved");
     return deductionText("rankOffline");
   }
   function renderResult(){
@@ -1151,7 +1188,7 @@
       :t(game.won?"countryFound":"countryLost",{country:name,count:game.guesses.length});
     $("finalScore").textContent=number(game.score);
     $("resultRanking").textContent=rankingResult();
-    renderDossier();
+    if(!archivedReport)renderDossier();
   }
   function feedback(){
     const el=$("feedback"),mobile=$("mobileGuessFeedback");
@@ -1658,10 +1695,12 @@
     else $("countrySearch").setAttribute("aria-activedescendant","");
   }
   async function share(){
-    const symbols=game.guesses.map(g=>g.countryCode===COUNTRY_CODES[game.index]?"✓":"×").join("");
-    const attempts=isRush()?String(game.guesses.length):game.guesses.length+"/"+maximum();
-    const txt="Cartigma "+caseCode()
-      +"\n"+(game.won?"✓ "+attempts:"×")+" · "+number(game.score)+" pts\n"+symbols
+    const record=archivedReport??game;
+    const symbols=record.guesses.map(g=>g.countryCode===COUNTRY_CODES[record.index]?"✓":"×").join("");
+    const attempts=record.difficulty==="rush"?String(record.guesses.length):
+      record.guesses.length+"/"+DIFFICULTIES[record.difficulty].attempts;
+    const txt="Cartigma "+caseCode(record)
+      +"\n"+(record.won?"✓ "+attempts:"×")+" · "+number(record.score)+" pts\n"+symbols
       +"\nhttps://f404x.github.io/cartigma/";
     try{
       if(navigator.share){await navigator.share({text:txt});return}
@@ -1985,6 +2024,9 @@
     $("reportOpenBtn").addEventListener("click",showReport);
     $("newCaseBtn").addEventListener("click",startFree);
     $("reportCloseBtn").addEventListener("click",closeReport);
+    $("reportDialog").addEventListener("close",()=>{
+      if(!$("reportDialog").open&&archivedReport)clearArchivedReport();
+    });
     $("reportMapBtn").addEventListener("click",()=>{
       closeReport();
       if(isMobileScreen()){
