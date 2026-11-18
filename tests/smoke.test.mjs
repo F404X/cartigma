@@ -237,6 +237,33 @@ test("All countries have valid evidence without latitude belts or UTM and no con
     assert.equal(keys.some(x=>["zone","utmZone","utmBand","latitude"].includes(x)),false);
   }
 });
+test("Caribbean cases show their own region clue, distinct from North/Central America",()=>{
+  const g=boot({autoStart:false}),$=g.get;
+  $("atlasBtn").click();
+  const selectCountry=code=>{
+    const item=$("atlasOptions").children.find(b=>
+      b.children[1]?.children[1]?.textContent===code);
+    assert.ok(item,"Missing atlas entry "+code);
+    item.click();
+    return $("atlasNormalEvidence").children[0].children[1].textContent;
+  };
+  g.language("pt");
+  assert.equal(selectCountry("CU"),"Região: Caribe");
+  assert.equal(selectCountry("JM"),"Região: Caribe");
+  assert.equal(selectCountry("MX"),"Região: América do Norte/Central");
+  assert.equal(selectCountry("PA"),"Região: América do Norte/Central");
+  assert.match(selectCountry("BR"),/América do Sul/);
+  g.language("en");
+  assert.equal(selectCountry("CU"),"Region: Caribbean");
+  assert.equal(selectCountry("MX"),"Region: North/Central America");
+  const locales=Object.entries(g.window.GeoCluesI18n);
+  assert.equal(locales.length,19);
+  for(const [language,pack] of locales){
+    assert.ok(pack.regions.northCentralAmerica,language);
+    assert.ok(pack.regions.caribbean,language);
+    assert.ok(pack.templates.countryRegion.includes("{value}"),language);
+  }
+});
 test("Signed-in account automatically uses the native map in ranked mode",async()=>{
   const events=[];
   const state={
