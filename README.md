@@ -32,17 +32,17 @@ Every guess is timestamped and its elapsed time is displayed in the guess histor
 
 ### Evidence
 
-Each investigation has **10 clues**, drawn from the available country-level facts and geographical references. Possible topics include continent, latitude belt, longitude sectors, UTM zone/band, hemisphere of the geographic reference, country currency denomination, language family, flag color where verified, country population, GDP per capita, territorial area and access to the sea.
+Each investigation has **6–10 clues**, depending on how much country-level source data exists. Clues include **continent OR north/south hemisphere** (never both in one case), 30° longitude sectors, currency denomination, language family, verified flag color, dated country population, GDP per capita, territorial area, access to the sea and number of land-border neighbours. **Latitude belts, latitude sectors and UTM zones/bands are not clue types.** The Normal, Hard and Rush modes draw from the same validated clue engine.
 
 **Landscape (“Paisagem”) is not an evidence type.** National-capital status, distance to a capital and distance to a coast are also excluded from gameplay, as are city population and density. These old city-only facts do not appear in the country archive either.
 
 Numerical evidence uses a strictly valid rounded bound, such as `> 100,000,000` or `< 2,000,000 km²`. Source values and years remain available in the country dossier where verified. Missing economic data is never substituted with invented values.
 
-Countries that intersect multiple latitude bands display the primary band and a localized **+another / +others** marker without showing counts: **Mexico: Subtropical +another**, **Brazil: Tropical +others** (Portuguese: **Subtropical +outra**, **Tropical +outras**). When a latitude-belt clue exists, the redundant **latitude-sector** clue is never selected. A sourced land-border-neighbors clue helps maintain ten distinct clues; UTM latitude bands remain separate. Purchasing the overlay highlights the represented latitude bands.
+Missing economic or flag-color data are not substituted with invented values. The game shows fewer than ten clues when that is the only accurate option. Clue order is deterministic per country/difficulty and is verified against the ranking server in tests.
 
 ### Optional map aids
 
-The game has an interactive MapLibre vector map with an OpenStreetMap/Leaflet fallback. Where supported, paid overlays can show a longitude sector, equator/hemisphere, continent outline or UTM grid. Normal and Hard retain their existing hint price and score systems; Hard's assisted information is more expensive. Rush automatically unlocks hints over time, with no manual Reveal button.
+The game has an interactive MapLibre vector map with an OpenStreetMap/Leaflet fallback. Where supported, paid overlays can show a longitude sector, equator/hemisphere or continent outline. Both the browser and the ranked server validate the same available overlays and prices. Normal and Hard retain their existing hint price and score systems; Hard's assisted information is more expensive. Rush automatically unlocks hints over time, with no manual Reveal button.
 
 **Rush** disables all purchased evidence overlays and hides their buttons. Its clues unlock automatically, and map pins for guesses and results remain usable.
 
@@ -52,7 +52,7 @@ The map has layer filters for country/city *basemap labels*, state boundaries, r
 
 ## Country archive
 
-Use the list button in the header to browse **all 195 country dossiers** and their available facts. The archive includes localized country names, flags, histories, a country profile and the ten Normal/Hard evidence examples for each country. Browsing never changes the active case or score.
+Use the list button in the header to browse **all 195 country dossiers** and their available facts. The archive includes localized country names, flags, histories, a country profile and the available Normal/Hard evidence examples for each country. Browsing never changes the active case or score.
 
 The UI supports **19 languages**: English, Brazilian Portuguese, Spanish, Simplified Chinese, Japanese, Russian, French, German, Italian, Dutch, Polish, Swedish, Turkish, Arabic, Hebrew, Korean, Thai, Vietnamese and Indonesian. Arabic and Hebrew use RTL layout. On phones, the responsive map and compact popovers share the available screen height without forcing the page to scroll.
 
@@ -73,9 +73,10 @@ The site uses plain HTML, CSS and JavaScript without an account, a server-side A
 
 | File | Purpose |
 | --- | --- |
-| `country-catalog.js` | The **195 unique countries**, geography, ISO codes and latitude bands |
+| `country-catalog.js` | The **195 unique countries**, geography and ISO codes |
 | `country-insights.js` | Country facts, ISO flags, source years and historical summaries |
 | `app.js` | Case state, country clues, country search, Rush, shuffle bag, map overlays and dossiers |
+| `shared-clues.js` | Shared source of truth for offline and ranked evidence selection, hint costs, overlays and scores |
 | `atlas-i18n.js` | Translated country-archive labels in 19 languages |
 | `clues-i18n.js` / `country-clues-i18n.js` | Geographical and country-data clue translations |
 | `index.html`, `styles.css`, `mobile.css`, `themes.css` | Accessible responsive UI |
