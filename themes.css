@@ -1,56 +1,78 @@
-/* GeoDetective appearance system.
-   Warm yellow is reserved for interactive accents, never for large background areas.
-   All base surfaces are blue-black (dark) or near-white (light). */
-:root,:root[data-theme="dark"]{
+/* The root and the miniature previews share the same palette tokens. */
+:root,[data-palette="midnight"]{
+  --bg:#0b1018;--surface:#111827;--surface2:#1a2434;
+  --text:#ebeff7;--muted:#a5b2c5;--accent:#f6ca47;
+}
+/* Raycast's charcoal and coral. */
+[data-palette="graphite"]{
+  --bg:#0a0a0c;--surface:#141416;--surface2:#202024;
+  --text:#f4f2f3;--muted:#b7afb5;--accent:#ff766e;
+}
+/* Linear's near-black and indigo. */
+[data-palette="orbit"]{
+  --bg:#101019;--surface:#181826;--surface2:#242337;
+  --text:#f1efff;--muted:#bcb7d4;--accent:#b3a4ff;
+}
+/* Supabase's green against subdued, dark surfaces. */
+[data-palette="forest"]{
+  --bg:#0c1411;--surface:#13201a;--surface2:#1c2c24;
+  --text:#edf6ef;--muted:#a6c1af;--accent:#69e2a6;
+}
+/* Primer's dark blue neutrals and blue accent. */
+[data-palette="abyss"]{
+  --bg:#0a1723;--surface:#112231;--surface2:#1a3044;
+  --text:#ecf6ff;--muted:#a9c2d6;--accent:#78d8fd;
+}
+/* GitLab's plum and orange. */
+[data-palette="ember"]{
+  --bg:#1b111b;--surface:#251725;--surface2:#332234;
+  --text:#fff0f3;--muted:#d1b4c5;--accent:#ffb080;
+}
+/* GitHub Primer's light surfaces with a cool blue accent. */
+[data-palette="porcelain"]{
+  --bg:#eff4fa;--surface:#fff;--surface2:#eaf1fa;
+  --text:#1c2b3d;--muted:#4f6178;--accent:#225bc4;
+}
+/* Financial Times's newsprint and claret. */
+[data-palette="linen"]{
+  --bg:#fff1e5;--surface:#fff9f2;--surface2:#f7e7db;
+  --text:#36251f;--muted:#69564d;--accent:#8b2849;
+}
+/* Shopify's green identity softened for a light UI. */
+[data-palette="garden"]{
+  --bg:#eef4ea;--surface:#fafff7;--surface2:#e5f0df;
+  --text:#223526;--muted:#4d6552;--accent:#246742;
+}
+/* The Pudding's editorial purple on a pale ground. */
+[data-palette="petal"]{
+  --bg:#f8eff9;--surface:#fffaff;--surface2:#f1e6f4;
+  --text:#39263d;--muted:#67536d;--accent:#7e368c;
+}
+:root{
   color-scheme:dark;
-  --bg:#0b1018;
-  --surface:#111827;
-  --surface2:#1a2434;
-  --surface3:#253247;
-  --border:#2a374b;
-  --border-strong:#455772;
-  --text:#ebeff7;
-  --muted:#a5b2c5;
-  --accent:#f6ca47;
-  --accent-hover:#ffdd70;
-  --accent-soft:#f6ca4717;
-  --accent-fill:#f6ca47;
-  --on-accent:#242014;
-  --danger:#ee918e;
-  --input-bg:#0c1420;
-  --hover-bg:#253249;
-  --disabled-bg:#303947;
-  --disabled-text:#99a6b8;
-  --map-placeholder:#101924;
-  --control-overlay:#111827ed;
-  --pin-outline:#0b1018;
+  --surface3:color-mix(in srgb,var(--surface2) 90%,var(--text));
+  --border:color-mix(in srgb,var(--surface2) 88%,var(--text));
+  --border-strong:color-mix(in srgb,var(--surface2) 68%,var(--text));
+  --accent-hover:color-mix(in srgb,var(--accent) 88%,var(--text));
+  --accent-soft:color-mix(in srgb,var(--accent) 12%,var(--surface));
+  --accent-fill:var(--accent);
+  --on-accent:#15121a;
+  --danger:#f29b98;
+  --input-bg:var(--bg);
+  --hover-bg:var(--surface3);
+  --disabled-bg:var(--surface3);
+  --disabled-text:var(--muted);
+  --map-placeholder:var(--surface2);
+  --control-overlay:color-mix(in srgb,var(--surface) 94%,transparent);
+  --pin-outline:var(--bg);
 }
-:root[data-theme="light"]{
+:root[data-color-mode="light"]{
   color-scheme:light;
-  --bg:#f3f6fb;
-  --surface:#ffffff;
-  --surface2:#f5f8fc;
-  --surface3:#eaf0f8;
-  --border:#d5dfec;
-  --border-strong:#b7c5d7;
-  --text:#172338;
-  --muted:#5e7087;
-  --accent:#855900;
-  --accent-hover:#a66f00;
-  --accent-soft:#fff2cf;
-  --accent-fill:#f5c84d;
-  --on-accent:#252015;
-  --danger:#b83a3a;
-  --input-bg:#f9fbff;
-  --hover-bg:#eaf1fa;
-  --disabled-bg:#e3e8f0;
-  --disabled-text:#8491a5;
-  --map-placeholder:#dfe7f0;
-  --control-overlay:#fffffff2;
-  --pin-outline:#344054;
+  --on-accent:#fff;
+  --danger:#a6283d;
+  --pin-outline:var(--text);
 }
-
-/* Neutral surfaces in both modes — no green cast or yellow fills for ordinary panels. */
+/* Shared application surfaces. */
 html,body{background:var(--bg);color:var(--text)}
 .site-header,.toolbar,.map-toolbar,.map-bottom,.case-header,.clue-panel,.guess-panel,.status-bar{
   background:var(--surface);border-color:var(--border)
@@ -119,42 +141,21 @@ dialog.case-report,dialog.case-report[open]{background:var(--surface);color:var(
 .clue-list,.case-columns .clue-list{scrollbar-color:var(--border-strong) transparent}
 .case-columns .clue-list::-webkit-scrollbar-thumb{background:var(--border-strong)}
 
-/* Light theme: dark ink over white/slate. Accent stays gold only on indicators. */
-:root[data-theme="light"] .clue.locked{opacity:.8}
-:root[data-theme="light"] .clue.locked .clue-text{color:#78869a}
-:root[data-theme="light"] .clue.locked .clue-category{color:#6c7c94}
-:root[data-theme="light"] .case-status{background:var(--accent-soft)}
-:root[data-theme="light"] .suggestion:hover,
-:root[data-theme="light"] .suggestion:focus-visible{background:var(--hover-bg)}
-:root[data-theme="light"] .result-card{box-shadow:0 3px 16px #17283d15}
-:root[data-theme="light"] .toast{box-shadow:0 5px 25px #15203319}
-:root[data-theme="light"] .report-stamp{color:var(--accent);border-color:var(--accent)}
-:root[data-theme="light"] .report-fact{border-left-color:var(--accent-fill)}
-:root[data-theme="light"] .report-grid>div{border-left-color:var(--border-strong)}
-:root[data-theme="light"] .report-log-row.best{border-left-color:var(--accent)}
-:root[data-theme="light"] .report-code{color:var(--text)}
-:root[data-theme="light"] .report-close{color:var(--muted)}
-:root[data-theme="light"] dialog.case-report,
-:root[data-theme="light"] dialog.case-report[open]{box-shadow:-8px 0 28px #17283d20}
-:root[data-theme="light"] dialog{box-shadow:0 16px 45px #19294429}
-:root[data-theme="light"] .language-menu{box-shadow:0 12px 35px #14233c23}
-:root[data-theme="light"] .suggestions{box-shadow:0 6px 18px #14233c21}
-:root[data-theme="light"] .language-option.selected{color:var(--text)}
-:root[data-theme="light"] .maplibregl-ctrl button .maplibregl-ctrl-icon{filter:invert(.12)}
-:root[data-theme="light"] .leaflet-tile-pane{filter:none}
-:root[data-theme="light"] .leaflet-control-zoom a{color:var(--text)!important}
-:root[data-theme="light"] .leaflet-container .leaflet-popup-content-wrapper,
-:root[data-theme="light"] .leaflet-container .leaflet-popup-tip{
+/* Light-mode overrides for external map controls and effects. */
+:root[data-color-mode="light"] .clue.locked{opacity:.85}
+:root[data-color-mode="light"] .result-card{box-shadow:0 3px 16px #10182715}
+:root[data-color-mode="light"] .toast{box-shadow:0 5px 25px #10182719}
+:root[data-color-mode="light"] dialog{box-shadow:0 16px 45px #10182729}
+:root[data-color-mode="light"] .maplibregl-ctrl button .maplibregl-ctrl-icon{filter:invert(.12)}
+:root[data-color-mode="light"] .leaflet-tile-pane{filter:none}
+.leaflet-container .leaflet-popup-content-wrapper,.leaflet-container .leaflet-popup-tip{
   color:var(--text)!important;background:var(--surface)!important
 }
-:root[data-theme="light"] .maplibregl-marker.pin .pin-head,
-:root[data-theme="light"] .geodetective-leaflet-pin .pin-head{border-color:var(--pin-outline)}
-:root[data-theme="light"] .compass-rose{color:#49596e}
-:root[data-theme="light"] .compass-art path[fill="#b7bdab"],
-:root[data-theme="light"] .compass-art path[fill="#8c9484"]{fill:#57687c}
-:root[data-theme="light"] .compass-art circle[fill="#141811"]{fill:#ffffff}
+.compass-art path[fill="#b7bdab"],.compass-art path[fill="#8c9484"]{fill:var(--muted)}
+.compass-art circle[fill="#141811"]{fill:var(--surface)}
+.compass-art path[fill="#ffd449"]{fill:var(--accent)}
 
-/* Theme toggle: plain utility control, not another yellow panel. */
+/* Theme catalog and preview cards. */
 .theme-toggle{
   height:33px;display:inline-flex;align-items:center;justify-content:center;gap:7px;
   padding:0 10px;border:1px solid var(--border-strong);border-radius:3px;
@@ -162,11 +163,67 @@ dialog.case-report,dialog.case-report[open]{background:var(--surface);color:var(
   white-space:nowrap;flex-shrink:0;
 }
 .theme-toggle:hover{color:var(--accent);border-color:var(--accent);background:var(--hover-bg)}
-.theme-toggle .theme-moon{display:none}
-:root[data-theme="light"] .theme-toggle .theme-sun{display:none}
-:root[data-theme="light"] .theme-toggle .theme-moon{display:block}
-:root[data-theme="light"] .theme-toggle{background:var(--surface);color:var(--text)}
-:root[data-theme="light"] .theme-toggle:hover{color:var(--accent)}
+.theme-trigger-icon{
+  display:block;width:15px;height:15px;border:1px solid currentColor;border-radius:50%;
+  background:conic-gradient(var(--accent) 0 25%,var(--surface3) 25% 50%,var(--text) 50% 75%,var(--surface) 75%);
+}
+dialog.theme-catalog{
+  width:min(680px,calc(100% - 24px));max-height:min(760px,calc(100dvh - 24px));
+  padding:0;border:1px solid var(--border-strong);border-radius:12px;
+  background:var(--surface);box-shadow:0 24px 68px #0006;overflow:hidden;
+}
+dialog.theme-catalog[open]{display:flex;flex-direction:column}
+.theme-catalog::backdrop{background:#090e17b0}
+.theme-catalog-header{
+  flex:none;display:flex;align-items:center;justify-content:space-between;
+  gap:12px;padding:15px 20px;border-bottom:1px solid var(--border);
+}
+.theme-catalog-header h2{margin:0;font:600 21px/1.2 var(--font);color:var(--text)}
+.theme-close{
+  flex:none;width:36px;height:36px;border:1px solid var(--border);border-radius:6px;
+  background:var(--surface2);color:var(--muted);font:500 22px/1 var(--font);
+}
+.theme-close:hover{border-color:var(--accent);color:var(--accent)}
+.theme-catalog-body{padding:16px 20px 21px;overflow:auto;overscroll-behavior:contain}
+.theme-catalog-body section+section{margin-top:17px}
+.theme-catalog-body h3{margin:0 0 10px;color:var(--muted);font:600 12px/1.3 var(--font)}
+.theme-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+#lightThemeOptions{grid-template-columns:repeat(4,minmax(0,1fr))}
+.theme-card{
+  min-width:0;padding:5px;text-align:start;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:7px;cursor:pointer;
+}
+.theme-card:hover{border-color:var(--border-strong);background:var(--surface3)}
+.theme-card[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.theme-card-name{
+  display:flex;align-items:center;justify-content:space-between;gap:4px;min-height:27px;
+  padding:3px 4px 0;font:600 12px/1.25 var(--font);
+}
+.theme-card[aria-pressed="true"] .theme-card-name::after{content:"";width:9px;height:5px;
+  border:solid var(--accent);border-width:0 0 2px 2px;transform:rotate(-45deg);flex:none}
+.theme-preview{
+  display:grid;grid-template-columns:3fr 2fr;gap:4px;height:51px;padding:10px 5px 5px;
+  background:linear-gradient(var(--surface2) 0 6px,var(--bg) 6px);
+  border:1px solid color-mix(in srgb,var(--text) 20%,var(--bg));border-radius:4px;
+}
+.theme-preview-map,.theme-preview-panel{position:relative;overflow:hidden;border-radius:2px}
+.theme-preview-map{
+  background:
+    radial-gradient(circle at 58% 49%,var(--accent) 0 3px,transparent 4px),
+    linear-gradient(135deg,transparent 24%,var(--surface2) 25% 52%,transparent 53%),
+    linear-gradient(27deg,var(--surface2) 0 29%,var(--surface) 30% 66%,var(--bg) 67%);
+}
+.theme-preview-panel{
+  background:
+    linear-gradient(var(--accent),var(--accent)) 5px 6px/42% 2px no-repeat,
+    linear-gradient(var(--text),var(--text)) 5px 12px/61% 2px no-repeat,
+    linear-gradient(var(--muted),var(--muted)) 5px 18px/49% 2px no-repeat,
+    var(--surface);
+}
+@media(max-width:560px){
+  .theme-options,#lightThemeOptions{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .theme-catalog-header,.theme-catalog-body{padding-inline:13px}
+}
 @media(max-width:760px){
   .theme-toggle{width:31px;height:31px;padding:0}
   .theme-toggle #themeLabel{display:none}
@@ -181,41 +238,19 @@ dialog.case-report,dialog.case-report[open]{background:var(--surface);color:var(
 }
 
 
-/* The world-map title is the difficulty signal, independent of the site theme. */
+/* Normal uses the selected accent. Hard and Rush retain their mode colors. */
 .map-toolbar{
-  background:#f4ca51;
-  color:#1e2836;
-  border-bottom-color:#d5a93b;
+  background:var(--accent-fill);color:var(--on-accent);
+  border-bottom-color:color-mix(in srgb,var(--accent-fill) 80%,var(--on-accent));
 }
-.map-toolbar.is-hard{
-  background:#c94152;
-  color:#fff;
-  border-bottom-color:#a63240;
-}
+.map-toolbar.is-hard{background:#b43747;color:#fff;border-bottom-color:#922b38}
 .map-toolbar .map-status,.map-toolbar .map-hint{color:inherit}
-.map-toolbar .map-hint{opacity:.82}
-.map-toolbar .status-dot{background:#283347}
-.map-toolbar.is-hard .status-dot{background:#fff}
+.map-toolbar .map-hint{opacity:.88}
+.map-toolbar .status-dot{background:currentColor}
 .map-toolbar .ghost-button{
-  background:#1e28360e;
-  border-color:#1e28365b;
-  color:#1e2836;
+  background:transparent;border-color:currentColor;color:inherit;
 }
-.map-toolbar.is-hard .ghost-button{
-  background:#ffffff15;
-  border-color:#ffffff87;
-  color:#fff;
-}
-.map-toolbar .ghost-button:hover{
-  background:#1e28361f;
-  border-color:#1e2836a8;
-  color:#1e2836;
-}
-.map-toolbar.is-hard .ghost-button:hover{
-  background:#ffffff2b;
-  border-color:#fff;
-  color:#fff;
-}
+.map-toolbar .ghost-button:hover{background:color-mix(in srgb,currentColor 13%,transparent);color:inherit}
 
 /* GitHub brand mark is visible and comfortably tappable on all screens. */
 .github-link{
@@ -282,10 +317,23 @@ dialog.case-report,dialog.case-report[open]{background:var(--surface);color:var(
 
 /* Map layer popover inherits light and dark UI surface tokens. */
 .map-filter-popover{background:var(--surface);border-color:var(--border-strong);color:var(--text)}
-:root[data-theme="light"] .map-filter-popover{box-shadow:0 12px 28px #17233829}
+:root[data-color-mode="light"] .map-filter-popover{box-shadow:0 12px 28px #17233829}
 
 /* Rush is distinct from Normal (gold) and Hard (red), in both themes. */
-.map-toolbar.is-rush{background:#ec4899;color:#fff;border-bottom-color:#b83176}
+.map-toolbar.is-rush{background:#a92667;color:#fff;border-bottom-color:#852053}
 .map-toolbar.is-rush .status-dot{background:#fff}
 .map-toolbar.is-rush .ghost-button{background:#ffffff18;border-color:#ffffff87;color:#fff}
 .map-toolbar.is-rush .ghost-button:hover{background:#ffffff30;border-color:#fff}
+
+
+/* Map controls and the selection marker reuse the application palette. */
+.score-box{background:var(--surface2);border-color:var(--border)}
+dialog.case-report .report-body{scrollbar-color:var(--border-strong) transparent}
+.maplibregl-marker.pin .pin-head,.geodetective-leaflet-pin .pin-head{
+  border-color:var(--pin-outline)
+}
+.maplibregl-marker.pin.current,.geodetective-leaflet-pin .pin.current{
+  --pin-color:var(--accent-fill);color:var(--on-accent)
+}
+.geodetective-leaflet-pin .pin.current .pin-head{color:inherit}
+.hemisphere-direction-arrow{color:var(--accent)}

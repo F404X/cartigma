@@ -44,7 +44,7 @@ The game has an interactive MapLibre vector map with an OpenStreetMap/Leaflet fa
 
 **Mobile layout:** the map, case summary, and two tappable bottom cards fit within one viewport. **Evidence** and **Your guess** open independent, compact popovers with their own bounded scrolling; only one is open at a time. The cards show clue/guess counts, hide locked clue rows, support keyboard and touch search, and preserve map interaction. On short landscape phones, the same controls occupy a small side dock rather than covering the map. The finished-case dossier opens as a scrollable mobile dialog. Desktop retains its full two-column investigation layout.
 
-The map has layer filters for country/city *basemap labels*, state boundaries, roads and physical features. These are map labels, **not a city database** and cannot be selected as game answers. The map theme supports dark and light appearances and localized country names.
+The map has layer filters for country/city *basemap labels*, state boundaries, roads and physical features. These are map labels, **not a city database** and cannot be selected as game answers. The theme catalog offers six dark and four light palettes, remembers your choice on this device, and keeps the map in the selected light or dark mode. The map also uses localized country names.
 
 ## Country archive
 

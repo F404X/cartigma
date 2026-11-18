@@ -42,6 +42,8 @@ class Element {
 const hash=input=>{let h=2166136261;for(const c of input){h ^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0};
 function boot({storage=new Map(),map=false,randomValue=0.42,mobile=false,clock=Date,countryData=null,autoStart=true,ranking=null,intl=Intl}={}){
   const clockCallbacks=[],nodes=new Map(),window={},mobileCase=new Element("mobile-case"),mapState={fits:[],eases:[],styles:[],zoomRanges:[],markers:[],layers:new Map(),sources:new Map(),events:{},canvas:new Element("canvas")};
+  const windowEvents={};
+  window.addEventListener=(type,listener)=>{windowEvents[type]=listener;};
   const document={
     readyState:"complete",documentElement:{lang:"en",dir:"ltr"},hidden:false,
     getElementById(id){if(!nodes.has(id))nodes.set(id,new Element(id));return nodes.get(id)},
@@ -70,6 +72,7 @@ function boot({storage=new Map(),map=false,randomValue=0.42,mobile=false,clock=D
       {id:"poi_museum",type:"symbol",layout:{"text-field":["get","name"]}},
       {id:"case-hemisphere-arrows",type:"symbol",layout:{"text-field":"↑"}}
     ]}},
+    setStyle(style){mapState.currentStyle=style;},
     setLayoutProperty(id,key,expr){mapState.styles.push({id,key,expr})},
     setLayerZoomRange(id,min,max){mapState.zoomRanges.push({id,min,max})},
     easeTo(options){mapState.eases.push(options);return this},
@@ -151,7 +154,7 @@ function boot({storage=new Map(),map=false,randomValue=0.42,mobile=false,clock=D
     startActiveFixture();
   };
   const language=value=>get("langSelect").handlers.change({target:{value}});
-  return {get,window,document,storage,select,difficulty,language,mapState,mobileCase,perf,
+  return {get,window,document,storage,select,difficulty,language,mapState,mobileCase,perf,windowEvents,
     tick(){for(const callback of clockCallbacks)callback()}};
 }
 
@@ -1331,4 +1334,22 @@ test("an archived dossier renders the original clues and country profile without
   assert.equal($("reportDialog").attributes["data-archive"],undefined);
   assert.equal(Boolean($("countrySearch").disabled),false);
   assert.equal($("caseCode").textContent,activeCode);
+});
+
+test("palette changes retain the case and the map camera, and reload tiles only across color modes",()=>{
+  const g=boot({map:true}),$=g.get;
+  const caseId=$("caseCode").textContent;
+  const attempts=$("attemptCount").textContent;
+  const camera=g.mapState.eases.length;
+  const change=g.windowEvents["geodetective:themechange"];
+  let mode="dark";
+  g.document.documentElement.getAttribute=name=>name==="data-color-mode"?mode:null;
+  change({detail:{previousColorMode:"dark",colorMode:"dark"}});
+  assert.equal(g.mapState.currentStyle,undefined);
+  mode="light";
+  change({detail:{previousColorMode:"dark",colorMode:"light"}});
+  assert.ok(g.mapState.currentStyle.endsWith("/positron"));
+  assert.equal($("caseCode").textContent,caseId);
+  assert.equal($("attemptCount").textContent,attempts);
+  assert.equal(g.mapState.eases.length,camera);
 });

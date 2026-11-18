@@ -1310,6 +1310,9 @@
   function sectorRectangle(west,south,east,north){
     return [[[west,south],[east,south],[east,north],[west,north],[west,south]]];
   }
+  function mapThemeColor(token,fallback){
+    return window.getComputedStyle?.(document.documentElement).getPropertyValue(token).trim()||fallback;
+  }
   function drawSectorOverlays(){
     if(!map||!mapStyleReady||!Array.isArray(game.sectorReveals))return;
     for(const clue of (game.ranked?game.rankedClues:cluesFor(game.index,difficulty))){
@@ -1320,7 +1323,7 @@
       map.addLayer({id,type:"fill",source:id,
         // Do not stroke the artificial 60° tile edges of geographic overlays.
         // Disabling fill antialiasing removes hairline seams between tiles.
-        paint:{"fill-color":"#ffd449","fill-opacity":0.10,
+        paint:{"fill-color":mapThemeColor("--accent","#ffd449"),"fill-opacity":0.10,
           "fill-antialias":false}});
     }
   }
@@ -1339,7 +1342,7 @@
     map.addSource(id,{type:"geojson",data:{type:"Feature",properties:{},geometry}});
     map.addLayer({id,type:"line",source:id,
       layout:{"line-cap":"round","line-join":"round"},
-      paint:{"line-color":"#ffd449","line-width":1.7,"line-opacity":0.28,
+      paint:{"line-color":mapThemeColor("--accent","#ffd449"),"line-width":1.7,"line-opacity":0.28,
         "line-opacity-transition":{duration:0,delay:0}}});
   }
   function drawHemisphereOverlay(){
@@ -1353,7 +1356,7 @@
       geometry:{type:"LineString",coordinates:[[-179.9,0],[179.9,0]]}}});
     map.addLayer({id:lineId,type:"line",source:lineId,
       layout:{"line-cap":"butt","line-join":"round"},
-      paint:{"line-color":"#ffd449","line-width":2,"line-opacity":0.9,"line-dasharray":[2,3]}});
+      paint:{"line-color":mapThemeColor("--accent","#ffd449"),"line-width":2,"line-opacity":0.9,"line-dasharray":[2,3]}});
     // Repeat labels at fixed SCREEN-pixel intervals along the Equator instead
     // of at fixed geographic coordinates, which drift far away when zoomed.
     const glyph=north?"↑":"↓";
@@ -1364,7 +1367,7 @@
         "text-rotation-alignment":"viewport",
         "text-pitch-alignment":"viewport",
         "text-allow-overlap":true,"text-ignore-placement":true},
-      paint:{"text-color":"#ffd449","text-halo-color":"#172015","text-halo-width":0.7,
+      paint:{"text-color":mapThemeColor("--accent","#ffd449"),"text-halo-color":mapThemeColor("--surface","#172015"),"text-halo-width":0.7,
         "text-opacity-transition":{duration:0,delay:0}}});
   }
   function addMarker(lat,lng,label,style,popupText=""){
@@ -1901,15 +1904,21 @@
     }finally{fallbackSwitching=false}
   }
   function activeMapTheme(){
-    return document.documentElement.getAttribute?.("data-theme")==="light"?"light":"dark";
+    return document.documentElement.getAttribute?.("data-color-mode")==="light"?"light":"dark";
   }
   function vectorMapStyle(){
     // Public OpenFreeMap styles, with no API keys or custom tile providers.
     return "https://tiles.openfreemap.org/styles/"+
       (activeMapTheme()==="light"?"positron":"dark");
   }
-  function updateMapTheme(){
-    if(!map||window.maplibregl?.isFallback)return; // Raster tiles follow CSS.
+  function updateMapTheme(event){
+    if(!map)return;
+    // Raster tiles follow CSS. Repaint case overlays without changing the
+    // current tiles or camera when the new palette keeps the same mode.
+    if(window.maplibregl?.isFallback||event?.detail?.previousColorMode===activeMapTheme()){
+      if(game)renderMap();
+      return;
+    }
     if(typeof map.setStyle!=="function")return;
     mapStyleReady=false;
     originalLayerVisibility.clear();
