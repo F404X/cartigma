@@ -93,3 +93,11 @@ CREATE TABLE IF NOT EXISTS ranked_reservations (
 );
 -- Remove the obsolete per-IP leaderboard cooldown (safe to repeat on staging deploy).
 DROP TABLE IF EXISTS leaderboard_cooldowns;
+
+-- Map overlays purchased for verified games. An independent table keeps
+-- existing staging sessions compatible with the schema migration.
+CREATE TABLE IF NOT EXISTS game_overlays (
+  game_id TEXT NOT NULL REFERENCES game_sessions(id) ON DELETE CASCADE,
+  clue_key TEXT NOT NULL CHECK(clue_key IN ('continent','hemisphere','longitude')),
+  PRIMARY KEY(game_id,clue_key)
+);
