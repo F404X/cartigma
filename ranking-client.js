@@ -311,10 +311,11 @@
      const title=document.createElement("strong"),details=document.createElement("span");
      const summary=document.createElement("span");
      button.type="button";button.className="rank-history-case";
-     title.textContent=countryNames?.of(game.target)??game.target;
+     const country=countryNames?.of(game.target)??game.target;
+     title.textContent=country+" - "+(game.won?"Vitória":"Derrota");
      details.textContent=(game.mode==="daily"?"Caso do dia":"Jogo livre")+" · "+DIFFICULTIES[game.difficulty];
      summary.textContent=historyDate.format(game.finishedAt)+" · "+
-       (game.won?"Acertou":"Encerrada")+" · "+game.score.toLocaleString("pt-BR")+" pts";
+       game.score.toLocaleString("pt-BR")+" pts";
      button.append(title,details,summary);
      button.onclick=()=>openMatch(game.id,button);
      row.append(button);list.append(row);
