@@ -134,25 +134,25 @@
   // (e.g. 009) rather than names on some browsers.
   const continentKeys = ["europe","africa","asia","oceania","northAmerica","southAmerica"];
   const continentNames = {
-    en:"Europe|Africa|Asia|Oceania|North/Central America|South America",
-    pt:"Europa|África|Ásia|Oceania|América do Norte/Central|América do Sul",
-    es:"Europa|África|Asia|Oceanía|América del Norte/Central|América del Sur",
-    zh:"欧洲|非洲|亚洲|大洋洲|北美洲／中美洲|南美洲",
-    ja:"ヨーロッパ|アフリカ|アジア|オセアニア|北アメリカ／中央アメリカ|南アメリカ",
-    ru:"Европа|Африка|Азия|Океания|Северная/Центральная Америка|Южная Америка",
-    fr:"Europe|Afrique|Asie|Océanie|Amérique du Nord/Centrale|Amérique du Sud",
-    de:"Europa|Afrika|Asien|Ozeanien|Nord-/Mittelamerika|Südamerika",
-    it:"Europa|Africa|Asia|Oceania|America settentrionale/centrale|America meridionale",
-    nl:"Europa|Afrika|Azië|Oceanië|Noord-/Centraal-Amerika|Zuid-Amerika",
-    pl:"Europa|Afryka|Azja|Oceania|Ameryka Północna/Środkowa|Ameryka Południowa",
-    sv:"Europa|Afrika|Asien|Oceanien|Nord-/Centralamerika|Sydamerika",
-    tr:"Avrupa|Afrika|Asya|Okyanusya|Kuzey/Orta Amerika|Güney Amerika",
-    ar:"أوروبا|إفريقيا|آسيا|أوقيانوسيا|أمريكا الشمالية/الوسطى|أمريكا الجنوبية",
-    he:"אירופה|אפריקה|אסיה|אוקיאניה|אמריקה הצפונית/המרכזית|דרום אמריקה",
-    ko:"유럽|아프리카|아시아|오세아니아|북아메리카/중앙아메리카|남아메리카",
-    th:"ยุโรป|แอฟริกา|เอเชีย|โอเชียเนีย|อเมริกาเหนือ/กลาง|อเมริกาใต้",
-    vi:"Châu Âu|Châu Phi|Châu Á|Châu Đại Dương|Bắc/Trung Mỹ|Nam Mỹ",
-    id:"Eropa|Afrika|Asia|Oseania|Amerika Utara/Tengah|Amerika Selatan"
+    en:"Europe|Africa|Asia|Oceania|North America|South America",
+    pt:"Europa|África|Ásia|Oceania|América do Norte|América do Sul",
+    es:"Europa|África|Asia|Oceanía|América del Norte|América del Sur",
+    zh:"欧洲|非洲|亚洲|大洋洲|北美洲|南美洲",
+    ja:"ヨーロッパ|アフリカ|アジア|オセアニア|北アメリカ|南アメリカ",
+    ru:"Европа|Африка|Азия|Океания|Северная Америка|Южная Америка",
+    fr:"Europe|Afrique|Asie|Océanie|Amérique du Nord|Amérique du Sud",
+    de:"Europa|Afrika|Asien|Ozeanien|Nordamerika|Südamerika",
+    it:"Europa|Africa|Asia|Oceania|America settentrionale|America meridionale",
+    nl:"Europa|Afrika|Azië|Oceanië|Noord-Amerika|Zuid-Amerika",
+    pl:"Europa|Afryka|Azja|Oceania|Ameryka Północna|Ameryka Południowa",
+    sv:"Europa|Afrika|Asien|Oceanien|Nordamerika|Sydamerika",
+    tr:"Avrupa|Afrika|Asya|Okyanusya|Kuzey Amerika|Güney Amerika",
+    ar:"أوروبا|إفريقيا|آسيا|أوقيانوسيا|أمريكا الشمالية|أمريكا الجنوبية",
+    he:"אירופה|אפריקה|אסיה|אוקיאניה|צפון אמריקה|דרום אמריקה",
+    ko:"유럽|아프리카|아시아|오세아니아|북아메리카|남아메리카",
+    th:"ยุโรป|แอฟริกา|เอเชีย|โอเชียเนีย|อเมริกาเหนือ|อเมริกาใต้",
+    vi:"Châu Âu|Châu Phi|Châu Á|Châu Đại Dương|Bắc Mỹ|Nam Mỹ",
+    id:"Eropa|Afrika|Asia|Oseania|Amerika Utara|Amerika Selatan"
   };
   for (const language of Object.keys(localeData)) {
     const labels = continentNames[language]?.split("|");
