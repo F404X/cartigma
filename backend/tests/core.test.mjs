@@ -17,9 +17,11 @@ test("catalogue and country codes are unique",()=>{
     assert.ok(clues.length>=6&&clues.length<=10,c.code+" "+level);
     const keys=clues.map(c=>c.key);
     assert.equal(new Set(keys).size,clues.length,c.code);
-    assert.equal(keys[0],"continent");
+    const region=globalThis.CartigmaClueEngine.geographicRegion(c);
+    if(region)assert.deepEqual(clues[0],{key:"countryRegion",region});
+    else assert.equal(keys[0],"continent");
     assert.equal(keys.some(k=>["hemisphere","zone","utmZone","utmBand","latitude"].includes(k)),false);
-    assert.ok(clues.slice(0,4).every(clue=>["continent","countrySubregion",
+    assert.ok(clues.slice(0,4).every(clue=>["continent","countryRegion","countrySubregion",
       "countryLandlocked","longitude","countryAreaBand","countryBorders"].includes(clue.key)));
     assert.ok(clues.every(clue=>clue.key!=="countryCurrency"||clue.family));
   }
@@ -130,4 +132,32 @@ test("the continental draw makes each group equally reachable and retains all 19
     }
   }
   assert.equal(picked.size,195);
+});
+
+test("North/Central America and the Caribbean are separate clue regions, not separate continents",()=>{
+  const engine=globalThis.CartigmaClueEngine;
+  const north=countries.filter(c=>engine.clueContinent(c)==="northAmerica");
+  const caribbean=north.filter(c=>engine.geographicRegion(c)==="caribbean");
+  const northCentral=north.filter(c=>engine.geographicRegion(c)==="northCentralAmerica");
+  assert.equal(north.length,23);
+  assert.equal(caribbean.length,13);
+  assert.equal(northCentral.length,10);
+  assert.equal(engine.CONTINENTS.length,6);
+  for(const c of north){
+    for(const difficulty of ["normal","hard","rush"]){
+      const clues=clueSet(c,difficulty);
+      assert.deepEqual(clues[0],{
+        key:"countryRegion",region:engine.geographicRegion(c)
+      },c.code+" "+difficulty);
+      if(engine.geographicRegion(c)==="caribbean")
+        assert.equal(clues.some(x=>x.key==="countrySubregion"&&x.region==="029"),false,
+          "Do not repeat the Caribbean clue");
+      // Old ranked matches keep the previous continent-level clue deck.
+      const historical=clueSet(c,difficulty,8);
+      assert.equal(historical[0].key,"continent");
+    }
+  }
+  assert.equal(engine.geographicRegion(countries.find(c=>c.code==="MX")),"northCentralAmerica");
+  assert.equal(engine.geographicRegion(countries.find(c=>c.code==="CU")),"caribbean");
+  assert.equal(engine.geographicRegion(countries.find(c=>c.code==="BR")),null);
 });
