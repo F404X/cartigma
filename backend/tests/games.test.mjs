@@ -19,7 +19,10 @@ async function setup(t){
           return {
             async first(){return statement.get(...args)??null;},
             async all(){return {results:statement.all(...args)};},
-            run(){return {meta:statement.run(...args)};}
+            run(){
+              if(/^SELECT/.test(query.trimStart()))return {results:statement.all(...args)};
+              return {meta:statement.run(...args)};
+            }
           };
         }
       };
@@ -53,7 +56,12 @@ async function setup(t){
     }),env);
     return {status:response.status,data:await response.json()};
   }
-  return {sql,call};
+  async function leaderboard(){
+    const response=await worker.fetch(new Request(origin+"/v1/leaderboards"),env);
+    assert.equal(response.status,200);
+    return (await response.json()).boards;
+  }
+  return {sql,call,leaderboard};
 }
 
 test("a ranked case resumes for its owner, unlocks evidence after purchases, and saves exactly once",async t=>{
@@ -67,7 +75,7 @@ test("a ranked case resumes for its owner, unlocks evidence after purchases, and
   const {target_code:target}=sql.prepare("SELECT target_code FROM game_sessions WHERE id=?").get(game.id);
   const session={id:game.id};
   assert.equal((await call("resume",parameters)).data.game.id,game.id);
-  assert.deepEqual((await call("resume",{...parameters,mode:"daily"})).data,{game:null,claimed:true});
+  assert.deepEqual((await call("resume",{...parameters,mode:"daily"})).data,{game:null,claimed:false});
   assert.equal((await call("state",session,"second")).status,404);
   assert.equal((await call("state",session,null)).status,401);
 
@@ -91,7 +99,7 @@ test("a ranked case resumes for its owner, unlocks evidence after purchases, and
   assert.equal(win.saved,true);
   assert.equal(win.score,3900-game.nextHintCost-500);
   assert.equal((await call("save",session)).data.saved,true);
-  assert.equal((await call("resume",parameters)).data.game.saved,true);
+  assert.deepEqual((await call("resume",parameters)).data,{game:null,claimed:false});
   const total=sql.prepare("SELECT points,games FROM player_stats WHERE period_type='total'").get();
   assert.equal(total.points,win.score);
   assert.equal(total.games,1);
@@ -120,6 +128,7 @@ test("a daily reservation from the previous ruleset keeps its clues after migrat
     VALUES(?,?,?,?,?,?,?)`).run(id,"unused",day,"hard","TR",Math.floor(Date.now()/1000),1);
   sql.prepare("INSERT INTO ranked_reservations(user_id,game_id,challenge_day,difficulty,mode) VALUES(?,?,?,?,?)")
     .run("first",id,day,"hard","daily");
+  sql.exec(schema);
   const {data}=await call("resume",{mode:"daily",difficulty:"hard"});
   assert.equal(data.game.id,id);
   assert.equal(data.game.rulesVersion,7);
@@ -147,4 +156,33 @@ test("a simultaneous overlay and win cannot desynchronize the saved score",async
   const total=sql.prepare("SELECT points,games FROM player_stats WHERE period_type='total'").get();
   assert.equal(total.points,state.score);
   assert.equal(total.games,1);
+});
+
+
+test("a new Freeplay win replaces the day’s zero score and appears in all three boards",async t=>{
+  const {sql,call,leaderboard}=await setup(t);
+  const parameters={mode:"free",difficulty:"normal"};
+  const {data:daily}=await call("start",{...parameters,mode:"daily"});
+  assert.equal((await call("finish",{id:daily.id})).data.rankingPoints,0);
+  assert.equal((await leaderboard()).normal.week[0].points,0);
+
+  const {data:first}=await call("start",parameters);
+  assert.equal((await call("start",parameters)).status,409);
+  const targetFor=id=>sql.prepare("SELECT target_code FROM game_sessions WHERE id=?").get(id).target_code;
+  const {data:win}=await call("guess",{id:first.id,code:targetFor(first.id)});
+  assert.equal(win.score,5000);
+  assert.equal(win.rankingPoints,5000);
+  const boards=await leaderboard();
+  for(const period of ["week","month","total"]){
+    assert.deepEqual(boards.normal[period],[{username:"first",points:5000,wins:1,games:1}]);
+  }
+
+  const {data:second}=await call("start",parameters);
+  assert.notEqual(second.id,first.id);
+  const {data:repeat}=await call("guess",{id:second.id,code:targetFor(second.id)});
+  assert.equal(repeat.score,5000);
+  assert.equal(repeat.rankingPoints,0);
+  assert.equal((await call("state",{id:daily.id})).data.rankingPoints,0);
+  assert.equal((await call("state",{id:first.id})).data.rankingPoints,5000);
+  assert.deepEqual((await leaderboard()).normal.total,boards.normal.total);
 });

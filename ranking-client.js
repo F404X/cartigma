@@ -2,15 +2,17 @@
 (()=>{
  "use strict";
  const BASE=(window.CARTIGMA_RANKING_API||(location.hostname.endsWith(".workers.dev")?location.origin:"https://api.cartigma.f404x.net")).replace(/\/$/,"");
- const CACHE_KEY="cartigma-leaderboard-cache-v1";
+ const CACHE_KEY="cartigma-leaderboard-cache-v2:"+BASE;
+ const DIFFICULTIES={normal:"Normal",hard:"Difícil",rush:"Rush"};
+ const PERIODS={week:"Semanal",month:"Mensal",total:"Total"};
  const TABS=["boards","account"];
  const ACCOUNT_MARKER="cartigma-ranked-account-v1";
  const rankResumes=new Map();
  let accountRequest=null;
- const CACHE_TTL=15*60*1000;
- const state={tab:"boards",difficulty:"normal",period:"week",boards:null,user:null,
-   meChecked:false,loading:false,visible:false};
- let leaderboardRequestPending=false;
+ const CACHE_TTL=60*1000;
+ const state={tab:"boards",boards:null,user:null,meChecked:false,loading:false,visible:false};
+ let leaderboardRequest=null,leaderboardRevision=0,lastRefresh=0;
+ const announcedGames=new Set();
  let turnstileSiteKey=null,turnstileToken=null;
  const $=id=>document.getElementById(id);
  function text(id,value){const el=$(id);if(el)el.textContent=value;}
@@ -51,7 +53,7 @@
    const panel=document.createElement("aside");panel.id="rank-panel";panel.className="rank-panel";
    panel.hidden=true;panel.setAttribute("aria-label","Cartigma — ranking competitivo");
    try{
-     const response=await fetch("ranking-panel.html");
+     const response=await fetch("ranking-panel.html?v=20261118-rankings-grid");
      if(!response.ok)throw Error("markup unavailable");
      panel.innerHTML=await response.text();
    }catch{console.warn("Cartigma ranking panel unavailable");return;}
@@ -65,13 +67,13 @@
    launch.onclick=()=>open();
    $("rank-close").onclick=close;
    panel.querySelectorAll("[data-rank-tab]").forEach(b=>b.onclick=()=>setTab(b.dataset.rankTab));
-   $("rank-period").onchange=e=>{state.period=e.target.value;renderBoards();};
-   $("rank-board-difficulty").onchange=e=>{state.difficulty=e.target.value;renderBoards();};
    panel.querySelectorAll("[data-auth-mode]").forEach(b=>b.onclick=()=>setAuthMode(b.dataset.authMode));
    $("rank-form").onsubmit=authenticate;
    $("rank-logout").onclick=logout;
    $("rank-forgot").onclick=requestReset;
-   setAuthMode("login");renderBoards();
+   setAuthMode("login");
+   setInterval(refreshVisibleBoards,15000);
+   document.addEventListener("visibilitychange",refreshVisibleBoards);
    const reset=new URL(location.href).searchParams.get("reset");
    if(reset){open();setTab("account");setTimeout(()=>resetPassword(reset),0);}
  }
@@ -89,6 +91,7 @@
  function close(){state.visible=false;$("rank-panel").hidden=true;}
  function setTab(tab){
    state.tab=TABS.includes(tab)?tab:"boards";
+   $("rank-panel").dataset.view=state.tab;
    for(const t of TABS)$("rank-"+t).hidden=t!==state.tab;
    document.querySelectorAll("[data-rank-tab]").forEach(b=>{
      b.classList.toggle("active",b.dataset.rankTab===state.tab);
@@ -97,38 +100,90 @@
    if(tab==="boards")loadBoards();
    if(tab==="account")renderAccount();
  }
- async function loadBoards(){
-   const cache=cached();
-   if(cache?.data){state.boards=cache.data;renderBoards();}
-   if(cache&&Date.now()-cache.at<CACHE_TTL)return;
-   // Deduplicate overlapping UI renders without imposing a cooldown.
-   if(leaderboardRequestPending)return;
-   leaderboardRequestPending=true;
-   try{
-     const result=await api("/leaderboards");
-     state.boards=result;saveCache(result);renderBoards();message("");
-   }catch(e){
-     if(!state.boards)message(e.message,true);
-   }finally{
-     leaderboardRequestPending=false;
-   } }
- function renderBoards(){
-   const list=$("rank-list");if(!list)return;list.replaceChildren();
-   const players=state.boards?.boards?.[state.difficulty]?.[state.period]||[];
-   if(!players.length){
-     const p=document.createElement("p");p.className="rank-note";
-     p.textContent=state.boards?"Nenhuma pontuação ainda.":"Sem placar em cache.";
-     list.append(p);return;
-   }
-   for(const [i,player] of players.entries()){
-     const li=document.createElement("li");
-     const username=document.createElement("span");username.textContent=(i+1)+". "+player.username;
-     const points=document.createElement("strong");
-     points.textContent=Number(player.points).toLocaleString("pt-BR")+" pts";
-     li.append(username,points);list.append(li);
+ function refreshVisibleBoards(){
+   if(state.visible&&state.tab==="boards"&&!document.hidden&&Date.now()-lastRefresh>=CACHE_TTL){
+     loadBoards();
    }
  }
-
+ function invalidateBoards(){
+   leaderboardRevision++;
+   lastRefresh=0;
+   try{localStorage.removeItem(CACHE_KEY);}catch{}
+   refreshVisibleBoards();
+ }
+ async function loadBoards(){
+   if(!state.boards){
+     const cache=cached();
+     if(cache?.data){state.boards=cache.data;renderBoards();}
+   }
+   const revision=leaderboardRevision;
+   if(leaderboardRequest?.revision===revision)return;
+   const request={revision};
+   leaderboardRequest=request;
+   try{
+     const result=await api("/leaderboards");
+     if(revision!==leaderboardRevision)return;
+     lastRefresh=Date.now();
+     state.boards=result;
+     saveCache(result);
+     renderBoards();
+   }catch(error){
+     if(revision===leaderboardRevision){
+       text("rank-freshness",state.boards
+         ?"Classificações exibidas em cache. Atualização indisponível."
+         :"Não foi possível carregar as classificações.");
+     }
+   }finally{
+     if(leaderboardRequest===request)leaderboardRequest=null;
+   }
+ }
+ function renderBoards(){
+   const groups=$("rank-groups");
+   if(!groups||!state.boards)return;
+   const focusedBoard=document.activeElement?.id;
+   const scrollPositions=new Map(Array.from(groups.querySelectorAll(".rank-list"),
+     list=>[list.id,list.scrollTop]));
+   groups.replaceChildren();
+   for(const [difficulty,label] of Object.entries(DIFFICULTIES)){
+     const section=document.createElement("section"),heading=document.createElement("h3");
+     const grid=document.createElement("div");
+     section.className="rank-group";heading.textContent=label;grid.className="rank-group-grid";
+     for(const [period,title] of Object.entries(PERIODS)){
+       const card=document.createElement("div"),caption=document.createElement("h4");
+       card.className="rank-board";caption.textContent=title;card.append(caption);
+       const players=state.boards.boards?.[difficulty]?.[period]||[];
+       if(players.length){
+         const list=document.createElement("ol");list.className="rank-list";
+         list.id="rank-list-"+difficulty+"-"+period;
+         list.tabIndex=0;
+         list.setAttribute("aria-label",label+" · "+title);
+         for(const [index,player] of players.entries()){
+           const row=document.createElement("li");
+           const position=document.createElement("span"),name=document.createElement("span"),points=document.createElement("strong");
+           position.className="rank-position";position.textContent=index+1;
+           name.className="rank-player";name.textContent=player.username;name.title=player.username;
+           points.textContent=Number(player.points).toLocaleString("pt-BR")+" pts";
+           row.classList.toggle("rank-self",player.username===state.user?.username);
+           row.append(position,name,points);list.append(row);
+         }
+         card.append(list);
+       }else{
+         const empty=document.createElement("p");
+         empty.className="rank-note";empty.textContent="Sem partidas registradas";
+         card.append(empty);
+       }
+       grid.append(card);
+     }
+     section.append(heading,grid);groups.append(section);
+   }
+   for(const [id,scrollTop] of scrollPositions){
+     const list=$(id);
+     if(list)list.scrollTop=scrollTop;
+   }
+   if(focusedBoard?.startsWith("rank-list-"))$(focusedBoard)?.focus({preventScroll:true});
+   const stamp=new Date(state.boards.updatedAt);
+   text("rank-freshness","Atualizado às "+stamp.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}));
+ }
  // Authenticate once when an existing account may be present. An anonymous
  // visitor never makes a session-check request just to play locally.
  async function signedInUser(){
@@ -144,24 +199,10 @@
    }
    return accountRequest;
  }
- function attemptKey(difficulty,userId){
-   return "cartigma-ranked-claimed-v1:"+userId+":"+
-     new Date().toISOString().slice(0,10)+":"+difficulty;
- }
- function recordAttempt(difficulty,userId){
-   try{localStorage.setItem(attemptKey(difficulty,userId),"1");}catch{}
- }
- function wasAttempted(difficulty,userId){
-   try{return localStorage.getItem(attemptKey(difficulty,userId))==="1";}catch{return false;}
- }
- const practiceOnly=(mode,game)=>mode==="free"&&game?.finished;
  function fetchResume(mode,difficulty,userId){
    const key=userId+":"+mode+":"+difficulty;
    if(!rankResumes.has(key)){
-     const request=api("/games/resume",{mode,difficulty}).then(result=>{
-       if(result.claimed)recordAttempt(difficulty,userId);
-       return result;
-     }).finally(()=>rankResumes.delete(key));
+     const request=api("/games/resume",{mode,difficulty}).finally(()=>rankResumes.delete(key));
      rankResumes.set(key,request);
    }
    return rankResumes.get(key);
@@ -170,26 +211,25 @@
    const user=await signedInUser();
    if(!user)return null;
    const pending=rankResumes.get(user.id+":"+mode+":"+difficulty);
-   if(pending||wasAttempted(difficulty,user.id)){
-     const {game,claimed}=await (pending||fetchResume(mode,difficulty,user.id));
-     if(claimed)return practiceOnly(mode,game)?null:game;
-   }
+   const existing=pending&&(await pending).game;
+   if(existing)return existing;
    try{
-     const result=await api("/games/start",{mode,difficulty});
-     delete result.playToken;
-     recordAttempt(difficulty,user.id);
-     return result;
+     return await api("/games/start",{mode,difficulty});
    }catch(error){
      if(error.code!=="ranked_attempt_already_started")throw error;
      const {game}=await fetchResume(mode,difficulty,user.id);
-     return practiceOnly(mode,game)?null:game;
+     if(game)return game;
+     // A previous Rush round can expire while reopening Freeplay.
+     if(mode==="free")return api("/games/start",{mode,difficulty});
+     throw error;
    }
  }
  async function gameAction(action,{id,mode,difficulty,...args}={}){
    if(!id)throw Error("Sessão competitiva indisponível");
    const result=await api("/games/"+action,{id,...args});
-   if(result.finished&&result.saved){
-     try{localStorage.removeItem(CACHE_KEY);}catch{}
+   if(result.finished&&result.saved&&!announcedGames.has(id)){
+     announcedGames.add(id);
+     invalidateBoards();
    }
    return result;
  }
@@ -197,12 +237,13 @@
    const user=await signedInUser();
    if(!user)return null;
    const {game}=await fetchResume(mode,difficulty,user.id);
-   return practiceOnly(mode,game)?null:game;
+   return game;
  }
  function renderAccount(){
    if(!$("rank-user"))return;
    $("rank-user").hidden=!state.user;$("rank-auth").hidden=Boolean(state.user);
    if(state.user)text("rank-username","Conectado como "+state.user.username);
+   if(state.visible&&state.tab==="boards")renderBoards();
  }
  let authMode="login";
  function setAuthMode(mode){

@@ -39,7 +39,7 @@ class Element {
   closest(){return null}
 }
 const hash=input=>{let h=2166136261;for(const c of input){h ^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0};
-function boot({storage=new Map(),map=false,randomValue=0.42,mobile=false,clock=Date,countryData=null,autoStart=true,ranking=null}={}){
+function boot({storage=new Map(),map=false,randomValue=0.42,mobile=false,clock=Date,countryData=null,autoStart=true,ranking=null,intl=Intl}={}){
   const clockCallbacks=[],nodes=new Map(),window={},mobileCase=new Element("mobile-case"),mapState={fits:[],eases:[],styles:[],zoomRanges:[],markers:[],layers:new Map(),sources:new Map(),events:{},canvas:new Element("canvas")};
   const document={
     readyState:"complete",documentElement:{lang:"en",dir:"ltr"},hidden:false,
@@ -104,11 +104,20 @@ function boot({storage=new Map(),map=false,randomValue=0.42,mobile=false,clock=D
     window.maplibregl=libre;
     window.GeoMapLoader={load:async style=>style==="osm"?{...libre,isFallback:true}:libre};
   }
-  const math=Object.create(Math);math.random=()=>randomValue;
+  const math=Object.create(Math);
+  let draw=0;
+  math.random=()=>{
+    const engine=window.CartigmaClueEngine,countries=window.CartigmaCountries;
+    const country=countries[Math.floor(randomValue*countries.length)];
+    const continent=engine.clueContinent(country);
+    const value=draw++%2===0?engine.CONTINENTS.indexOf(continent):
+      countries.filter(item=>engine.clueContinent(item)===continent).indexOf(country);
+    return value/2**32;
+  };
   const perf={distanceCalls:0};
   math.atan2=(...args)=>{perf.distanceCalls++;return Math.atan2(...args)};
   const context={
-    window,document,localStorage,navigator:{},Math:math,Number,String,Array,Set,Map,JSON,Date:clock,Intl,
+    window,document,localStorage,navigator:{},Math:math,Number,String,Array,Set,Map,JSON,Date:clock,Intl:intl,
     AbortController,console,setTimeout(){return 0},clearTimeout(){},
     setInterval(fn){clockCallbacks.push(fn);return clockCallbacks.length},clearInterval(){},
     fetch:async url=>String(url).includes("admin_0_countries.geojson")
@@ -301,10 +310,10 @@ test("Completed ranked free case permits another free case and changing to Daily
     },
     beginRanked:async({mode})=>{
       starts++;
-      return starts===1?{...initial,mode}:null;
+      return {...initial,mode,id:initial.id.slice(0,-1)+starts};
     },
     gameAction:async()=>({...initial,guesses:[{code:"BR",elapsedMs:1000}],
-      finished:true,won:true,score:5000,saved:true,target:"BR",revealed:10})
+      finished:true,won:true,score:5000,saved:true,rankingPoints:5000,target:"BR",revealed:10})
   };
   const g=boot({ranking:ranked,autoStart:false}),$=g.get;
   $("freeBtn").click();
@@ -315,6 +324,7 @@ test("Completed ranked free case permits another free case and changing to Daily
   g.select("Brazil");$("guessBtn").click();
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal($("resultCard").classList.contains("hidden"),false);
+  assert.equal($("reportRanking").textContent,"+5,000 pts to the ranking");
   $("reportNextBtn").click();
   assert.equal($("reportDialog").open,false);
   assert.equal($("rushIntro").classList.contains("hidden"),false);
@@ -323,7 +333,8 @@ test("Completed ranked free case permits another free case and changing to Daily
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(starts,2);
   assert.equal($("rushIntro").classList.contains("hidden"),true,
-    "New Free game must start offline after ranked score is used");
+    "A new ranked Freeplay round should start after the first one ends");
+  assert.match($("modeCaption").textContent,/RANKED/);
   assert.equal($("guessBtn").disabled,true);
   g.select("Brazil");
   assert.equal($("guessBtn").disabled,false);
@@ -433,7 +444,7 @@ test("Rush daily waiting state survives reload without hint leaks",()=>{
   assert.equal(g("hintCount").textContent,"1 / "+g("clueList").children.length);
   assert.equal(JSON.parse(storage.get(key)).revealed,1);
 });
-test("Freeplay independently samples from every country without persistent history",()=>{
+test("Freeplay can repeat countries without persistent history",()=>{
   const first=boot({randomValue:0}),a=first.get;
   const low=first.window.CartigmaCountries[0];
   for(let i=0;i<4;i++){
@@ -1144,4 +1155,76 @@ test("Mobile postgame button is not offered while a case is active",()=>{
   assert.equal($("reportDialog").open,false);
   $("mobileGuessBtn").click();
   assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),true);
+});
+
+test("Caribbean evidence resolves both padded and numeric M49 codes",async()=>{
+  const mockIntl={DisplayNames:class{
+    constructor(...args){this.formatter=new Intl.DisplayNames(...args);}
+    of(code){return code==="029"?"29":this.formatter.of(code);}
+  }};
+  const ranking={
+    mayRank:()=>true,
+    resumeRanked:async()=>null,
+    beginRanked:async()=>({
+      id:"b1592f31-fc31-4189-aebf-1d2ee615d877",mode:"daily",difficulty:"normal",
+      startedAt:Date.now(),revealed:2,clueCount:8,
+      clues:[{key:"countrySubregion",region:"029"},{key:"countrySubregion",region:29}],
+      guesses:[]
+    })
+  };
+  const g=boot({ranking,autoStart:false,intl:mockIntl});
+  g.get("rushStartBtn").click();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(clueTexts(g).slice(0,2),["Subregion: Caribbean","Subregion: Caribbean"]);
+  g.language("pt");
+  assert.deepEqual(clueTexts(g).slice(0,2),["Sub-região: Caribe","Sub-região: Caribe"]);
+});
+
+test("the ranking opens all nine boards and refreshes an open panel after saving a result",async()=>{
+  class RankElement extends Element {
+    querySelectorAll(){return []}
+    removeAttribute(name){delete this.attributes[name]}
+  }
+  const window={},nodes=new Map(),cache=new Map();
+  const body=new RankElement("body");
+  const get=id=>{
+    const attached=body.children.find(node=>node.id===id);
+    if(attached)return attached;
+    if(!nodes.has(id))nodes.set(id,new RankElement(id));
+    return nodes.get(id);
+  };
+  const document={body,readyState:"complete",getElementById:get,
+    createElement:()=>new RankElement(),querySelectorAll:()=>[],addEventListener(){}};
+  let score=0,requests=0;
+  const valueResponse=data=>({ok:true,json:async()=>data});
+  const context={window,document,URL,Date,location:new URL("https://cartigma.workers.dev/"),setInterval(){},
+    localStorage:{getItem:key=>cache.get(key),setItem:(key,value)=>cache.set(key,value),removeItem:key=>cache.delete(key)},
+    fetch:async url=>{
+      if(url.includes("ranking-panel.html"))return {ok:true,text:async()=>""};
+      if(url.endsWith("/auth/me"))return valueResponse({user:{username:"Tester"}});
+      if(url.endsWith("/games/guess")){
+        score=5000;
+        return valueResponse({finished:true,saved:true,rankingPoints:score});
+      }
+      assert.ok(url.endsWith("/leaderboards"));
+      requests++;
+      const periods=Object.fromEntries(["week","month","total"].map(period=>[period,[{username:"Tester",points:score}]]));
+      return valueResponse({updatedAt:Date.now(),boards:{normal:periods,hard:{},rush:{}}});
+    }
+  };
+  const code=readFileSync(new URL("../ranking-client.js",import.meta.url),"utf8");
+  runInNewContext(code,context,{filename:"ranking-client.js"});
+  await new Promise(resolve=>setImmediate(resolve));
+  await get("rank-launch").onclick();
+  const groups=get("rank-groups");
+  assert.deepEqual(groups.children.map(section=>section.children[0].textContent),["Normal","Difícil","Rush"]);
+  for(const section of groups.children){
+    assert.deepEqual(section.children[1].children.map(card=>card.children[0].textContent),["Semanal","Mensal","Total"]);
+  }
+  await window.CartigmaRanking.gameAction("guess",{id:"free-match",mode:"free",difficulty:"normal",code:"BR"});
+  await new Promise(resolve=>setImmediate(resolve));
+  const normal=groups.children[0].children[1].children;
+  assert.deepEqual(normal.map(card=>card.children[1].children[0].children[2].textContent),
+    Array(3).fill((5000).toLocaleString("pt-BR")+" pts"));
+  assert.equal(requests,2);
 });

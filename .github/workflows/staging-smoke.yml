@@ -1,8 +1,5 @@
 name: Test public staging ranking flow
 on:
-  push:
-    branches: ["feature/ranking"]
-    paths: [".github/workflows/staging-smoke.yml"]
   workflow_dispatch:
 permissions:
   contents: read
@@ -87,12 +84,17 @@ jobs:
               const state=await ok('/v1/games/state',{id:start.id,playToken:start.playToken});
               assert.equal(state.finished,false);
               assert.equal('target' in state,false);
-              assert.equal((await req('/v1/games/start',{difficulty:'normal',mode:'daily'})).status,409);
+              const daily=await ok('/v1/games/start',{difficulty:'normal',mode:'daily'},201);
+              assert.notEqual(daily.id,start.id);
+              assert.equal((await req('/v1/games/start',{difficulty:'normal',mode:'free'})).status,409);
               const finish=await ok('/v1/games/finish',{id:start.id,playToken:start.playToken});
               assert.equal(finish.finished,true);
               assert.equal(finish.score,0);
               const saved=await ok('/v1/games/save',{id:start.id,playToken:start.playToken});
               assert.equal(saved.saved,true);
+              assert.equal(saved.rankingPoints,0);
+              const next=await ok('/v1/games/start',{difficulty:'normal',mode:'free'},201);
+              assert.notEqual(next.id,start.id);
               const board=await ok('/v1/leaderboards');
               assert.ok(board.boards.normal.week);
               const repeated=await ok('/v1/leaderboards');

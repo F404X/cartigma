@@ -3,19 +3,23 @@ import {requireUser} from "./auth.js";
 const DIFFICULTIES=["normal","hard","rush"];
 const PERIODS=["week","month","total"];
 export async function leaderboard(request,env){
-  // No Worker-side request cooldown: rejected calls still count toward the
-  // Workers Free quota. Ordinary visitors use the 15-minute browser cache.
-  const date=dayUTC(),keys=periodKeys(date);
+  const keys=periodKeys(dayUTC());
   const boards={};
-  // Each query uses the period/difficulty/score index; no full result history scan.
-  for(const d of DIFFICULTIES){
-    boards[d]={};
+  const queries=[];
+  for(const difficulty of DIFFICULTIES){
+    boards[difficulty]={};
     for(const period of PERIODS){
       const key=period==="week"?keys.week:period==="month"?keys.month:"all";
-      const rows=await env.DB.prepare("SELECT u.username,s.points,s.wins,s.games FROM player_stats s JOIN users u ON u.id=s.user_id WHERE s.period_type=? AND s.period_key=? AND s.difficulty=? AND u.deleted_at IS NULL ORDER BY s.points DESC,s.wins DESC,s.games ASC,u.username ASC LIMIT 25")
-        .bind(period,key,d).all();
-      boards[d][period]=rows.results||[];
+      queries.push(env.DB.prepare(`SELECT u.username,s.points,s.wins,s.games FROM player_stats s
+        JOIN users u ON u.id=s.user_id WHERE s.period_type=? AND s.period_key=? AND s.difficulty=?
+        AND u.deleted_at IS NULL ORDER BY s.points DESC,s.wins DESC,s.games ASC,u.username ASC LIMIT 25`)
+        .bind(period,key,difficulty));
     }
+  }
+  const results=await env.DB.batch(queries);
+  let index=0;
+  for(const difficulty of DIFFICULTIES){
+    for(const period of PERIODS)boards[difficulty][period]=results[index++].results||[];
   }
   return json({updatedAt:Date.now(),periods:keys,boards},200,{"cache-control":"no-store"});
 }

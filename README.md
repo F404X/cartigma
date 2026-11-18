@@ -26,8 +26,8 @@ Every guess is timestamped and its elapsed time is displayed in the guess histor
 
 ### Randomness and repetition
 
-- **Daily:** each UTC date and difficulty independently determine a reproducible pseudo-random country, shared worldwide. Countries **can repeat** on different days, with no predetermined no-repeat sequence that could be solved by elimination.
-- **Freeplay:** each new round independently chooses one of **all 195 countries with equal probability**, using browser cryptographic randomness when available (`Math.random()` fallback). There is **no shuffled bag or country history**; repeats are possible, preventing elimination by tracking past cases.
+- **Daily:** each UTC date and difficulty determine a shared target. The draw selects one of the six continents with equal probability, then one country from that continent.
+- **Freeplay:** every new round uses the same two-stage draw. All 195 countries can appear, and countries can repeat.
 - The country-only catalogue uses new saved-game keys so old city-based daily records cannot be confused with the new investigations.
 
 ### Evidence

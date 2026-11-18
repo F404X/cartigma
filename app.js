@@ -10,6 +10,7 @@
   const COUNTRY_INSIGHTS = window.GeoCountryInsights || {};
   const CLUE_ENGINE = window.CartigmaClueEngine;
   if(!CLUE_ENGINE)throw new Error("Shared clue engine was not loaded");
+  const pickCountry=CLUE_ENGINE.countryPicker(COUNTRIES);
   const COUNTRY_CLUE_I18N = window.GeoCountryClueI18n || {};
   const CURRENCY_DENOMINATIONS = window.GeoCurrencyDenominations || {};
   const ATLAS_I18N = window.CartigmaAtlasI18n || {};
@@ -164,19 +165,58 @@
     vi:["Tiểu vùng","điểm tham chiếu của quốc gia"],
     id:["Subwilayah","titik acuan negara"]
   };
+  const SUBREGION_NAMES={
+    "005":["South America","América do Sul"],
+    "011":["Western Africa","África Ocidental"],
+    "013":["Central America","América Central"],
+    "014":["Eastern Africa","África Oriental"],
+    "015":["Northern Africa","Norte da África"],
+    "017":["Middle Africa","África Central"],
+    "018":["Southern Africa","África Austral"],
+    "021":["Northern America","América Setentrional"],
+    "029":["Caribbean","Caribe"],
+    "030":["Eastern Asia","Ásia Oriental"],
+    "034":["Southern Asia","Sul da Ásia"],
+    "035":["South-eastern Asia","Sudeste Asiático"],
+    "039":["Southern Europe","Sul da Europa"],
+    "053":["Australia and New Zealand","Austrália e Nova Zelândia"],
+    "054":["Melanesia","Melanésia"],
+    "057":["Micronesia","Micronésia"],
+    "061":["Polynesia","Polinésia"],
+    "143":["Central Asia","Ásia Central"],
+    "145":["Western Asia","Ásia Ocidental"],
+    "151":["Eastern Europe","Europa Oriental"],
+    "154":["Northern Europe","Norte da Europa"],
+    "155":["Western Europe","Europa Ocidental"]
+  };
+  function subregionName(region){
+    const code=String(region).padStart(3,"0");
+    const fallback=SUBREGION_NAMES[code];
+    if(lang==="pt")return fallback?.[1]||"";
+    const localized=displayRegion(code);
+    return /\p{L}/u.test(localized||"")?localized:fallback?.[0]||"";
+  }
   const DEDUCTION_TEXT={
     en:{
       guessFeedback:"From your guess to the answer: {value}",
       alreadyGuessed:"You already tried this country.",
       playOffline:"Play offline",rankUnavailable:"Ranked play is unavailable. Try again or play offline.",
-      rankedAttempt:"Daily and Freeplay share one ranked attempt per difficulty each UTC day.",
+      rankedAttempt:"Your best verified score of the UTC day counts per difficulty.",
+      rankAdded:"+{points} pts to the ranking",
+      rankBest:"Your best score for this difficulty today is kept.",
+      rankSaved:"Ranked result saved.",
+      rankOffline:"Offline result. Points apply to this case.",
       practice:"Practice"
     },
     pt:{
       guessFeedback:"Do seu palpite até a resposta: {value}",
       alreadyGuessed:"Você já tentou esse país.",
       playOffline:"Jogar offline",rankUnavailable:"Ranqueada indisponível. Tente de novo ou jogue offline.",
-      rankedAttempt:"O Caso do dia e o Jogo livre compartilham uma tentativa ranqueada por dificuldade a cada dia UTC.",
+      rankedAttempt:"Vale sua melhor pontuação verificada do dia UTC em cada dificuldade.",
+      rankAdded:"+{points} pts no ranking",
+      rankBest:"Sua melhor pontuação do dia nesta dificuldade foi mantida.",
+      rankSaved:"Resultado salvo no ranking.",
+      rankOffline:"Resultado offline. Os pontos valem para este caso.",
       practice:"Treino"
     }
   };
@@ -273,7 +313,7 @@
     if(clue.key==="hemisphere")
       return tc("hemisphere",{value:tc(clue.hemisphere)});
     const [subregionLabel,referenceLabel]=GEOGRAPHY_LABELS[lang]||GEOGRAPHY_LABELS.en;
-    if(clue.key==="countrySubregion")return subregionLabel+": "+displayRegion(clue.region);
+    if(clue.key==="countrySubregion")return subregionLabel+": "+subregionName(clue.region);
     if(clue.key==="longitude"&&clue.reference)return tc("longitude",clue)+" ("+referenceLabel+")";
     if(clue.key==="countryAreaBand"){
       const comparison=clue.min===0?"<":clue.max===null?"≥":"";
@@ -301,7 +341,13 @@
   // Each UTC date is independently seeded: the same country may reappear
   // on subsequent dates. No elimination-style daily cycle is exposed.
   function dailyIndex(level=difficulty){
-    return hash("cartigma-country-daily-v6:"+today()+":"+level)%COUNTRIES.length;
+    const seed="cartigma-country-daily-v7:"+today()+":"+level;
+    let draw=0;
+    return COUNTRIES.indexOf(pickCountry(()=>hash(seed+":"+draw++)));
+  }
+  function matchesDailyDraw(saved,level){
+    if(saved.drawVersion===2)return saved.index===dailyIndex(level);
+    return saved.started&&saved.index===hash("cartigma-country-daily-v6:"+today()+":"+level)%COUNTRIES.length;
   }
   function dailyStorageKey(level=difficulty){return DAILY_KEY+today()+"-"+level}
   // Finished daily cases cannot be replayed, whether solved or closed after
@@ -309,7 +355,7 @@
   function otherDailyAvailable(level){
     const saved=store.get(dailyStorageKey(level));
     return !(saved?.mode==="daily"&&saved.date===today()&&
-      saved.difficulty===level&&saved.index===dailyIndex(level)&&saved.finished===true);
+      saved.difficulty===level&&matchesDailyDraw(saved,level)&&saved.finished===true);
   }
   function nextCaseNumber(date=today()){
     const key=SERIAL_PREFIX+date;
@@ -319,7 +365,7 @@
     return count;
   }
   function newGame(mode,index) {
-    return {mode,index,difficulty,date:today(),serial:nextCaseNumber(),guesses:[],
+    return {mode,index,difficulty,date:today(),drawVersion:2,serial:nextCaseNumber(),guesses:[],
       started:false,
       startedAt:null,endedAt:null,durationMs:null,
       revealed:0,penalty:0,paidHints:0,
@@ -419,6 +465,8 @@
     game.won=Boolean(response.won);
     game.finished=Boolean(response.finished);
     game.score=response.score||0;
+    game.rankingPoints=response.rankingPoints;
+    game.rankingSaved=Boolean(response.saved);
     game.guesses=(response.guesses||[]).map((item,i)=>{
       const code=item.code,old=previous[i];
       const coords=COUNTRIES[COUNTRY_CODES.indexOf(code)];
@@ -521,7 +569,7 @@
   function savedDaily(){
     const saved=store.get(dailyStorageKey());
     if(!saved||saved.mode!=="daily"||saved.date!==today()||
-       saved.difficulty!==difficulty||saved.index!==dailyIndex()||
+       saved.difficulty!==difficulty||saved.ranked||!matchesDailyDraw(saved,difficulty)||
        saved.targetKind!=="country"||![7,RULES_VERSION].includes(saved.evidenceVersion)||
        !Array.isArray(saved.guesses)||saved.guesses.length>maximum()||
        !Number.isFinite(saved.revealed))return null;
@@ -531,13 +579,11 @@
     return saved;
   }
   function save(){if(game?.mode==="daily"&&!game.ranked)store.set(dailyStorageKey(),game)}
-  // Every Freeplay roll independently samples all 195 countries with an
-  // equal chance. Never remember used countries or exclude recent answers.
   function chooseFree(){
-    const entropy=typeof window.crypto?.getRandomValues==="function"
-      ?window.crypto.getRandomValues(new Uint32Array(1))[0]/4294967296
-      :Math.random();
-    return Math.floor(entropy*COUNTRIES.length);
+    const draw=typeof window.crypto?.getRandomValues==="function"
+      ?()=>window.crypto.getRandomValues(new Uint32Array(1))[0]
+      :()=>Math.floor(Math.random()*2**32);
+    return COUNTRIES.indexOf(pickCountry(draw));
   }
   function startDaily(){
     mobilePanel="clues";
@@ -1026,6 +1072,7 @@
     $("reportHints").textContent=number(Number.isInteger(game.paidHints)
       ?game.paidHints:Math.round(game.penalty/HINT_COST));
     $("reportScore").textContent=number(game.score)+" / 5,000";
+    $("reportRanking").textContent=rankingResult();
     $("reportCoordinates").textContent=isCountryGame()?"—":place[3].toFixed(4)+"°, "+place[4].toFixed(4)+"°";
     $("reportContinent").textContent=continentName(game.index);
     renderCountryProfile(details,iso,place);
@@ -1085,6 +1132,12 @@
       }else dialog.show();
     }
   }
+  function rankingResult(){
+    if(game.rankingPoints>0)return deductionText("rankAdded",{points:number(game.rankingPoints)});
+    if(game.rankingPoints===0)return deductionText("rankBest");
+    if(game.rankingSaved)return deductionText("rankSaved");
+    return deductionText("rankOffline");
+  }
   function renderResult(){
     renderCaseNavigation();
     $("resultCard").classList.toggle("hidden",!game.finished);
@@ -1097,6 +1150,7 @@
         count:game.guesses.length,time:formatElapsed(game.durationMs??elapsedMs())})
       :t(game.won?"countryFound":"countryLost",{country:name,count:game.guesses.length});
     $("finalScore").textContent=number(game.score);
+    $("resultRanking").textContent=rankingResult();
     renderDossier();
   }
   function feedback(){

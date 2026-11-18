@@ -47,6 +47,20 @@
   }).flatMap(([group,codes])=>codes.split(" ").map(code=>[code,group]))));
   const AREA_BOUNDS=[0,100,1000,10000,100000,1000000,10000000,Infinity];
   const clueContinent=country=>country.code==="CY"?"asia":country.continent;
+  const CONTINENTS=Object.freeze(["africa","asia","europe","northAmerica","oceania","southAmerica"]);
+  function uniformIndex(size,nextUint32){
+    const ceiling=2**32-2**32%size;
+    let value;
+    do{value=nextUint32();}while(value>=ceiling);
+    return value%size;
+  }
+  function countryPicker(catalog){
+    const groups=CONTINENTS.map(continent=>catalog.filter(country=>clueContinent(country)===continent));
+    return draw=>{
+      const group=groups[uniformIndex(groups.length,draw)];
+      return group[uniformIndex(group.length,draw)];
+    };
+  }
   const areaBand=area=>AREA_BOUNDS.findIndex(bound=>area<bound)-1;
   // Keep legacy deck order and hint prices for sessions already in progress.
   function revealAfterMiss(revealed,difficulty,guesses,total,version){
@@ -218,7 +232,7 @@
     return clues.slice(0,MAX_CLUES);
   }
   const api=Object.freeze({buildClues,clueCost,overlayCost,scoreFor,numericBoundary,hash,
-    guessFeedback,revealAfterMiss,clueContinent,MAX_CLUES,EXCLUDED,PRICES,OVERLAY_PRICES,
+    guessFeedback,revealAfterMiss,clueContinent,countryPicker,CONTINENTS,MAX_CLUES,EXCLUDED,PRICES,OVERLAY_PRICES,
     DIFFICULTIES,RULES_VERSION,RUSH_DURATION_MS,RUSH_CLUE_INTERVAL_MS});
   if(typeof window!=="undefined")window.CartigmaClueEngine=api;
   if(typeof globalThis!=="undefined")globalThis.CartigmaClueEngine=api;

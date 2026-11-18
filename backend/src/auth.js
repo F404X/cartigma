@@ -146,7 +146,7 @@ export async function authRoute(request,env,path){
     if(!await verifyPassword(body.password,secret,env))fail(403,"invalid_credentials");
     await env.DB.batch([
       env.DB.prepare("DELETE FROM game_results WHERE user_id=?").bind(user.id),
-      env.DB.prepare("DELETE FROM game_sessions WHERE id IN (SELECT game_id FROM ranked_reservations WHERE user_id=?)")
+      env.DB.prepare("DELETE FROM game_sessions WHERE id IN (SELECT game_id FROM ranked_matches WHERE user_id=?)")
         .bind(user.id),
       env.DB.prepare("DELETE FROM users WHERE id=?").bind(user.id)
     ]);

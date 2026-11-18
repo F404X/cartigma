@@ -108,3 +108,48 @@ CREATE TABLE IF NOT EXISTS game_rules (
   version INTEGER NOT NULL,
   started_at_ms INTEGER NOT NULL
 );
+
+-- Keep the old reservations as a migration source. Daily and Freeplay now
+-- have separate reservations, and only unfinished Freeplay rounds occupy a slot.
+CREATE TABLE IF NOT EXISTS ranked_matches (
+  game_id TEXT PRIMARY KEY REFERENCES game_sessions(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  challenge_day TEXT NOT NULL,
+  difficulty TEXT NOT NULL,
+  mode TEXT NOT NULL CHECK(mode IN ('daily','free')),
+  duration_ms INTEGER,
+  awarded_points INTEGER
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_ranked_daily_slot
+  ON ranked_matches(user_id,challenge_day,difficulty) WHERE mode='daily';
+CREATE UNIQUE INDEX IF NOT EXISTS ix_ranked_free_slot
+  ON ranked_matches(user_id,challenge_day,difficulty) WHERE mode='free' AND duration_ms IS NULL;
+CREATE INDEX IF NOT EXISTS ix_ranked_matches_user ON ranked_matches(user_id,challenge_day);
+-- Cover reservations made by the previous Worker during the rollout.
+CREATE TRIGGER IF NOT EXISTS migrate_ranked_reservation AFTER INSERT ON ranked_reservations
+BEGIN
+  INSERT OR IGNORE INTO ranked_matches(game_id,user_id,challenge_day,difficulty,mode)
+  VALUES (NEW.game_id,NEW.user_id,NEW.challenge_day,NEW.difficulty,NEW.mode);
+END;
+INSERT OR IGNORE INTO ranked_matches(game_id,user_id,challenge_day,difficulty,mode,duration_ms,awarded_points)
+SELECT r.game_id,r.user_id,r.challenge_day,r.difficulty,r.mode,
+  COALESCE(b.duration_ms,CASE WHEN g.saved_user_id IS NOT NULL THEN (g.finished_at-g.created_at)*1000 END),
+  CASE WHEN g.saved_user_id IS NOT NULL THEN g.score END
+FROM ranked_reservations r JOIN game_sessions g ON g.id=r.game_id
+LEFT JOIN game_results b ON b.game_id=r.game_id;
+
+-- One game_results row per date and difficulty represents the player's best
+-- result. Better results add only the difference to each leaderboard.
+CREATE TRIGGER IF NOT EXISTS results_best_rollup AFTER UPDATE OF score ON game_results
+WHEN NEW.score>OLD.score
+BEGIN
+  UPDATE player_stats SET points=points+NEW.score-OLD.score,wins=wins+NEW.won-OLD.won
+  WHERE user_id=NEW.user_id AND difficulty=NEW.difficulty AND (
+    (period_type='week' AND period_key=NEW.week_key) OR
+    (period_type='month' AND period_key=NEW.month_key) OR
+    (period_type='total' AND period_key='all')
+  );
+END;
+
+CREATE INDEX IF NOT EXISTS ix_legacy_daily_target
+  ON ranked_reservations(challenge_day,difficulty) WHERE mode='daily';

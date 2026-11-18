@@ -21,10 +21,10 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="styles.css?v=20261117-country195">
   <link rel="stylesheet" href="themes.css?v=20261117-rush-ready-v2">
-  <link rel="stylesheet" href="ranking.css?v=20261117-feature-ranking">
+  <link rel="stylesheet" href="ranking.css?v=20261118-rankings-grid">
   <link rel="stylesheet" href="mobile.css?v=20261118-deduction-feedback">
 
-  <script defer src="shared-clues.js?v=20261118-deduction-v8"></script>
+  <script defer src="shared-clues.js?v=20261118-continental-draw"></script>
   <script defer src="country-catalog.js?v=20261117-country195"></script>
   <script defer src="continent-borders.js?v=20261116-profile-diversity"></script>
   <script defer src="i18n.js?v=20261117-country195"></script>
@@ -43,8 +43,8 @@
   <script defer src="theme.js"></script>
   <script defer src="map-fallback.js?v=20261117-clean-overlays"></script>
   <script defer src="language-picker.js"></script>
-  <script type="module" src="map-bootstrap.js?v=20261118-deduction-v8"></script>
-  <script defer src="ranking-client.js?v=20261118-ranked-resume-v8"></script>
+  <script type="module" src="map-bootstrap.js?v=20261118-continental-draw"></script>
+  <script defer src="ranking-client.js?v=20261118-rankings-grid"></script>
 </head>
 <body>
 <div class="app">
@@ -263,6 +263,7 @@
               <h3 id="resultTitle"></h3>
               <p id="resultDetail"></p>
               <div class="score-box"><span data-i18n="score">Score</span><strong id="finalScore">0</strong><small>/ 5,000</small></div>
+              <p class="rank-result-note" id="resultRanking"></p>
               <div class="result-actions">
                 <button id="newCaseBtn" type="button" class="secondary-btn" data-i18n="newCase">New case</button>
                 <button id="reportOpenBtn" type="button" class="primary-btn" data-i18n="openReport">View case file</button>
@@ -375,7 +376,7 @@
         <div><dt data-i18n="reportAttempts">Guesses</dt><dd id="reportAttempts"></dd></div>
         <div><dt data-i18n="reportBest">Closest guess</dt><dd id="reportBest"></dd></div>
         <div><dt data-i18n="reportHints">Extra hints</dt><dd id="reportHints"></dd></div>
-        <div><dt data-i18n="score">Score</dt><dd id="reportScore"></dd></div>
+        <div><dt data-i18n="score">Score</dt><dd id="reportScore"></dd><small class="rank-result-note" id="reportRanking"></small></div>
         <div><dt data-i18n="reportCoordinates">Coordinates</dt><dd id="reportCoordinates"></dd></div>
         <div><dt data-i18n="reportContinent">Continent</dt><dd id="reportContinent"></dd></div>
       </dl>

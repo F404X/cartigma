@@ -33,18 +33,17 @@ Set these with `wrangler secret put`, never in source control:
 ### Game routes
 All game routes require a signed-in account.
 
-- POST `/v1/games/start` reserves the day's attempt for a difficulty.
+- POST `/v1/games/start` starts a Daily or Freeplay round for a difficulty.
 - POST `/v1/games/resume` looks up the signed-in player's case by current UTC day, mode and difficulty.
 - POST `/v1/games/state`, `/v1/games/guess`, `/v1/games/reveal`, `/v1/games/overlay` and `/v1/games/finish` take the game ID and validate its owner.
 - POST `/v1/games/save` is idempotent. New completions save the result and update the leaderboard in the same database transaction.
 
-An account has one ranked attempt per difficulty and UTC day across Daily and Freeplay. A completed Freeplay attempt can be followed by unlimited local practice. Visitors without an account play locally. The server selects the target and calculates the score, with the same evidence, feedback and prices as the browser. Applying the schema adds the new rules version and millisecond start time to new sessions. Existing sessions retain their original clue order.
+An account can play one Daily case and repeated Freeplay rounds per difficulty. Both modes contribute to the best verified score per account, difficulty and UTC day. The ranking adds the improvement over the previous best. Visitors without an account play locally. The server selects the target and calculates the score, with the same evidence, feedback and prices as the browser. Applying the schema adds the new rules version and millisecond start time to new sessions. Existing sessions retain their original clue order.
 
 ### Leaderboard access and request economy
 The leaderboard has **no IP cooldown or Worker-side rate limit**. A blocked
-request would still consume a Workers Free invocation. The browser keeps the
-public board in localStorage for 15 minutes and reuses it while offline or
-when the API is unavailable, without polling or a manual refresh button.
+request would still consume a Workers Free invocation. The browser can show the last public board immediately. It fetches fresh
+data when opened, after a verified result and once a minute while visible.
 Authentication and game mutation endpoints still have separate, stricter
 abuse protection. To protect the Workers quota itself, configure Cloudflare
 WAF rules in front of the Worker on the production hostname.

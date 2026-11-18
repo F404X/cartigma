@@ -112,3 +112,22 @@ test("guess feedback uses reference points and omits the direction in Hard",()=>
   assert.equal(engine.guessFeedback(from,target,"rush"),null);
   assert.equal(engine.guessFeedback(target,target,"normal"),null);
 });
+
+
+test("the continental draw makes each group equally reachable and retains all 195 countries",()=>{
+  const engine=globalThis.CartigmaClueEngine;
+  const drawCountry=engine.countryPicker(countries);
+  const picked=new Set();
+  for(const [continentIndex,continent] of engine.CONTINENTS.entries()){
+    const members=countries.filter(country=>engine.clueContinent(country)===continent);
+    for(const [index,country] of members.entries()){
+      // The final two 32-bit values do not divide evenly into six continents.
+      const words=[2**32-1,continentIndex,index];
+      const selected=drawCountry(()=>words.shift());
+      assert.equal(selected.code,country.code);
+      assert.equal(words.length,0);
+      picked.add(selected.code);
+    }
+  }
+  assert.equal(picked.size,195);
+});

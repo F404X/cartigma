@@ -5,12 +5,8 @@
   <button type="button" data-rank-tab="account">Conta</button>
 </div>
 <section class="rank-body" id="rank-boards" aria-label="Rankings">
-  <div class="rank-field"><label for="rank-period">Período</label>
-    <select id="rank-period"><option value="week">Semanal</option><option value="month">Mensal</option><option value="total">Total</option></select></div>
-  <div class="rank-field"><label for="rank-board-difficulty">Dificuldade</label>
-    <select id="rank-board-difficulty"><option value="normal">Normal</option><option value="hard">Difícil</option><option value="rush">Rush</option></select></div>
-  <ol id="rank-list" class="rank-list"></ol>
-
+  <p class="rank-note" id="rank-freshness" role="status">Carregando classificações…</p>
+  <div id="rank-groups" class="rank-groups"></div>
 </section>
 <section class="rank-body" id="rank-account" aria-label="Sua conta" hidden>
   <div id="rank-user" hidden>
