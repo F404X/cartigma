@@ -74,7 +74,7 @@ test("a ranked case resumes for its owner, unlocks evidence after purchases, and
   const parameters={mode:"free",difficulty:"normal"};
   const {status,data:game}=await call("start",parameters);
   assert.equal(status,201);
-  assert.equal(game.rulesVersion,8);
+  assert.equal(game.rulesVersion,9);
   assert.equal(game.clues.length,2);
   assert.equal("target" in game,false);
   const {target_code:target}=sql.prepare("SELECT target_code FROM game_sessions WHERE id=?").get(game.id);
@@ -94,15 +94,23 @@ test("a ranked case resumes for its owner, unlocks evidence after purchases, and
   assert.ok(Number.isInteger(miss.data.guesses[0].feedback.direction));
   assert.equal("target" in miss.data,false);
   assert.equal((await call("guess",wrong)).data.error,"country_already_guessed");
-  const overlay=await call("overlay",{...session,key:"continent"});
-  assert.equal(overlay.data.sectorMapPenalty,500);
-  assert.equal((await call("overlay",{...session,key:"continent"})).status,409);
+  // Caribbean starts with a region clue, not a continent overlay.
+  // Unlock longitude if there is no purchasable continent clue.
+  let latest=miss.data;
+  let overlayKey=latest.clues.some(c=>c.key==="continent")?"continent":"longitude";
+  while(!latest.clues.some(c=>c.key===overlayKey)){
+    latest=(await call("reveal",session)).data;
+  }
+  const overlay=await call("overlay",{...session,key:overlayKey});
+  const overlayPrice=overlayKey==="continent"?500:1000;
+  assert.equal(overlay.data.sectorMapPenalty,overlayPrice);
+  assert.equal((await call("overlay",{...session,key:overlayKey})).status,409);
 
   const {data:win}=await call("guess",{...session,code:target});
   assert.equal(win.won,true);
   assert.equal(win.target,target);
   assert.equal(win.saved,true);
-  assert.equal(win.score,3900-game.nextHintCost-500);
+  assert.equal(win.score,3900-latest.penalty-overlayPrice);
   assert.equal((await call("save",session)).data.saved,true);
   assert.deepEqual((await call("resume",parameters)).data,{game:null,claimed:false});
   const total=sql.prepare("SELECT points,games FROM player_stats WHERE period_type='total'").get();
