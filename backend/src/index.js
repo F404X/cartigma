@@ -39,7 +39,7 @@ export default {
       }
     }catch(e){
       if(e instanceof ApiError){
-        response=json({error:e.code},e.status,e.status===429?{"retry-after":e.code==="cooldown"?"180":"60"}:{});
+        response=json({error:e.code},e.status,e.status===429?{"retry-after":"60"}:{});
       }else{
         console.error("Cartigma API unexpected error",String(e?.message||e));
         response=json({error:"internal_error"},500);
