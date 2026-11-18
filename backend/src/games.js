@@ -1,34 +1,21 @@
 import {now,dayUTC,periodKeys,randomToken,sha256,hmac,json,readJSON,fail,difficulty,rate,ipOf} from "./lib.js";
 import {requireUser} from "./auth.js";
 import {countries,countryByCode} from "./catalog.js";
-const LIMITS={normal:6,hard:4,rush:30};
+import {insights,denominations} from "./clue-data.js";
+import "../../shared-clues.js";
+const EVIDENCE=globalThis.CartigmaClueEngine;
+const LIMITS={normal:6,hard:4,rush:Infinity};
 const INITIAL={normal:2,hard:1,rush:1};
 const RUSH_MS=60000;
-export function clueSet(country){
-  const lat=country.lat,lng=country.lng,area=country.area;
-  const latAbs=Math.abs(lat);
-  const hemisphere=lat>1?"Norte":lat<(-1)?"Sul":"Equador";
-  const longSide=lng>=0?"Leste":"Oeste";
-  return [
-    {key:"continent",label:"Continente",value:{
-      africa:"África",asia:"Ásia",europe:"Europa",oceania:"Oceania",
-      northAmerica:"América do Norte",southAmerica:"América do Sul"
-    }[country.continent]||"Desconhecido"},
-    {key:"hemisphere",label:"Hemisfério de referência",value:hemisphere},
-    {key:"landlocked",label:"Saída para o mar",value:country.landlocked?"Sem litoral":"Possui litoral"},
-    {key:"area",label:"Área territorial",value:area<1000?"Menos de 1 mil km²":area<100000?"Entre 1 mil e 100 mil km²":area<1000000?"Entre 100 mil e 1 milhão de km²":"Mais de 1 milhão de km²"},
-    {key:"latitude",label:"Latitude de referência",value:latAbs<15?"Próxima ao Equador":latAbs<35?"Baixa ou média latitude":latAbs<60?"Latitude média":"Alta latitude"},
-    {key:"neighbors",label:"Fronteiras terrestres",value:country.borders===0?"Sem fronteiras terrestres":country.borders<=2?"Até 2 países":country.borders<=5?"Entre 3 e 5 países":"Mais de 5 países"},
-    {key:"longitude",label:"Hemisfério longitudinal",value:longSide},
-    {key:"currency",label:"Código da moeda",value:country.currency||"Não registrado"},
-    {key:"longitudeZone",label:"Faixa de longitude",value:Math.abs(lng)<30?"Até 30° de Greenwich":Math.abs(lng)<90?"Entre 30° e 90° de Greenwich":"Além de 90° de Greenwich"},
-    {key:"language",label:"Língua de referência",value:country.language||"Não registrada"}
-  ];
+export function clueSet(country,difficulty="normal"){
+  return EVIDENCE.buildClues(country,insights[country.code],difficulty,denominations);
 }
-export function points({difficulty:d,guesses,penalty,elapsedMs,won}){
-  if(!won)return 0;
-  if(d==="rush")return Math.max(0,Math.round(5000*(1-Math.min(RUSH_MS,elapsedMs)/RUSH_MS)));
-  return Math.max(0,Math.max(250,Math.round(5000*Math.pow(.78,guesses-1)-penalty)));
+export function points({difficulty,guesses,penalty,sectorMapPenalty=0,elapsedMs,won}){
+  return EVIDENCE.scoreFor({difficulty,guesses,penalty,sectorMapPenalty,elapsedMs,won});
+}
+function purchasedPenalty(game){
+  return (game._overlays||[]).reduce((sum,key)=>
+    sum+EVIDENCE.overlayCost(key,game.difficulty),0);
 }
 async function targetFor(env,day,d){
   if(!env.GAME_SECRET||env.GAME_SECRET.length<32)fail(503,"game_not_configured");
@@ -36,17 +23,21 @@ async function targetFor(env,day,d){
   const number=(((digest[0]*256+digest[1])*256+digest[2])*256+digest[3])>>>0;
   return countries[number%countries.length].code;
 }
-function state(g,includeToken=false){
+function state(g){
   const elapsed=Math.max(0,Date.now()-g.created_at*1000);
   const guesses=JSON.parse(g.guesses_json);
   const isFinished=g.finished_at!==null&&g.finished_at!==undefined;
-  const accessible=isFinished?10:g.difficulty==="rush"
-    ?Math.min(10,INITIAL.rush+Math.floor(elapsed/6000)):g.revealed;
-  const clues=clueSet(countryByCode.get(g.target_code));
+  const clues=clueSet(countryByCode.get(g.target_code),g.difficulty);
+  const accessible=Math.min(clues.length,isFinished?clues.length:g.difficulty==="rush"
+    ?INITIAL.rush+Math.floor(elapsed/6000):g.revealed);
+  const nextHintCost=!isFinished&&g.difficulty!=="rush"&&accessible<clues.length
+    ?EVIDENCE.clueCost(clues[accessible],g.difficulty):0;
   const response={
     id:g.id,day:g.day,difficulty:g.difficulty,startedAt:g.created_at*1000,
     remainingMs:g.difficulty==="rush"?Math.max(0,RUSH_MS-elapsed):null,
-    revealed:accessible,clues:clues.slice(0,accessible),mode:g.mode||"daily",
+    revealed:accessible,clues:clues.slice(0,accessible),
+    clueCount:clues.length,nextHintCost,mode:g.mode||"daily",
+    overlays:g._overlays||[],sectorMapPenalty:purchasedPenalty(g),
     guesses:guesses.map(x=>({code:x.code,elapsedMs:x.elapsedMs})),finished:isFinished,won:Boolean(g.won),
     score:isFinished?g.score:null,penalty:g.penalty,hints:g.hints_bought,
     saved:Boolean(g.saved_user_id)
@@ -64,13 +55,16 @@ async function lookup(request,env,body){
   const user=await requireUser(request,env);
   if(user.id!==g.owner_user_id)fail(403,"not_your_game");
   if(now()-g.created_at>2*86400)fail(410,"game_expired");
+  const overlays=await env.DB.prepare("SELECT clue_key FROM game_overlays WHERE game_id=?")
+    .bind(g.id).all();
+  g._overlays=(overlays.results||[]).map(row=>row.clue_key);
   return g;
 }
 function finished(g,won,elapsed){
   const count=JSON.parse(g.guesses_json).length;
   g.finished_at=now();g.won=won?1:0;
   g.score=points({difficulty:g.difficulty,guesses:count,penalty:g.penalty,
-    elapsedMs:elapsed,won});
+    sectorMapPenalty:purchasedPenalty(g),elapsedMs:elapsed,won});
 }
 async function persist(env,g,previous){
   const result=await env.DB.prepare("UPDATE game_sessions SET guesses_json=?,revealed=?,penalty=?,hints_bought=?,finished_at=?,won=?,score=? WHERE id=? AND guesses_json=? AND revealed=? AND finished_at IS NULL")
@@ -91,7 +85,7 @@ export async function gameRoute(request,env,path){
     const playToken=randomToken();
     const g={id:crypto.randomUUID(),day,difficulty:d,mode,owner_user_id:user.id,target_code:code,created_at:now(),
       finished_at:null,guesses_json:"[]",revealed:INITIAL[d],
-      penalty:0,hints_bought:0,won:0,score:0,saved_user_id:null};
+      penalty:0,hints_bought:0,won:0,score:0,saved_user_id:null,_overlays:[]};
     try{
       await env.DB.batch([
         env.DB.prepare("INSERT INTO game_sessions(id,play_hash,day,difficulty,target_code,created_at,guesses_json,revealed) VALUES(?,?,?,?,?,?,?,?)")
@@ -135,6 +129,24 @@ export async function gameRoute(request,env,path){
   if(g.difficulty==="rush"&&elapsed>=RUSH_MS){
     finished(g,false,elapsed);await persist(env,g,previous);return json(state(g));
   }
+  if(path==="/v1/games/overlay"){
+    if(g.difficulty==="rush")fail(409,"rush_no_overlays");
+    const key=String(body.key||"");
+    if(!["continent","hemisphere","longitude"].includes(key))fail(400,"invalid_overlay");
+    const clues=clueSet(countryByCode.get(g.target_code),g.difficulty);
+    if(!clues.slice(0,Math.min(g.revealed,clues.length)).some(clue=>clue.key===key))
+      fail(409,"overlay_clue_locked");
+    if(g._overlays.includes(key))fail(409,"overlay_already_purchased");
+    try{
+      await env.DB.prepare("INSERT INTO game_overlays(game_id,clue_key) VALUES(?,?)")
+        .bind(g.id,key).run();
+    }catch(error){
+      if(/UNIQUE constraint failed/i.test(String(error)))fail(409,"overlay_already_purchased");
+      throw error;
+    }
+    g._overlays.push(key);
+    return json(state(g));
+  }
   if(path==="/v1/games/guess"){
     const code=String(body.code||"").toUpperCase();
     if(!countryByCode.has(code))fail(400,"invalid_country");
@@ -144,15 +156,19 @@ export async function gameRoute(request,env,path){
     g.guesses_json=JSON.stringify(guesses);
     const won=code===g.target_code;
     if(won||guesses.length>=LIMITS[g.difficulty])finished(g,won,elapsed);
-    else if(g.difficulty!=="rush")g.revealed=Math.min(10,Math.max(g.revealed,INITIAL[g.difficulty]+guesses.length));
+    else if(g.difficulty!=="rush"){
+      const limit=clueSet(countryByCode.get(g.target_code),g.difficulty).length;
+      g.revealed=Math.min(limit,Math.max(g.revealed,INITIAL[g.difficulty]+guesses.length));
+    }
     await persist(env,g,previous);
     return json(state(g));
   }
   if(path==="/v1/games/reveal"){
     if(g.difficulty==="rush")fail(409,"rush_auto_hints");
-    if(g.revealed>=10)fail(409,"all_hints_revealed");
+    const clues=clueSet(countryByCode.get(g.target_code),g.difficulty);
+    if(g.revealed>=clues.length)fail(409,"all_hints_revealed");
+    g.penalty+=EVIDENCE.clueCost(clues[g.revealed],g.difficulty);
     g.revealed++;g.hints_bought++;
-    g.penalty+=g.difficulty==="hard"?450:300;
     await persist(env,g,previous);
     return json(state(g));
   }
