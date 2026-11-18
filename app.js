@@ -26,13 +26,13 @@
   // 300 is preserved only for loading older saved games. New charges reflect
   // information gain; the price for the NEXT clue is always shown before purchase.
   // Overlay costs differ by how tightly each display constrains the target.
-  const MAP_OVERLAY_COSTS=Object.freeze({hemisphere:250,continent:500,longitude:1000});
+  const MAP_OVERLAY_COSTS=CLUE_ENGINE.OVERLAY_PRICES;
   // Hard charges 50% more for clues AND every map aid, rounding to 50 points.
   // Stored purchases retain their original cost when a daily case is reopened.
   const HARD_COST_FACTOR=1.5;
   const pricedCost=(base)=>difficulty==="hard"
     ?Math.ceil(base*HARD_COST_FACTOR/50)*50:base;
-  const overlayCost=(key)=>pricedCost(MAP_OVERLAY_COSTS[key]||0);
+  const overlayCost=(key)=>CLUE_ENGINE.overlayCost(key,difficulty);
   // Europe and North America are fully/almost entirely in the Northern
   // Hemisphere. The others have meaningful populations on BOTH sides of 0°.
   const COUNTRY_CODES=COUNTRIES.map(c=>c.code);
@@ -628,49 +628,35 @@
     countryBorders:"clueRegion"
   });
   function revealGeographyOnMap(clue){
-    // Rush unlocks evidence by time and never offers purchasable overlays.
-    if(isRush())return;
-    const cost=overlayCost(clue.key);
-    if(game.finished||!game.started||!map||!mapStyleReady||!cost)return;
-    if(clue.key==="continent"&&!CONTINENT_BORDERS[continentKey(game.index)])return;
-    if(!cluesFor(game.index,difficulty).slice(0,game.revealed).some(item=>
-      item.key===clue.key&&(
-        item.key==="utmZone"?item.zone===clue.zone:
-        item.key==="utmBand"?item.band===clue.band:
-        ["hemisphere","continent","zone"].includes(clue.key)
-          ?item.value===clue.value:item.from===clue.from&&item.to===clue.to)))return;
+    if(isRush()||!game.started||game.finished||game.pending||!map||!mapStyleReady)return;
+    const cost=CLUE_ENGINE.overlayCost(clue.key,difficulty);
+    if(!cost||game.sectorReveals?.includes(clue.key))return;
+    if(game.ranked){
+      if(!game.rankedClues?.some(item=>item.key===clue.key))return;
+      rankedAction("overlay",{key:clue.key});return;
+    }
+    const match=cluesFor(game.index,difficulty).slice(0,game.revealed)
+      .find(item=>item.key===clue.key);
+    if(!match||JSON.stringify(match)!==JSON.stringify(clue))return;
     if(!Array.isArray(game.sectorReveals))game.sectorReveals=[];
-    if(game.sectorReveals.includes(clue.key))return;
     game.sectorReveals.push(clue.key);
     game.sectorMapPenalty=(game.sectorMapPenalty||0)+cost;
     save();renderClues();renderMap();
-    if(clue.key==="hemisphere"){
-      map.easeTo({center:[0,0],zoom:1.7,duration:450});
-    }else if(clue.key==="continent"){
-      const bounds=CONTINENT_BORDERS[continentKey(game.index)].bbox;
-      map.fitBounds([[bounds[0],bounds[1]],[bounds[2],bounds[3]]],{
-        padding:{top:20,bottom:20,left:20,right:20},maxZoom:4,duration:400
-      });
-    }else if(clue.key==="zone"){
-      // Show both hemispheres without centering on the hidden city's latitude.
-      map.easeTo({center:[0,0],zoom:1.55,duration:450});
-    }else{
-      let bounds;
-      if(clue.key==="utmZone"){
-        const polygons=utmZonePolygons(clue.zone);
-        const coords=polygons.flatMap(poly=>poly[0]);
-        bounds=[[Math.min(...coords.map(p=>p[0])),Math.min(...coords.map(p=>p[1]))],
-          [Math.max(...coords.map(p=>p[0])),Math.max(...coords.map(p=>p[1]))]];
-      }else if(clue.key==="utmBand"){
-        const [south,north]=utmBandBounds(clue.band);
-        bounds=[[-179.5,south],[179.5,north]];
-      }else bounds=clue.key==="longitude"?
-        [[clue.from,-75],[clue.to,75]]:[[-179.5,clue.from],[179.5,clue.to]];
-      map.fitBounds(bounds,{padding:{top:20,bottom:20,left:20,right:20},maxZoom:3,duration:450});
+    if(clue.key==="hemisphere")map.easeTo({center:[0,0],zoom:1.7,duration:450});
+    else if(clue.key==="continent"){
+      const bounds=(clue.continents||[])
+        .map(key=>CONTINENT_BORDERS[key]?.bbox).filter(Boolean);
+      if(bounds.length)map.fitBounds([
+        [Math.min(...bounds.map(b=>b[0])),Math.min(...bounds.map(b=>b[1]))],
+        [Math.max(...bounds.map(b=>b[2])),Math.max(...bounds.map(b=>b[3]))]
+      ],{padding:20,maxZoom:4,duration:400});
+    }else if(clue.key==="longitude"){
+      map.fitBounds([[clue.from,-75],[clue.to,75]],{
+        padding:20,maxZoom:3,duration:450});
     }
-    const message=clue.key==="hemisphere"?"hemisphereMapPurchased":
-      clue.key==="continent"?"continentMapPurchased":"sectorMapPurchased";
-    toast(tc(message,{cost:number(cost)}));
+    toast(tc(clue.key==="hemisphere"?"hemisphereMapPurchased":
+      clue.key==="continent"?"continentMapPurchased":"sectorMapPurchased",
+      {cost:number(cost)}));
   }
   function nextHintCost(){
     if(game?.ranked)return game.rankedNextHintCost||0;
@@ -1227,8 +1213,8 @@
   }
   function drawSectorOverlays(){
     if(!map||!mapStyleReady||!Array.isArray(game.sectorReveals))return;
-    for(const clue of cluesFor(game.index,difficulty)){
-      if(!game.sectorReveals.includes(clue.key)||!["longitude","latitude"].includes(clue.key))continue;
+    for(const clue of (game.ranked?game.rankedClues:cluesFor(game.index,difficulty))){
+      if(!game.sectorReveals.includes(clue.key)||clue.key!=="longitude")continue;
       const geometry=clue.key==="longitude"
         ?{type:"Polygon",coordinates:sectorRectangle(clue.from,-85,clue.to,85)}
         :{type:"MultiPolygon",coordinates:Array.from({length:6},(_,i)=>
@@ -1361,32 +1347,29 @@
         "text-halo-width":1.3}});
   }
   function drawContinentOutline(){
-    if(!map||!mapStyleReady||!Array.isArray(game.sectorReveals)
-      ||!game.sectorReveals.includes("continent"))return;
-    const shape=CONTINENT_BORDERS[continentKey(game.index)];
-    if(!shape)return;
+    if(!map||!mapStyleReady||!game.sectorReveals?.includes("continent"))return;
+    const clue=(game.ranked?game.rankedClues:cluesFor(game.index,difficulty))
+      .find(clue=>clue.key==="continent");
+    const continents=clue?.continents||[];
+    const shapes=continents.map(key=>CONTINENT_BORDERS[key]).filter(Boolean);
+    if(shapes.length!==continents.length||!shapes.length)return;
+    const geometry=shapes.length===1?shapes[0].geometry:
+      {type:"MultiPolygon",coordinates:shapes.flatMap(shape=>
+        shape.geometry.type==="MultiPolygon"?shape.geometry.coordinates:
+          [shape.geometry.coordinates])};
     const id="case-continent-outline";
-    // Istanbul spans the Bosporus, so both continental sides are relevant.
-    const geometry=game.index===12
-      ?{type:"MultiPolygon",coordinates:[
-        ...CONTINENT_BORDERS.europe.geometry.coordinates,
-        ...CONTINENT_BORDERS.asia.geometry.coordinates
-      ]}
-      :shape.geometry;
-    map.addSource(id,{type:"geojson",data:{
-      type:"Feature",properties:{},geometry
-    }});
-    // Only outline: no fill layer. Remains subtle against geographic labels.
+    map.addSource(id,{type:"geojson",data:{type:"Feature",properties:{},geometry}});
     map.addLayer({id,type:"line",source:id,
       layout:{"line-cap":"round","line-join":"round"},
       paint:{"line-color":"#ffd449","line-width":1.7,"line-opacity":0.28,
         "line-opacity-transition":{duration:0,delay:0}}});
   }
   function drawHemisphereOverlay(){
-    if(!map||!mapStyleReady||!Array.isArray(game.sectorReveals)
-      ||!game.sectorReveals.includes("hemisphere")
-      ||!cluesFor(game.index,difficulty).some(clue=>clue.key==="hemisphere"))return;
-    const north=countryAt(game.index)[3]>=0;
+    if(!map||!mapStyleReady||!game.sectorReveals?.includes("hemisphere"))return;
+    const clue=(game.ranked?game.rankedClues:cluesFor(game.index,difficulty))
+      .find(clue=>clue.key==="hemisphere");
+    if(!clue)return;
+    const north=clue.hemisphere==="north";
     const lineId="case-hemisphere-line",arrowsId="case-hemisphere-arrows";
     map.addSource(lineId,{type:"geojson",data:{type:"Feature",properties:{},
       geometry:{type:"LineString",coordinates:[[-179.9,0],[179.9,0]]}}});
@@ -1533,10 +1516,8 @@
     // reconfigured, including on style reloads and Rush clue unlocks.
     syncCasePins();
     clearMapOverlays();
-    if(!isRush()&&!game.ranked){
+    if(!isRush()){
       drawSectorOverlays();
-      drawLatitudeBeltOverlay();
-      drawUtmOverlays();
       drawHemisphereOverlay();
       drawContinentOutline();
     }
@@ -1676,13 +1657,10 @@
     if(game.won||game.guesses.length>=maximum()){
       game.finished=true;game.revealed=cluesFor(game.index,difficulty).length;
       game.endedAt=new Date(now).toISOString();game.durationMs=elapsed;
-      game.score=game.won
-        ?isRush()
-          ?Math.max(0,Math.round(5000*(1-Math.min(RUSH_DURATION_MS,elapsed)/
-            RUSH_DURATION_MS))-(game.sectorMapPenalty||0))
-          :Math.max(0,Math.max(250,Math.round(5000*Math.pow(.78,game.guesses.length-1)-
-            game.penalty))-(game.sectorMapPenalty||0))
-        :0;
+      game.score=CLUE_ENGINE.scoreFor({
+        difficulty,guesses:game.guesses.length,penalty:game.penalty,
+        sectorMapPenalty:game.sectorMapPenalty||0,elapsedMs:elapsed,won:game.won
+      });
     }else if(!isRush()){
       game.revealed=Math.min(cluesFor(game.index,difficulty).length,
         Math.max(game.revealed,DIFFICULTIES[difficulty].initial+game.guesses.length));
