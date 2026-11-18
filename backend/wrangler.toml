@@ -10,13 +10,6 @@ database_name = "cartigma-ranking-staging"
 database_id = "00000000-0000-0000-0000-000000000000"
 
 [[ratelimits]]
-name = "LEADERBOARD_LIMIT"
-namespace_id = "609101"
-[ratelimits.simple]
-limit = 1
-period = 60
-
-[[ratelimits]]
 name = "AUTH_LIMIT"
 namespace_id = "609102"
 [ratelimits.simple]
