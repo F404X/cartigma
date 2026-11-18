@@ -3,6 +3,13 @@ import {now,randomToken,base64url,unbase64url,sha256,hmac,
 const cookieName="__Host-cartigma_session";
 const sessionLifetime=14*86400;
 const ITERATIONS=100000; // Cloudflare WebCrypto cap; benchmark before production
+// New credentials must contain only letters and digits, including each class.
+// Do not apply this rule to login: existing accounts may use older passwords.
+export function validNewPassword(value){
+  return typeof value==="string" && value.length>=8 && value.length<=256 &&
+    /^[A-Za-z0-9]+$/.test(value) && /[a-z]/.test(value) &&
+    /[A-Z]/.test(value) && /[0-9]/.test(value);
+}
 async function hashPassword(password,salt,pepper){
   if(!pepper||pepper.length<32)fail(503,"auth_not_configured");
   const input=await hmac(pepper,password);
@@ -62,7 +69,7 @@ export async function authRoute(request,env,path){
     const password=body.password;
     if(!/^[a-zA-Z0-9_]{3,20}$/.test(username)||!/^\S+@\S+\.\S+$/.test(email)||email.length>254)
       fail(400,"invalid_account_details");
-    if(typeof password!=="string"||password.length<12||password.length>256)fail(400,"weak_password");
+    if(!validNewPassword(password))fail(400,"weak_password");
     await validateTurnstile(body,request,env);
     const salt=randomToken(16);
     const hashed=await hashPassword(password,salt,env.AUTH_PEPPER);
@@ -116,7 +123,7 @@ export async function authRoute(request,env,path){
   if(path==="/v1/auth/reset"){
     const token=body.token,password=body.password;
     if(typeof token!=="string"||token.length!==43
-      ||typeof password!=="string"||password.length<12||password.length>256)
+      ||!validNewPassword(password))
       fail(400,"invalid_reset");
     const hash=await sha256(token);
     const reset=await env.DB.prepare("SELECT user_id FROM password_resets WHERE token_hash=? AND expires_at>?")
