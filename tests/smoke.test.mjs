@@ -1231,8 +1231,11 @@ test("the ranking opens all nine boards and refreshes an open panel after saving
   const document={body,readyState:"complete",getElementById:get,
     createElement:()=>new RankElement(),querySelectorAll:()=>tabs,addEventListener(){}};
   let score=0,requests=0;
+  let now=Date.now(),periodicRefresh=null,refreshCheckMs=0;
+  class Clock extends Date {static now(){return now}}
   const valueResponse=data=>({ok:true,json:async()=>data});
-  const context={window,document,URL,Date,location:new URL("https://cartigma.workers.dev/"),setInterval(){},
+  const context={window,document,URL,Date:Clock,location:new URL("https://cartigma.workers.dev/"),
+    setInterval(fn,ms){periodicRefresh=fn;refreshCheckMs=ms;},
     localStorage:{getItem:key=>cache.get(key),setItem:(key,value)=>cache.set(key,value),removeItem:key=>cache.delete(key)},
     fetch:async url=>{
       if(url.includes("ranking-panel.html"))return {ok:true,text:async()=>""};
@@ -1255,6 +1258,20 @@ test("the ranking opens all nine boards and refreshes an open panel after saving
   runInNewContext(code,context,{filename:"ranking-client.js"});
   await new Promise(resolve=>setImmediate(resolve));
   await get("rank-launch").onclick();
+  assert.equal(requests,1,"Opening ranking fetches immediately");
+  assert.equal(refreshCheckMs,30000,"Periodic checks do not hit the API every 15 seconds");
+  now+=4*60*1000+59000;
+  periodicRefresh();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(requests,1,"An open board does not poll before five minutes");
+  now+=1000;
+  periodicRefresh();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(requests,2,"An open board refreshes at five minutes");
+  tabs[1].onclick();
+  tabs[0].onclick();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(requests,3,"Re-opening the ranking tab refreshes immediately");
   const groups=get("rank-groups");
   assert.deepEqual(groups.children.map(section=>section.children[0].textContent),["Normal","Difícil","Rush"]);
   for(const section of groups.children){
@@ -1270,13 +1287,19 @@ test("the ranking opens all nine boards and refreshes an open panel after saving
     assert.equal(points.textContent,(5000).toLocaleString("pt-BR")+" pts");
     assert.equal(time.textContent,"1:22,345");
   }
-  assert.equal(requests,2);
+  assert.equal(requests,4,"Saving a match refreshes without waiting five minutes");
   tabs[1].onclick();
   await new Promise(resolve=>setImmediate(resolve));
   const historyButton=get("rank-history-list").children[0].children[0];
   assert.equal(historyButton.children[0].textContent,"Brasil - Vitória");
   await historyButton.onclick();
   assert.deepEqual(opened,dossier);
+  get("rank-close").onclick();
+  await window.CartigmaRanking.gameAction("guess",{
+    id:"another-match",mode:"free",difficulty:"normal",code:"BR"
+  });
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(requests,5,"A finished game updates boards even when the panel is closed");
 });
 
 test("an archived dossier renders the original clues and country profile without changing the current game",()=>{
