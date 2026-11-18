@@ -134,31 +134,141 @@
   // (e.g. 009) rather than names on some browsers.
   const continentKeys = ["europe","africa","asia","oceania","northAmerica","southAmerica"];
   const continentNames = {
-    en:"Europe|Africa|Asia|Oceania|North America|South America",
-    pt:"Europa|África|Ásia|Oceania|América do Norte|América do Sul",
-    es:"Europa|África|Asia|Oceanía|América del Norte|América del Sur",
-    zh:"欧洲|非洲|亚洲|大洋洲|北美洲|南美洲",
-    ja:"ヨーロッパ|アフリカ|アジア|オセアニア|北アメリカ|南アメリカ",
-    ru:"Европа|Африка|Азия|Океания|Северная Америка|Южная Америка",
-    fr:"Europe|Afrique|Asie|Océanie|Amérique du Nord|Amérique du Sud",
-    de:"Europa|Afrika|Asien|Ozeanien|Nordamerika|Südamerika",
-    it:"Europa|Africa|Asia|Oceania|America settentrionale|America meridionale",
-    nl:"Europa|Afrika|Azië|Oceanië|Noord-Amerika|Zuid-Amerika",
-    pl:"Europa|Afryka|Azja|Oceania|Ameryka Północna|Ameryka Południowa",
-    sv:"Europa|Afrika|Asien|Oceanien|Nordamerika|Sydamerika",
-    tr:"Avrupa|Afrika|Asya|Okyanusya|Kuzey Amerika|Güney Amerika",
-    ar:"أوروبا|إفريقيا|آسيا|أوقيانوسيا|أمريكا الشمالية|أمريكا الجنوبية",
-    he:"אירופה|אפריקה|אסיה|אוקיאניה|צפון אמריקה|דרום אמריקה",
-    ko:"유럽|아프리카|아시아|오세아니아|북아메리카|남아메리카",
-    th:"ยุโรป|แอฟริกา|เอเชีย|โอเชียเนีย|อเมริกาเหนือ|อเมริกาใต้",
-    vi:"Châu Âu|Châu Phi|Châu Á|Châu Đại Dương|Bắc Mỹ|Nam Mỹ",
-    id:"Eropa|Afrika|Asia|Oseania|Amerika Utara|Amerika Selatan"
+    en:"Europe|Africa|Asia|Oceania|North/Central America|South America",
+    pt:"Europa|África|Ásia|Oceania|América do Norte/Central|América do Sul",
+    es:"Europa|África|Asia|Oceanía|América del Norte/Central|América del Sur",
+    zh:"欧洲|非洲|亚洲|大洋洲|北美洲／中美洲|南美洲",
+    ja:"ヨーロッパ|アフリカ|アジア|オセアニア|北アメリカ／中央アメリカ|南アメリカ",
+    ru:"Европа|Африка|Азия|Океания|Северная/Центральная Америка|Южная Америка",
+    fr:"Europe|Afrique|Asie|Océanie|Amérique du Nord/Centrale|Amérique du Sud",
+    de:"Europa|Afrika|Asien|Ozeanien|Nord-/Mittelamerika|Südamerika",
+    it:"Europa|Africa|Asia|Oceania|America settentrionale/centrale|America meridionale",
+    nl:"Europa|Afrika|Azië|Oceanië|Noord-/Centraal-Amerika|Zuid-Amerika",
+    pl:"Europa|Afryka|Azja|Oceania|Ameryka Północna/Środkowa|Ameryka Południowa",
+    sv:"Europa|Afrika|Asien|Oceanien|Nord-/Centralamerika|Sydamerika",
+    tr:"Avrupa|Afrika|Asya|Okyanusya|Kuzey/Orta Amerika|Güney Amerika",
+    ar:"أوروبا|إفريقيا|آسيا|أوقيانوسيا|أمريكا الشمالية/الوسطى|أمريكا الجنوبية",
+    he:"אירופה|אפריקה|אסיה|אוקיאניה|אמריקה הצפונית/המרכזית|דרום אמריקה",
+    ko:"유럽|아프리카|아시아|오세아니아|북아메리카/중앙아메리카|남아메리카",
+    th:"ยุโรป|แอฟริกา|เอเชีย|โอเชียเนีย|อเมริกาเหนือ/กลาง|อเมริกาใต้",
+    vi:"Châu Âu|Châu Phi|Châu Á|Châu Đại Dương|Bắc/Trung Mỹ|Nam Mỹ",
+    id:"Eropa|Afrika|Asia|Oseania|Amerika Utara/Tengah|Amerika Selatan"
   };
   for (const language of Object.keys(localeData)) {
     const labels = continentNames[language]?.split("|");
     if (!labels || labels.length !== continentKeys.length)
       throw new Error("Incomplete continent translation for " + language);
     localeData[language].continents = Object.fromEntries(continentKeys.map((key,i) => [key,labels[i]]));
+  }
+  // The Caribbean is a region, not a seventh continent. The same labels
+  // are used by offline gameplay, verified ranked games and the case archive.
+  const regionLabels={
+  "en": [
+    "North/Central America",
+    "Caribbean"
+  ],
+  "pt": [
+    "América do Norte/Central",
+    "Caribe"
+  ],
+  "es": [
+    "América del Norte/Central",
+    "Caribe"
+  ],
+  "zh": [
+    "北美洲／中美洲",
+    "加勒比地区"
+  ],
+  "ja": [
+    "北アメリカ／中央アメリカ",
+    "カリブ海地域"
+  ],
+  "ru": [
+    "Северная/Центральная Америка",
+    "Карибский бассейн"
+  ],
+  "fr": [
+    "Amérique du Nord/Centrale",
+    "Caraïbes"
+  ],
+  "de": [
+    "Nord-/Mittelamerika",
+    "Karibik"
+  ],
+  "it": [
+    "America settentrionale/centrale",
+    "Caraibi"
+  ],
+  "nl": [
+    "Noord-/Centraal-Amerika",
+    "Cariben"
+  ],
+  "pl": [
+    "Ameryka Północna/Środkowa",
+    "Karaiby"
+  ],
+  "sv": [
+    "Nord-/Centralamerika",
+    "Karibien"
+  ],
+  "tr": [
+    "Kuzey/Orta Amerika",
+    "Karayipler"
+  ],
+  "ar": [
+    "أمريكا الشمالية/الوسطى",
+    "منطقة البحر الكاريبي"
+  ],
+  "he": [
+    "אמריקה הצפונית/המרכזית",
+    "האיים הקריביים"
+  ],
+  "ko": [
+    "북아메리카/중앙아메리카",
+    "카리브 지역"
+  ],
+  "th": [
+    "อเมริกาเหนือ/กลาง",
+    "แคริบเบียน"
+  ],
+  "vi": [
+    "Bắc/Trung Mỹ",
+    "Caribe"
+  ],
+  "id": [
+    "Amerika Utara/Tengah",
+    "Karibia"
+  ]
+};
+  const regionTemplates={
+  "en": "Region: {value}",
+  "pt": "Região: {value}",
+  "es": "Región: {value}",
+  "zh": "地区：{value}",
+  "ja": "地域：{value}",
+  "ru": "Регион: {value}",
+  "fr": "Région : {value}",
+  "de": "Region: {value}",
+  "it": "Regione: {value}",
+  "nl": "Regio: {value}",
+  "pl": "Region: {value}",
+  "sv": "Region: {value}",
+  "tr": "Bölge: {value}",
+  "ar": "المنطقة: {value}",
+  "he": "אזור: {value}",
+  "ko": "지역: {value}",
+  "th": "ภูมิภาค: {value}",
+  "vi": "Khu vực: {value}",
+  "id": "Wilayah: {value}"
+};
+  for(const language of Object.keys(localeData)){
+    const labels=regionLabels[language];
+    if(!labels||!regionTemplates[language])
+      throw new Error("Missing geographic-region localization for "+language);
+    localeData[language].regions={
+      northCentralAmerica:labels[0],caribbean:labels[1]
+    };
+    localeData[language].templates.countryRegion=regionTemplates[language];
   }
   const sectorButtonKeys=["sectorMapButton","sectorMapped","sectorMapPurchased"];
   const sectorButtonText={"en":"Map −{cost}|On map ✓|Sector displayed · −{cost} points","pt":"Mapa −{cost}|No mapa ✓|Setor exibido · −{cost} pontos","es":"Mapa −{cost}|En mapa ✓|Sector mostrado · −{cost} puntos","zh":"地图 −{cost}|已显示 ✓|已显示区域 · −{cost} 分","ja":"地図 −{cost}|表示済み ✓|範囲を表示 · −{cost} 点","ru":"Карта −{cost}|На карте ✓|Сектор показан · −{cost} очков","fr":"Carte −{cost}|Sur carte ✓|Secteur affiché · −{cost} points","de":"Karte −{cost}|Auf Karte ✓|Sektor angezeigt · −{cost} Punkte","it":"Mappa −{cost}|Su mappa ✓|Settore mostrato · −{cost} punti","nl":"Kaart −{cost}|Op kaart ✓|Sector getoond · −{cost} punten","pl":"Mapa −{cost}|Na mapie ✓|Sektor pokazany · −{cost} pkt","sv":"Karta −{cost}|På karta ✓|Sektor visad · −{cost} poäng","tr":"Harita −{cost}|Haritada ✓|Bölge gösterildi · −{cost} puan","ar":"الخريطة −{cost}|على الخريطة ✓|تم عرض القطاع · −{cost} نقطة","he":"מפה −{cost}|במפה ✓|האזור מוצג · −{cost} נקודות","ko":"지도 −{cost}|지도 표시 ✓|영역 표시 · −{cost}점","th":"แผนที่ −{cost}|แสดงแล้ว ✓|แสดงพื้นที่แล้ว · −{cost} คะแนน","vi":"Bản đồ −{cost}|Trên bản đồ ✓|Đã hiện khu vực · −{cost} điểm","id":"Peta −{cost}|Di peta ✓|Sektor ditampilkan · −{cost} poin"};
