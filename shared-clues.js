@@ -8,11 +8,11 @@
     hemisphere:150,continent:300,longitude:400,
     countryCurrency:250,countryLanguageFamily:250,countryFlagColor:200,
     countryPopulation:300,countryGDP:350,countryArea:300,
-    countryLandlocked:200,countryBorders:300,countrySubregion:300,countryAreaBand:250
+    countryLandlocked:200,countryBorders:300,countrySubregion:300,countryAreaBand:250,countryRegion:300
   });
   const OVERLAY_PRICES=Object.freeze({hemisphere:250,continent:500,longitude:1000});
   const MAX_CLUES=10;
-  const RULES_VERSION=8;
+  const RULES_VERSION=9;
   const DIFFICULTIES=Object.freeze({
     normal:Object.freeze({attempts:6,initial:2}),
     hard:Object.freeze({attempts:4,initial:1}),
@@ -47,6 +47,12 @@
   }).flatMap(([group,codes])=>codes.split(" ").map(code=>[code,group]))));
   const AREA_BOUNDS=[0,100,1000,10000,100000,1000000,10000000,Infinity];
   const clueContinent=country=>country.code==="CY"?"asia":country.continent;
+  // The Caribbean is a geographic region, not an extra continent. It stays
+  // inside the existing North America pool for the six-continent draw.
+  const geographicRegion=country=>{
+    if(SUBREGIONS[country.code]==="029")return "caribbean";
+    return clueContinent(country)==="northAmerica"?"northCentralAmerica":null;
+  };
   const CONTINENTS=Object.freeze(["africa","asia","europe","northAmerica","oceania","southAmerica"]);
   function uniformIndex(size,nextUint32){
     const ceiling=2**32-2**32%size;
@@ -188,17 +194,24 @@
     const band=areaBand(area);
     const geography=[
       {clue:{key:"countrySubregion",region:SUBREGIONS[code]},
-        match:c=>SUBREGIONS[c.code]===SUBREGIONS[code],use:SUBREGIONS[code]!=="005"},
+        match:c=>SUBREGIONS[c.code]===SUBREGIONS[code],
+        use:SUBREGIONS[code]!=="005"&&(version<9||SUBREGIONS[code]!=="029")},
       {clue:{key:"countryLandlocked",landlocked},match:c=>c.landlocked===landlocked},
       {clue:{key:"longitude",from:west,to:west+30,reference:true},match:c=>c.lng>=west&&c.lng<west+30},
       {clue:{key:"countryAreaBand",min:AREA_BOUNDS[band],max:AREA_BOUNDS[band+1]===Infinity?null:AREA_BOUNDS[band+1]},
         match:c=>areaBand(c.area)===band},
       {clue:{key:"countryBorders",value:borders},match:c=>landBorders(c)===borders}
     ].filter(option=>option.use!==false);
-    // The first clue uses the catalogue's geographic grouping. Turkey's
-    // transcontinental location is still shown in its completed case file.
-    const clues=[{key:"continent",continents:[continent]}];
-    let candidates=catalog.filter(c=>clueContinent(c)===continent);
+    // The starting clue distinguishes the Caribbean (13 sovereign states)
+    // from North/Central America (10), without claiming the Caribbean
+    // is a continent or changing the balanced six-continent country draw.
+    // Version 8 games must retain their original clue deck.
+    const region=version>=9?geographicRegion(country):null;
+    const clues=[region?{key:"countryRegion",region}:
+      {key:"continent",continents:[continent]}];
+    let candidates=catalog.filter(c=>region
+      ?geographicRegion(c)===region
+      :clueContinent(c)===continent);
     // Choose early clues by how many plausible answers they leave. Reserve
     // single-answer clues for later and skip facts that add no constraint
     // until the useful geographic clues have been shown.
@@ -232,7 +245,7 @@
     return clues.slice(0,MAX_CLUES);
   }
   const api=Object.freeze({buildClues,clueCost,overlayCost,scoreFor,numericBoundary,hash,
-    guessFeedback,revealAfterMiss,clueContinent,countryPicker,CONTINENTS,MAX_CLUES,EXCLUDED,PRICES,OVERLAY_PRICES,
+    guessFeedback,revealAfterMiss,clueContinent,geographicRegion,countryPicker,CONTINENTS,MAX_CLUES,EXCLUDED,PRICES,OVERLAY_PRICES,
     DIFFICULTIES,RULES_VERSION,RUSH_DURATION_MS,RUSH_CLUE_INTERVAL_MS});
   if(typeof window!=="undefined")window.CartigmaClueEngine=api;
   if(typeof globalThis!=="undefined")globalThis.CartigmaClueEngine=api;
