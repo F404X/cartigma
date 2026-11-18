@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {periodKeys,dayUTC,constantTimeEqual} from "../src/lib.js";
 import {points,clueSet} from "../src/games.js";
+import {validNewPassword} from "../src/auth.js";
 import {countries,countryByCode} from "../src/catalog.js";
 
 test("catalogue and country codes are unique",()=>{
@@ -26,4 +27,13 @@ test("password comparison is constant-output and rejects different lengths",()=>
   assert.equal(constantTimeEqual("abc","abc"),true);
   assert.equal(constantTimeEqual("abc","abd"),false);
   assert.equal(constantTimeEqual("abc","ab"),false);
+});
+
+test("new passwords require 8+ ASCII alphanumerics, uppercase, lowercase and digits",()=>{
+  for(const password of ["Ab123456","Abc12345","Cartigma2026","A1bcdefg"])
+    assert.equal(validNewPassword(password),true,password);
+  for(const password of ["aB12345","abcdefgh","ABCDEFGH","12345678",
+    "Aaaabbbb","A1234567","a1234567","Ab12345!","Ab12345_",
+    "Ab12345é","Ab12345 ","",null])
+    assert.equal(validNewPassword(password),false,String(password));
 });
