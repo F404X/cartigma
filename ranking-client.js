@@ -11,7 +11,7 @@
  const ACCOUNT_MARKER="cartigma-ranked-account-v1";
  const rankResumes=new Map();
  let accountRequest=null;
- const CACHE_TTL=60*1000;
+ const CACHE_TTL=5*60*1000; // Re-fetch only every 5 minutes while the board stays open.
  const state={tab:"boards",boards:null,user:null,meChecked:false,loading:false,visible:false};
  let leaderboardRequest=null,leaderboardRevision=0,lastRefresh=0;
  const announcedGames=new Set();
@@ -77,7 +77,7 @@
    $("rank-history-more").onclick=()=>loadMatchHistory(Boolean(matchHistory.nextCursor));
    $("rank-forgot").onclick=requestReset;
    setAuthMode("login");
-   setInterval(refreshVisibleBoards,15000);
+   setInterval(refreshVisibleBoards,30000);
    document.addEventListener("visibilitychange",refreshVisibleBoards);
    const reset=new URL(location.href).searchParams.get("reset");
    if(reset){open();setTab("account");setTimeout(()=>resetPassword(reset),0);}
@@ -121,7 +121,10 @@
    leaderboardRevision++;
    lastRefresh=0;
    try{localStorage.removeItem(CACHE_KEY);}catch{}
-   refreshVisibleBoards();
+   // A completed game must refresh rankings immediately, even if the panel
+   // is closed or the Account tab is selected. The next periodic refresh
+   // then starts five minutes after this request.
+   loadBoards();
  }
  async function loadBoards(){
    if(!state.boards){
