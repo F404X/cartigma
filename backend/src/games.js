@@ -124,7 +124,10 @@ function resultStatements(env,g){
       ON CONFLICT(user_id,challenge_day,difficulty) DO UPDATE SET
         game_id=excluded.game_id,score=excluded.score,won=excluded.won,guesses=excluded.guesses,
         hints=excluded.hints,duration_ms=excluded.duration_ms,created_at=excluded.created_at
-      WHERE excluded.score>game_results.score`)
+      WHERE excluded.score>game_results.score OR (
+        excluded.score=game_results.score AND excluded.won=1
+        AND (game_results.won=0 OR excluded.duration_ms<game_results.duration_ms)
+      )`)
       .bind(g.owner_user_id,keys.week,keys.month,now(),g.id),
     env.DB.prepare(`UPDATE game_sessions SET saved_user_id=? WHERE id=? AND saved_user_id IS NULL
       AND finished_at IS NOT NULL`).bind(g.owner_user_id,g.id)

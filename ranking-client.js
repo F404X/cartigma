@@ -2,7 +2,7 @@
 (()=>{
  "use strict";
  const BASE=(window.CARTIGMA_RANKING_API||(location.hostname.endsWith(".workers.dev")?location.origin:"https://api.cartigma.f404x.net")).replace(/\/$/,"");
- const CACHE_KEY="cartigma-leaderboard-cache-v2:"+BASE;
+ const CACHE_KEY="cartigma-leaderboard-cache-v3:"+BASE;
  const DIFFICULTIES={normal:"Normal",hard:"Difícil",rush:"Rush"};
  const PERIODS={week:"Semanal",month:"Mensal",total:"Total"};
  const TABS=["boards","account"];
@@ -53,7 +53,7 @@
    const panel=document.createElement("aside");panel.id="rank-panel";panel.className="rank-panel";
    panel.hidden=true;panel.setAttribute("aria-label","Cartigma — ranking competitivo");
    try{
-     const response=await fetch("ranking-panel.html?v=20261118-rankings-grid");
+     const response=await fetch("ranking-panel.html?v=20261118-solve-time");
      if(!response.ok)throw Error("markup unavailable");
      panel.innerHTML=await response.text();
    }catch{console.warn("Cartigma ranking panel unavailable");return;}
@@ -137,6 +137,14 @@
      if(leaderboardRequest===request)leaderboardRequest=null;
    }
  }
+ function formatSolveTime(ms){
+   const millis=String(ms%1000).padStart(3,"0");
+   const seconds=String(Math.floor(ms/1000)%60).padStart(2,"0");
+   const minutes=Math.floor(ms/60000);
+   const clock=minutes>=60?Math.floor(minutes/60)+":"+String(minutes%60).padStart(2,"0"):
+     String(minutes);
+   return clock+":"+seconds+","+millis;
+ }
  function renderBoards(){
    const groups=$("rank-groups");
    if(!groups||!state.boards)return;
@@ -163,8 +171,14 @@
            position.className="rank-position";position.textContent=index+1;
            name.className="rank-player";name.textContent=player.username;name.title=player.username;
            points.textContent=Number(player.points).toLocaleString("pt-BR")+" pts";
+           const stats=document.createElement("span"),time=document.createElement("small");
+           stats.className="rank-player-stats";
+           const hasTime=Number.isInteger(player.solve_time_ms)&&player.solve_time_ms>=0;
+           time.textContent=hasTime?formatSolveTime(player.solve_time_ms):"—";
+           time.setAttribute("aria-label",hasTime?"Tempo de acerto "+time.textContent:"Sem tempo de acerto");
+           stats.append(points,time);
            row.classList.toggle("rank-self",player.username===state.user?.username);
-           row.append(position,name,points);list.append(row);
+           row.append(position,name,stats);list.append(row);
          }
          card.append(list);
        }else{

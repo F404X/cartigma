@@ -153,3 +153,55 @@ END;
 
 CREATE INDEX IF NOT EXISTS ix_legacy_daily_target
   ON ranked_reservations(challenge_day,difficulty) WHERE mode='daily';
+
+-- Sum the successful daily results that contribute points to each board.
+CREATE TABLE IF NOT EXISTS player_solve_times (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  period_type TEXT NOT NULL CHECK(period_type IN ('week','month','total')),
+  period_key TEXT NOT NULL,
+  difficulty TEXT NOT NULL,
+  solve_time_ms INTEGER NOT NULL,
+  PRIMARY KEY(user_id,period_type,period_key,difficulty)
+);
+CREATE TRIGGER IF NOT EXISTS rollup_solve_time_on_insert AFTER INSERT ON game_results
+WHEN NEW.won=1
+BEGIN
+  INSERT INTO player_solve_times(user_id,period_type,period_key,difficulty,solve_time_ms)
+  VALUES (NEW.user_id,'week',NEW.week_key,NEW.difficulty,NEW.duration_ms),
+    (NEW.user_id,'month',NEW.month_key,NEW.difficulty,NEW.duration_ms),
+    (NEW.user_id,'total','all',NEW.difficulty,NEW.duration_ms)
+  ON CONFLICT(user_id,period_type,period_key,difficulty) DO UPDATE SET
+    solve_time_ms=solve_time_ms+excluded.solve_time_ms;
+END;
+CREATE TRIGGER IF NOT EXISTS rollup_solve_time_on_update AFTER UPDATE OF won,duration_ms ON game_results
+WHEN NEW.won=1 AND (OLD.won=0 OR NEW.duration_ms<>OLD.duration_ms)
+BEGIN
+  INSERT INTO player_solve_times(user_id,period_type,period_key,difficulty,solve_time_ms)
+  VALUES (NEW.user_id,'week',NEW.week_key,NEW.difficulty,NEW.duration_ms-OLD.won*OLD.duration_ms),
+    (NEW.user_id,'month',NEW.month_key,NEW.difficulty,NEW.duration_ms-OLD.won*OLD.duration_ms),
+    (NEW.user_id,'total','all',NEW.difficulty,NEW.duration_ms-OLD.won*OLD.duration_ms)
+  ON CONFLICT(user_id,period_type,period_key,difficulty) DO UPDATE SET
+    solve_time_ms=solve_time_ms+excluded.solve_time_ms;
+END;
+CREATE TRIGGER IF NOT EXISTS results_equal_score_win_rollup AFTER UPDATE OF won ON game_results
+WHEN NEW.score=OLD.score AND NEW.won>OLD.won
+BEGIN
+  UPDATE player_stats SET wins=wins+1
+  WHERE user_id=NEW.user_id AND difficulty=NEW.difficulty AND (
+    (period_type='week' AND period_key=NEW.week_key) OR
+    (period_type='month' AND period_key=NEW.month_key) OR
+    (period_type='total' AND period_key='all')
+  );
+END;
+
+-- Backfill existing leaderboard results. A schema reapply reconciles times
+-- with the same rows that earn points, without incrementing totals twice.
+WITH periods(period_type) AS (VALUES ('week'),('month'),('total'))
+INSERT INTO player_solve_times(user_id,period_type,period_key,difficulty,solve_time_ms)
+SELECT user_id,period_type,
+  CASE period_type WHEN 'week' THEN week_key WHEN 'month' THEN month_key ELSE 'all' END AS period_key,
+  difficulty,SUM(duration_ms)
+FROM game_results CROSS JOIN periods WHERE won=1
+GROUP BY user_id,period_type,period_key,difficulty
+ON CONFLICT(user_id,period_type,period_key,difficulty) DO UPDATE SET solve_time_ms=excluded.solve_time_ms
+WHERE player_solve_times.solve_time_ms<>excluded.solve_time_ms;

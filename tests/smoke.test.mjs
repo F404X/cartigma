@@ -1208,7 +1208,7 @@ test("the ranking opens all nine boards and refreshes an open panel after saving
       }
       assert.ok(url.endsWith("/leaderboards"));
       requests++;
-      const periods=Object.fromEntries(["week","month","total"].map(period=>[period,[{username:"Tester",points:score}]]));
+      const periods=Object.fromEntries(["week","month","total"].map(period=>[period,[{username:"Tester",points:score,solve_time_ms:score?82345:null}]]));
       return valueResponse({updatedAt:Date.now(),boards:{normal:periods,hard:{},rush:{}}});
     }
   };
@@ -1221,10 +1221,15 @@ test("the ranking opens all nine boards and refreshes an open panel after saving
   for(const section of groups.children){
     assert.deepEqual(section.children[1].children.map(card=>card.children[0].textContent),["Semanal","Mensal","Total"]);
   }
+  const firstRow=groups.children[0].children[1].children[0].children[1].children[0];
+  assert.equal(firstRow.children[2].children[1].textContent,"—");
   await window.CartigmaRanking.gameAction("guess",{id:"free-match",mode:"free",difficulty:"normal",code:"BR"});
   await new Promise(resolve=>setImmediate(resolve));
   const normal=groups.children[0].children[1].children;
-  assert.deepEqual(normal.map(card=>card.children[1].children[0].children[2].textContent),
-    Array(3).fill((5000).toLocaleString("pt-BR")+" pts"));
+  for(const card of normal){
+    const [points,time]=card.children[1].children[0].children[2].children;
+    assert.equal(points.textContent,(5000).toLocaleString("pt-BR")+" pts");
+    assert.equal(time.textContent,"1:22,345");
+  }
   assert.equal(requests,2);
 });

@@ -10,9 +10,12 @@ export async function leaderboard(request,env){
     boards[difficulty]={};
     for(const period of PERIODS){
       const key=period==="week"?keys.week:period==="month"?keys.month:"all";
-      queries.push(env.DB.prepare(`SELECT u.username,s.points,s.wins,s.games FROM player_stats s
-        JOIN users u ON u.id=s.user_id WHERE s.period_type=? AND s.period_key=? AND s.difficulty=?
-        AND u.deleted_at IS NULL ORDER BY s.points DESC,s.wins DESC,s.games ASC,u.username ASC LIMIT 25`)
+      queries.push(env.DB.prepare(`SELECT u.username,s.points,s.wins,s.games,t.solve_time_ms FROM player_stats s
+        JOIN users u ON u.id=s.user_id
+        LEFT JOIN player_solve_times t ON t.user_id=s.user_id AND t.period_type=s.period_type
+          AND t.period_key=s.period_key AND t.difficulty=s.difficulty
+        WHERE s.period_type=? AND s.period_key=? AND s.difficulty=? AND u.deleted_at IS NULL
+        ORDER BY s.points DESC,t.solve_time_ms ASC NULLS LAST,s.wins DESC,s.games ASC,u.username ASC LIMIT 25`)
         .bind(period,key,difficulty));
     }
   }

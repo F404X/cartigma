@@ -44,7 +44,8 @@
 .rank-list li.rank-self{box-shadow:inset 2px 0 #f5cf56}
 .rank-list .rank-position{font-size:11px;color:#aeb9c3;text-align:right}
 .rank-list .rank-player{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rank-list li strong{font:600 12px "IBM Plex Mono",monospace;white-space:nowrap}
+.rank-player-stats{display:grid;justify-items:end;gap:2px;font:600 12px "IBM Plex Mono",monospace;white-space:nowrap}
+.rank-player-stats small{color:#aeb9c3;font-size:10px;font-weight:400}
 .rank-note{color:#aeb9c3;font-size:12px;margin:5px 0}
 .rank-result-note{color:var(--muted);font-size:12px}
 .rank-status{margin:6px 16px 14px;font-size:12px;min-height:1em;color:#e0ca7c}

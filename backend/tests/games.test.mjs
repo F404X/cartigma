@@ -164,7 +164,9 @@ test("a new Freeplay win replaces the day’s zero score and appears in all thre
   const parameters={mode:"free",difficulty:"normal"};
   const {data:daily}=await call("start",{...parameters,mode:"daily"});
   assert.equal((await call("finish",{id:daily.id})).data.rankingPoints,0);
-  assert.equal((await leaderboard()).normal.week[0].points,0);
+  const loss=(await leaderboard()).normal.week[0];
+  assert.equal(loss.points,0);
+  assert.equal(loss.solve_time_ms,null);
 
   const {data:first}=await call("start",parameters);
   assert.equal((await call("start",parameters)).status,409);
@@ -174,7 +176,7 @@ test("a new Freeplay win replaces the day’s zero score and appears in all thre
   assert.equal(win.rankingPoints,5000);
   const boards=await leaderboard();
   for(const period of ["week","month","total"]){
-    assert.deepEqual(boards.normal[period],[{username:"first",points:5000,wins:1,games:1}]);
+    assert.deepEqual(boards.normal[period],[{username:"first",points:5000,wins:1,games:1,solve_time_ms:win.elapsedMs}]);
   }
 
   const {data:second}=await call("start",parameters);
@@ -184,5 +186,48 @@ test("a new Freeplay win replaces the day’s zero score and appears in all thre
   assert.equal(repeat.rankingPoints,0);
   assert.equal((await call("state",{id:daily.id})).data.rankingPoints,0);
   assert.equal((await call("state",{id:first.id})).data.rankingPoints,5000);
-  assert.deepEqual((await leaderboard()).normal.total,boards.normal.total);
+  const bestTime=Math.min(win.elapsedMs,repeat.elapsedMs);
+  assert.deepEqual((await leaderboard()).normal.total,[{...boards.normal.total[0],solve_time_ms:bestTime}]);
+});
+
+test("equal points use the lower total solve time on all boards and faster replays keep the same points",async t=>{
+  let current=Date.parse("2026-11-17T12:00:00Z");
+  t.mock.method(Date,"now",()=>current);
+  const {sql,call,leaderboard}=await setup(t);
+  const parameters={mode:"free",difficulty:"normal"};
+  async function win(user,time){
+    const {data:game}=await call("start",parameters,user);
+    const {target_code}=sql.prepare("SELECT target_code FROM game_sessions WHERE id=?").get(game.id);
+    current+=time;
+    const {data:result}=await call("guess",{id:game.id,code:target_code},user);
+    assert.equal(result.elapsedMs,time);
+    return result;
+  }
+  async function assertBoards(expected){
+    const boards=(await leaderboard()).normal;
+    for(const board of Object.values(boards)){
+      assert.deepEqual(board.map(({username,points,solve_time_ms})=>[username,points,solve_time_ms]),expected);
+    }
+  }
+
+  await win("first",20100);
+  await win("second",10025);
+  await assertBoards([["second",5000,10025],["first",5000,20100]]);
+  assert.equal((await win("first",5100)).rankingPoints,0);
+  await win("first",9000);
+  await assertBoards([["first",5000,5100],["second",5000,10025]]);
+
+  current=Date.parse("2026-11-18T08:00:00Z");
+  await win("first",7600);
+  const {data:loss}=await call("start",parameters,"second");
+  current+=5400;
+  await call("finish",{id:loss.id},"second");
+  const expected=[["first",10000,12700],["second",5000,10025]];
+  await assertBoards(expected);
+
+  // Simulate an existing database when the new time table is installed.
+  sql.exec("DROP TABLE player_solve_times");
+  sql.exec(schema);
+  sql.exec(schema);
+  await assertBoards(expected);
 });
