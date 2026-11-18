@@ -7,9 +7,9 @@
  const ACCOUNT_MARKER="cartigma-ranked-account-v1";
  const RANK_SESSION_PREFIX="cartigma-ranked-session-v2:";
  const CACHE_TTL=15*60*1000;
- const COOLDOWN=3*60*1000;
  const state={tab:"boards",difficulty:"normal",period:"week",boards:null,user:null,
-   meChecked:false,activeRank:null,loading:false,nextRankingFetch:0,visible:false};
+   meChecked:false,activeRank:null,loading:false,visible:false};
+ let leaderboardRequestPending=false;
  let turnstileSiteKey=null,turnstileToken=null;
  const $=id=>document.getElementById(id);
  function text(id,value){const el=$(id);if(el)el.textContent=value;}
@@ -34,7 +34,6 @@
    const result=await response.json().catch(()=>({}));
    if(!response.ok){
      const err=Error({
-       cooldown:"Muitas consultas deste IP. Exibindo o placar em cache.",
        login_required:"Entre na sua conta para salvar o placar.",
        daily_score_already_saved:"Você já salvou uma partida deste dia e dificuldade.",
        game_state_conflict:"Partida alterada em outra aba. Tente novamente.",
@@ -42,7 +41,7 @@
        game_not_configured:"Partidas competitivas ainda não configuradas.",
        invalid_credentials:"E-mail ou senha incorretos.",
        account_unavailable:"Usuário ou e-mail já utilizado.",
-       weak_password:"Senha precisa ter no mínimo 12 caracteres.",
+       weak_password:"Use pelo menos 8 caracteres, com maiúscula, minúscula e número, sem símbolos.",
        bot_check_failed:"Verificação anti-bot recusada.",
        turnstile_required:"Complete a verificação de segurança."
      }[result.error]||result.error||"Erro na solicitação");
@@ -98,24 +97,24 @@
      b.classList.toggle("active",b.dataset.rankTab===state.tab);
      b.setAttribute("aria-selected",String(b.dataset.rankTab===state.tab));
    });
-   if(tab==="boards")loadBoards(false);
+   if(tab==="boards")loadBoards();
    if(tab==="account")renderAccount();
  }
- async function loadBoards(force){
+ async function loadBoards(){
    const cache=cached();
    if(cache?.data){state.boards=cache.data;renderBoards();}
-   const timestamp=Date.now();
-   if(!force&&cache&&timestamp-cache.at<CACHE_TTL)return;
-   if(timestamp<state.nextRankingFetch)return;
-   state.nextRankingFetch=timestamp+COOLDOWN;
+   if(cache&&Date.now()-cache.at<CACHE_TTL)return;
+   // Deduplicate overlapping UI renders without imposing a cooldown.
+   if(leaderboardRequestPending)return;
+   leaderboardRequestPending=true;
    try{
      const result=await api("/leaderboards");
      state.boards=result;saveCache(result);renderBoards();message("");
    }catch(e){
-     if(e.code==="cooldown")state.nextRankingFetch=Date.now()+e.retry*1000;
-     if(e.code!=="cooldown"&&!state.boards)message(e.message,true);
-   }
- }
+     if(!state.boards)message(e.message,true);
+   }finally{
+     leaderboardRequestPending=false;
+   } }
  function renderBoards(){
    const list=$("rank-list");if(!list)return;list.replaceChildren();
    const players=state.boards?.boards?.[state.difficulty]?.[state.period]||[];
@@ -270,6 +269,15 @@
    $("rank-username-label").hidden=authMode!=="register";
    $("rank-username-input").required=authMode==="register";
    $("rank-password").setAttribute("autocomplete",authMode==="register"?"new-password":"current-password");
+   const passwordInput=$("rank-password");
+   if(authMode==="register"){
+     passwordInput.setAttribute("pattern","(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])[A-Za-z0-9]{8,256}");
+     passwordInput.setAttribute("title","Mínimo de 8 caracteres: letras maiúsculas, minúsculas e números, sem símbolos.");
+   }else{
+     // Login must continue accepting passwords created under older policies.
+     passwordInput.removeAttribute("pattern");
+     passwordInput.removeAttribute("title");
+   }
    text("rank-auth-submit",authMode==="register"?"Criar conta":"Entrar");
    document.querySelectorAll("[data-auth-mode]").forEach(b=>b.classList.toggle("active",b.dataset.authMode===authMode));
    if(authMode==="register")loadTurnstile();
@@ -324,7 +332,7 @@
    }catch(e){message(e.message,true);}
  }
  async function resetPassword(token){
-   const password=prompt("Nova senha (mínimo 12 caracteres):");
+   const password=prompt("Nova senha (mínimo 8 caracteres, maiúscula, minúscula e número, sem símbolos):");
    if(!password)return;
    try{
      await api("/auth/reset",{token,password});
