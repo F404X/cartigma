@@ -78,8 +78,8 @@ test("shared source snapshots and clue payloads match the browser for all 195 co
         JSON.parse(JSON.stringify(sourceClues)),country.code+" "+difficulty);
     }
   }
-  assert.deepEqual(denominations.codes,front.GeoCurrencyDenominations.codes);
-  assert.deepEqual(denominations.labels.en,front.GeoCurrencyDenominations.labels.en);
+  assert.deepEqual(denominations.codes,JSON.parse(JSON.stringify(front.GeoCurrencyDenominations.codes)));
+  assert.deepEqual(denominations.labels.en,JSON.parse(JSON.stringify(front.GeoCurrencyDenominations.labels.en)));
 });
 test("server score and overlay prices match offline shared formulas",()=>{
   const engine=globalThis.CartigmaClueEngine;
