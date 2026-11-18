@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {runInNewContext} from "node:vm";
 
-const names=["country-catalog.js","continent-borders.js","i18n.js",
+const names=["country-catalog.js","shared-clues.js","continent-borders.js","i18n.js",
   "map-filters-i18n.js","clues-i18n.js","report-i18n.js","atlas-i18n.js",
   "country-insights.js","country-clues-i18n.js","currency-denominations.js",
   "country-profile-i18n.js","compass-i18n.js","app.js","index.html","styles.css",
