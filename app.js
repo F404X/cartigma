@@ -1079,10 +1079,12 @@
     $("reportNextBtn").textContent=newLabel;
     const other=difficulty==="normal"?"hard":"normal";
     const showOther=daily&&Boolean(game?.finished)&&otherDailyAvailable(other);
+    const switchToDaily=!daily&&Boolean(game?.finished);
     const button=$("reportAlternateBtn");
-    button.classList.toggle("hidden",!showOther);
-    button.disabled=!showOther;
-    if(showOther)button.textContent=t("otherDaily",{difficulty:t(other)});
+    button.classList.toggle("hidden",!(showOther||switchToDaily));
+    button.disabled=!(showOther||switchToDaily);
+    if(switchToDaily)button.textContent=t("daily");
+    else if(showOther)button.textContent=t("otherDaily",{difficulty:t(other)});
   }
   function renderDossier(){
     if(!game.finished)return;
@@ -2177,7 +2179,12 @@
     });
     $("reportNextBtn").addEventListener("click",()=>{closeReport();startFree()});
     $("reportAlternateBtn").addEventListener("click",()=>{
-      if(game?.mode!=="daily"||!game.finished)return;
+      if(!game?.finished)return;
+      if(game.mode==="free"){
+        closeReport();
+        startDaily();
+        return;
+      }
       const other=difficulty==="normal"?"hard":"normal";
       if(!otherDailyAvailable(other))return;
       closeReport();
