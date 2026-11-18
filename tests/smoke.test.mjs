@@ -348,6 +348,21 @@ test("Completed ranked free case permits another free case and changing to Daily
   assert.equal($("rushIntro").classList.contains("hidden"),true);
   assert.equal($("dailyBtn").classList.contains("active"),true);
 });
+test("A finished Free case offers a one-click return to Daily from the result dialog",()=>{
+  const g=boot({autoStart:false}),$=g.get;
+  $("freeBtn").click();
+  $("rushStartBtn").click();
+  const target=g.window.CartigmaCountries[Math.floor(0.42*195)];
+  g.select(target.name);
+  $("guessBtn").click();
+  assert.equal($("reportDialog").open,true);
+  assert.equal($("reportAlternateBtn").classList.contains("hidden"),false);
+  assert.equal($("reportAlternateBtn").textContent,"Daily case");
+  $("reportAlternateBtn").click();
+  assert.equal($("reportDialog").open,false);
+  assert.equal($("dailyBtn").classList.contains("active"),true);
+  assert.equal($("rushIntro").classList.contains("hidden"),false);
+});
 test("Normal, Hard, and Rush all require explicit Start before revealing clues",()=>{
   for(const level of ["normal","hard","rush"]){
     const g=boot({autoStart:false}),$=g.get;
