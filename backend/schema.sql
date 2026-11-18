@@ -91,8 +91,5 @@ CREATE TABLE IF NOT EXISTS ranked_reservations (
   mode TEXT NOT NULL CHECK(mode IN ('daily','free')),
   PRIMARY KEY(user_id, challenge_day, difficulty)
 );
-CREATE TABLE IF NOT EXISTS leaderboard_cooldowns (
-  ip_hash TEXT PRIMARY KEY,
-  next_allowed INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS ix_leaderboard_cooldown_expiry ON leaderboard_cooldowns(next_allowed);
+-- Remove the obsolete per-IP leaderboard cooldown (safe to repeat on staging deploy).
+DROP TABLE IF EXISTS leaderboard_cooldowns;
