@@ -75,6 +75,7 @@ function boot({storage=new Map(),map=false,randomValue=0.42,mobile=false,clock=D
     ]}},
     setStyle(style){mapState.currentStyle=style;},
     setPaintProperty(id,key,expr){mapState.styles.push({id,key,expr})},
+    setFilter(id,expr){mapState.styles.push({id,key:"filter",expr})},
     setLayoutProperty(id,key,expr){mapState.styles.push({id,key,expr})},
     setLayerZoomRange(id,min,max){mapState.zoomRanges.push({id,min,max})},
     easeTo(options){mapState.eases.push(options);return this},
@@ -548,15 +549,37 @@ test("All 195 map references select their own country, including wrapped Oceania
   assert.equal($("guessBtn").disabled,false);
 });
 
+test("Monaco land selects Monaco, Beausoleil selects France, and nearby sea selects neither",async()=>{
+  const world=JSON.parse(readFileSync(new URL("../country-boundaries.geojson",import.meta.url),"utf8"));
+  const g=boot({map:true,countryData:world}),$=g.get;
+  for(const [lng,lat,label] of [
+    [7.42017,43.73084,"Monaco"],
+    [7.42738,43.73902,"Monaco"],
+    [7.43125,43.74000,"Monaco"],
+    [7.42417,43.74467,"France"],
+    [7.4055,43.749,"France"],
+    [7.437,43.7314,"Select a location"]
+  ]){
+    g.mapState.events.click({lngLat:{lng,lat}});
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal($("selectedText").textContent,label);
+  }
+});
+
 test("Dark national outlines keep contrast and obey the national borders toggle",()=>{
   const g=boot({map:true}),$=g.get;
   for(const id of ["boundary_country","boundary_2"]){
     assert.ok(g.mapState.styles.some(style=>style.id===id&&style.key==="line-color"&&style.expr==="#8a94a0"));
   }
   assert.ok(!g.mapState.styles.some(style=>style.id==="boundary_state"&&style.key==="line-color"));
-  $("mapFilterRegions").handlers.change({target:{checked:false}});
+  const filter=g.mapState.styles.find(style=>style.id==="boundary_2"&&style.key==="filter");
+  assert.equal(JSON.stringify(filter.expr),'["!=",["get","maritime"],1]');
   const visibility=id=>g.mapState.styles.findLast(style=>style.id===id&&style.key==="visibility").expr;
   assert.equal(visibility("boundary_2"),"visible");
+  assert.equal(visibility("boundary_state"),"none");
+  $("mapFilterRegions").handlers.change({target:{checked:true}});
+  assert.equal(visibility("boundary_state"),"visible");
+  $("mapFiltersReset").click();
   assert.equal(visibility("boundary_state"),"none");
   $("mapFilterBorders").handlers.change({target:{checked:false}});
   assert.equal(visibility("boundary_2"),"none");
@@ -586,7 +609,7 @@ test("About opens on the credits and switches to a separate How to play tab",()=
   g.language("pt");
   $("helpBtn").click();
   assert.equal($("helpBtn").attributes["aria-label"],"Sobre");
-  assert.equal($("accountBtn").attributes["aria-label"],"Conta");
+  assert.equal($("accountBtn").attributes["aria-label"],"Perfil");
   assert.equal($("helpDialog").open,true);
   assert.equal($("aboutPanel").hidden,false);
   $("howToPlayTab").click();
@@ -1317,14 +1340,7 @@ test("Caribbean evidence resolves both padded and numeric M49 codes",async()=>{
 });
 
 test("the ranking opens all nine boards and refreshes an open panel after saving a result",async()=>{
-  class RankElement extends Element {
-    querySelectorAll(selector){return selector==="[data-rank-tab]"?tabs:[]}
-  }
-  const tabs=["boards","account"].map(name=>{
-    const button=new RankElement();
-    button.dataset.rankTab=name;
-    return button;
-  });
+  class RankElement extends Element {querySelectorAll(){return []}}
   const dossier={id:"free-match",target:"BR",finished:true};
   let opened=null;
   const window={CartigmaCaseArchive:{open(game){opened=game;return true;}}};
@@ -1337,7 +1353,7 @@ test("the ranking opens all nine boards and refreshes an open panel after saving
     return nodes.get(id);
   };
   const document={body,readyState:"complete",getElementById:get,
-    createElement:()=>new RankElement(),querySelectorAll:()=>tabs,addEventListener(){}};
+    createElement:()=>new RankElement(),addEventListener(){}};
   let score=0,requests=0;
   let now=Date.now(),periodicRefresh=null,refreshCheckMs=0;
   class Clock extends Date {static now(){return now}}
@@ -1367,11 +1383,14 @@ test("the ranking opens all nine boards and refreshes an open panel after saving
   runInNewContext(code,context,{filename:"ranking-client.js"});
   await new Promise(resolve=>setImmediate(resolve));
   await get("accountBtn").onclick();
-  assert.equal(get("rank-panel").dataset.view,"account");
+  assert.equal(get("profile-panel").hidden,false);
+  assert.equal(get("rank-panel").hidden,true);
   assert.equal(get("accountBtn").attributes["aria-expanded"],"true");
   assert.equal(requests,0,"Opening account does not fetch the leaderboards");
   await get("rank-launch").onclick();
   await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(get("rank-panel").hidden,false);
+  assert.equal(get("profile-panel").hidden,true);
   assert.equal(requests,1,"Opening ranking fetches immediately");
   assert.equal(refreshCheckMs,30000,"Periodic checks do not hit the API every 15 seconds");
   now+=4*60*1000+59000;
@@ -1382,8 +1401,8 @@ test("the ranking opens all nine boards and refreshes an open panel after saving
   periodicRefresh();
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(requests,2,"An open board refreshes at five minutes");
-  tabs[1].onclick();
-  tabs[0].onclick();
+  await get("accountBtn").onclick();
+  await get("rank-launch").onclick();
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(requests,3,"Re-opening the ranking tab refreshes immediately");
   const groups=get("rank-groups");
@@ -1402,13 +1421,13 @@ test("the ranking opens all nine boards and refreshes an open panel after saving
     assert.equal(time.textContent,"1:22,345");
   }
   assert.equal(requests,4,"Saving a match refreshes without waiting five minutes");
-  tabs[1].onclick();
+  await get("accountBtn").onclick();
   await new Promise(resolve=>setImmediate(resolve));
   const historyButton=get("rank-history-list").children[0].children[0];
   assert.equal(historyButton.children[0].textContent,"Brasil - Vitória");
   await historyButton.onclick();
   assert.deepEqual(opened,dossier);
-  get("rank-close").onclick();
+  get("profile-close").onclick();
   await window.CartigmaRanking.gameAction("guess",{
     id:"another-match",mode:"free",difficulty:"normal",code:"BR"
   });

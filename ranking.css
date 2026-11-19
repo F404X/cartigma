@@ -6,7 +6,7 @@
   background:var(--surface);color:var(--text);border:1px solid var(--border-strong);
   box-shadow:0 16px 55px #0009;border-radius:9px;font:14px/1.45 "IBM Plex Sans",sans-serif;
 }
-.rank-panel[data-view="account"]{width:min(365px,calc(100vw - 28px))}
+#profile-panel{width:min(365px,calc(100vw - 28px))}
 .rank-panel [hidden],.rank-panel[hidden]{display:none!important}
 .rank-panel button,.rank-panel input,.rank-panel select{font:inherit}
 .rank-panel button{cursor:pointer}
@@ -16,11 +16,9 @@
 .rank-top{padding:14px 16px 12px;display:flex;justify-content:space-between;align-items:center;
   border-bottom:1px solid var(--border);color:var(--text);font-weight:700;letter-spacing:.015em}
 .rank-top button{background:transparent;color:var(--muted);border:0;font-size:24px;line-height:1}
-.rank-tabs{display:grid;grid-template-columns:repeat(2,1fr);gap:3px;padding:9px 12px;
-  border-bottom:1px solid var(--border)}
-.rank-tabs button,.rank-auth-tabs button{padding:8px 5px;background:transparent;color:var(--muted);
+.rank-auth-tabs button{padding:8px 5px;background:transparent;color:var(--muted);
   border:1px solid transparent;border-radius:5px;font-size:13px}
-.rank-tabs button.active,.rank-auth-tabs button.active{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.rank-auth-tabs button.active{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
 .rank-body{padding:14px 16px 6px;overflow:auto;overscroll-behavior:contain;min-height:0}
 .rank-panel label{display:block;color:var(--muted);font-size:12px;margin:9px 0 5px}
 .rank-panel input,.rank-panel select{background:var(--input-bg);color:var(--text);
@@ -65,7 +63,7 @@
 @media(max-width:760px){
   #rank-launch{font-size:0}
   #rank-launch::after{content:"🏆";font-size:18px}
-  .rank-panel,.rank-panel[data-view="account"]{right:8px;left:8px;top:auto;bottom:8px;width:auto;max-height:78dvh}
+  .rank-panel,#profile-panel{right:8px;left:8px;top:auto;bottom:8px;width:auto;max-height:78dvh}
   .rank-group-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))}
   .rank-clues{max-height:18dvh}
   .rank-panel select{min-width:120px}

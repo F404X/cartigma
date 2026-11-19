@@ -12,6 +12,8 @@ There is **no city/urban-place database**. The former 500-city catalogue, urban 
 
 Country selection uses the 195 Natural Earth admin-0 country polygons bundled in `country-boundaries.geojson`. The source is the [1:10m Natural Earth dataset](https://github.com/nvkelso/natural-earth-vector/blob/ca96624a56bd078437bca8184e78163e5039ad19/geojson/ne_10m_admin_0_countries.geojson), filtered to the country catalogue and simplified with Mapshaper (`-simplify 10% keep-shapes`, five decimal places). Zoom in or search by name for small islands and micronations. Boundaries follow Natural Earth's approximate de facto representation.
 
+Monaco's polygon follows the land border and coastline from the [Geofabrik Monaco extract](https://download.geofabrik.de/europe/monaco.html) of [© OpenStreetMap contributors](https://www.openstreetmap.org/copyright), licensed under the ODbL. The adjacent French coastline uses IGN Admin Express COG (2018) via [france-geojson](https://github.com/gregoiredavid/france-geojson), under the French Open Licence.
+
 When the ranking API is unavailable at the start of a match, Cartigma starts a local round. If the API goes down during ranked play, Cartigma opens a separate local round because the ranked answer is stored on the server. Local results are scored in the game.
 
 ## Game modes

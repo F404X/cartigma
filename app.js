@@ -1505,7 +1505,7 @@
   function rushCountryFeatures(){
     if(!countryShapesPromise){
       countryShapesPromise=(async()=>{
-        const response=await fetch("country-boundaries.geojson?v=20261119");
+        const response=await fetch("country-boundaries.geojson?v=20261119-monaco");
         if(!response.ok)throw Error("Could not retrieve country boundaries");
         const geojson=await response.json();
         if(!Array.isArray(geojson?.features)||geojson.features.length<COUNTRIES.length)
@@ -1744,11 +1744,14 @@
   });
   const MAP_FILTER_KEYS=Object.keys(MAP_FILTER_INPUTS);
   const MAP_FILTER_DEFAULTS=Object.freeze({
-    borders:true,regions:true,countryNames:true,
+    borders:true,regions:false,countryNames:true,
     cityNames:true,roads:true,areas:true,water:true,poi:true
   });
-  const MAP_FILTER_STORAGE="cartigma-map-filters-v1";
-  const previousMapFilters=store.get(MAP_FILTER_STORAGE);
+  const MAP_FILTER_STORAGE="cartigma-map-filters-v2";
+  // The old format stored default regions=true even when another filter was
+  // the only setting changed. Carry over the other filters on upgrade.
+  const previousMapFilters=store.get(MAP_FILTER_STORAGE)||
+    {...store.get("cartigma-map-filters-v1"),regions:MAP_FILTER_DEFAULTS.regions};
   let mapFilterPrefs=Object.fromEntries(MAP_FILTER_KEYS.map(key=>[
     key,typeof previousMapFilters?.[key]==="boolean"?previousMapFilters[key]:MAP_FILTER_DEFAULTS[key]
   ]));
@@ -1804,6 +1807,9 @@
        typeof map.setPaintProperty!=="function")return;
     for(const layer of map.getStyle()?.layers||[]){
       if(mapFilterCategory(layer)!=="borders")continue;
+      const landOnly=["!=",["get","maritime"],1];
+      if(layer["source-layer"]==="boundary")
+        map.setFilter(layer.id,layer.filter?["all",layer.filter,landOnly]:landOnly);
       map.setPaintProperty(layer.id,"line-color","#8a94a0");
       map.setPaintProperty(layer.id,"line-blur",0);
       map.setPaintProperty(layer.id,"line-width",["interpolate",["linear"],["zoom"],1,1.1,5,1.6,12,2.3]);

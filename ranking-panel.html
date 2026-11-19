@@ -1,15 +1,16 @@
+<aside class="rank-panel" id="rank-panel" aria-labelledby="rank-title" hidden>
 <div class="rank-top"><strong id="rank-title">Ranking</strong>
   <button type="button" id="rank-close" aria-label="Fechar">×</button></div>
-<div class="rank-tabs" role="tablist">
-  <button type="button" data-rank-tab="boards">Classificação</button>
-  <button type="button" data-rank-tab="account">Conta</button>
-</div>
 <section class="rank-body" id="rank-boards" aria-label="Rankings">
   <p class="rank-note" id="rank-freshness" role="status">Carregando classificações…</p>
   <p class="rank-note">Em caso de empate, vale o menor tempo total dos acertos que contam para o placar.</p>
   <div id="rank-groups" class="rank-groups"></div>
 </section>
-<section class="rank-body" id="rank-account" aria-label="Sua conta" hidden>
+</aside>
+<aside class="rank-panel" id="profile-panel" aria-labelledby="profile-title" hidden>
+<div class="rank-top"><strong id="profile-title">Perfil</strong>
+  <button type="button" id="profile-close" aria-label="Fechar">×</button></div>
+<section class="rank-body" id="rank-account" aria-label="Sua conta">
   <div id="rank-user" hidden>
     <p id="rank-username"></p>
     <button type="button" class="rank-secondary" id="rank-logout">Sair da conta</button>
@@ -39,3 +40,4 @@
   </div>
 </section>
 <p id="rank-status" class="rank-status" role="status" aria-live="polite"></p>
+</aside>

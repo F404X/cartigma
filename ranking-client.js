@@ -7,13 +7,12 @@
  const PERIODS={week:"Semanal",month:"Mensal",total:"Total"};
  const countryNames=Intl.DisplayNames?new Intl.DisplayNames("pt-BR",{type:"region"}):null;
  const historyDate=new Intl.DateTimeFormat("pt-BR",{dateStyle:"short",timeStyle:"short"});
- const TABS=["boards","account"];
  const ACCOUNT_MARKER="cartigma-ranked-account-v1";
  const rankResumes=new Map();
  let accountRequest=null;
  const CACHE_TTL=5*60*1000; // Re-fetch only every 5 minutes while the board stays open.
  const REQUEST_TIMEOUT=5000;
- const state={tab:"boards",boards:null,user:null,meChecked:false,loading:false,visible:false};
+ const state={panel:null,boards:null,user:null,meChecked:false,loading:false};
  let leaderboardRequest=null,leaderboardRevision=0,lastRefresh=0;
  const announcedGames=new Set();
  let matchHistory={};
@@ -59,31 +58,28 @@
    return result;
  }
  async function build(){
-   const panel=document.createElement("aside");panel.id="rank-panel";panel.className="rank-panel";
-   panel.hidden=true;panel.setAttribute("aria-labelledby","rank-title");
-   const account=$("accountBtn");
+   const panels=document.createElement("div");
    try{
-     const response=await fetch("ranking-panel.html?v=20261119-account");
+     const response=await fetch("ranking-panel.html?v=20261119-separate-profile");
      if(!response.ok)throw Error("markup unavailable");
-     panel.innerHTML=await response.text();
-   }catch{console.warn("Cartigma ranking panel unavailable");return;}
-   document.body.append(panel);
+     panels.innerHTML=await response.text();
+   }catch{console.warn("Cartigma ranking panels unavailable");return;}
+   document.body.append(panels);
    const launch=document.createElement("button");
    launch.id="rank-launch";launch.className="header-button";launch.type="button";
    launch.textContent="Ranking";launch.setAttribute("aria-label","Ranking");
-   launch.setAttribute("aria-controls",panel.id);launch.setAttribute("aria-expanded","false");
+   launch.setAttribute("aria-controls","rank-panel");launch.setAttribute("aria-expanded","false");
    const sibling=$("helpBtn");
    if(sibling?.parentNode)sibling.parentNode.insertBefore(launch,sibling);
    else document.body.append(launch);
-   launch.onclick=()=>togglePanel("boards",launch);
-   if(account){
-     account.onclick=()=>togglePanel("account",account);
-     account.disabled=false;
+   for(const [id,trigger] of [["rank",launch],["profile",$("accountBtn")]]){
+     if(!trigger)continue;
+     trigger.onclick=()=>state.panel===id?closePanel():openPanel(id);
+     trigger.disabled=false;
+     $(id+"-close").onclick=closePanel;
+     $(id+"-panel").addEventListener("keydown",event=>{if(event.key==="Escape")closePanel();});
    }
-   $("rank-close").onclick=close;
-   panel.addEventListener("keydown",event=>{if(event.key==="Escape")close();});
-   panel.querySelectorAll("[data-rank-tab]").forEach(b=>b.onclick=()=>setTab(b.dataset.rankTab));
-   panel.querySelectorAll("[data-auth-mode]").forEach(b=>b.onclick=()=>setAuthMode(b.dataset.authMode));
+   $("profile-panel").querySelectorAll("[data-auth-mode]").forEach(b=>b.onclick=()=>setAuthMode(b.dataset.authMode));
    $("rank-form").onsubmit=authenticate;
    $("rank-logout").onclick=logout;
    $("rank-history-more").onclick=()=>loadMatchHistory(Boolean(matchHistory.nextCursor));
@@ -92,59 +88,36 @@
    setInterval(refreshVisibleBoards,30000);
    document.addEventListener("visibilitychange",refreshVisibleBoards);
    const reset=new URL(location.href).searchParams.get("reset");
-   if(reset){open("account");setTimeout(()=>resetPassword(reset),0);}
+   if(reset){openPanel("profile");setTimeout(()=>resetPassword(reset),0);}
  }
- let panelTrigger=null;
- function togglePanel(tab,trigger){
-   if(state.visible&&state.tab===tab){close();return;}
-   panelTrigger=trigger;
-   return open(tab);
+ function showPanel(id){
+   state.panel=id;
+   $("rank-panel").hidden=id!=="rank";
+   $("profile-panel").hidden=id!=="profile";
+   $("rank-launch").setAttribute("aria-expanded",String(id==="rank"));
+   $("accountBtn")?.setAttribute("aria-expanded",String(id==="profile"));
  }
- async function open(tab){
-   state.visible=true;$("rank-panel").hidden=false;setTab(tab);
-   $("rank-close").focus();
-   if(!state.meChecked){
-     state.meChecked=true;
-     const previousUser=state.user;
-     try{
-       const {user}=await api("/auth/me");
-       if(state.user!==previousUser)return;
-       state.user=user;
-       if(state.user)localStorage.setItem(ACCOUNT_MARKER,"1");
-       else localStorage.removeItem(ACCOUNT_MARKER);
-     }catch(error){
-       state.meChecked=false;
-       if(state.visible&&state.tab==="account")message(error.message,true);
-     }
-     renderAccount();
+ async function openPanel(id){
+   showPanel(id);
+   $(id+"-close").focus();
+   if(id==="rank"){
+     loadBoards();
+     signedInUser().catch(()=>{});
+     return;
    }
- }
- function close(){
-   state.visible=false;$("rank-panel").hidden=true;
-   $("rank-launch").setAttribute("aria-expanded","false");
-   $("accountBtn")?.setAttribute("aria-expanded","false");
-   panelTrigger?.focus();
- }
- function setTab(tab){
-   state.tab=TABS.includes(tab)?tab:"boards";
-   $("rank-panel").dataset.view=state.tab;
-   text("rank-title",state.tab==="account"?$("accountBtn")?.title||"Conta":"Ranking");
-   $("rank-launch").setAttribute("aria-expanded",String(state.tab==="boards"));
-   $("accountBtn")?.setAttribute("aria-expanded",String(state.tab==="account"));
+   text("profile-title",$("accountBtn")?.title||"Perfil");
    message("");
-   for(const t of TABS)$("rank-"+t).hidden=t!==state.tab;
-   document.querySelectorAll("[data-rank-tab]").forEach(b=>{
-     b.classList.toggle("active",b.dataset.rankTab===state.tab);
-     b.setAttribute("aria-selected",String(b.dataset.rankTab===state.tab));
-   });
-   if(tab==="boards")loadBoards();
-   if(state.tab==="account"){
-     renderAccount();
-     if(state.user)loadMatchHistory();
-   }
+   renderAccount();
+   try{await signedInUser(true);}
+   catch(error){if(state.panel==="profile")message(error.message,true);}
+ }
+ function closePanel(){
+   const trigger=$(state.panel==="rank"?"rank-launch":"accountBtn");
+   showPanel(null);
+   trigger?.focus();
  }
  function refreshVisibleBoards(){
-   if(state.visible&&state.tab==="boards"&&!document.hidden&&Date.now()-lastRefresh>=CACHE_TTL){
+   if(state.panel==="rank"&&!document.hidden&&Date.now()-lastRefresh>=CACHE_TTL){
      loadBoards();
    }
  }
@@ -153,7 +126,7 @@
    lastRefresh=0;
    try{localStorage.removeItem(CACHE_KEY);}catch{}
    // A completed game must refresh rankings immediately, even if the panel
-   // is closed or the Account tab is selected. The next periodic refresh
+   // is closed or the profile is open. The next periodic refresh
    // then starts five minutes after this request.
    loadBoards();
  }
@@ -246,13 +219,18 @@
  }
  // Authenticate once when an existing account may be present. An anonymous
  // visitor never makes a session-check request just to play locally.
- async function signedInUser(){
+ async function signedInUser(checkAnonymous=false){
    if(state.user)return state.user;
-   if(localStorage.getItem(ACCOUNT_MARKER)!=="1")return null;
+   if(!checkAnonymous&&localStorage.getItem(ACCOUNT_MARKER)!=="1")return null;
+   if(state.meChecked)return null;
    if(!accountRequest){
+     const previousUser=state.user;
      accountRequest=api("/auth/me").then(({user})=>{
+       state.meChecked=true;
+       if(state.user!==previousUser)return state.user;
        state.user=user;
-       if(!user)localStorage.removeItem(ACCOUNT_MARKER);
+       if(user)localStorage.setItem(ACCOUNT_MARKER,"1");
+       else localStorage.removeItem(ACCOUNT_MARKER);
        renderAccount();
        return user;
      }).finally(()=>{accountRequest=null;});
@@ -292,7 +270,7 @@
      invalidateBoards();
      if(state.user){
        resetMatchHistory(state.user.id);
-       if(state.visible&&state.tab==="account")loadMatchHistory();
+       if(state.panel==="profile")loadMatchHistory();
      }
    }
    return result;
@@ -366,7 +344,7 @@
    text("rank-history-status","Abrindo ficha…");
    try{
      const {game}=await api("/me/games/"+encodeURIComponent(id));
-     if(history!==matchHistory||!state.visible||state.tab!=="account")return;
+     if(history!==matchHistory||state.panel!=="profile")return;
      if(!window.CartigmaCaseArchive?.open(game))throw Error("Não foi possível abrir a ficha.");
      text("rank-history-status","");
    }catch(error){
@@ -382,9 +360,9 @@
    if(matchHistory.owner!==state.user?.id)resetMatchHistory(state.user?.id);
    if(state.user){
      text("rank-username","Conectado como "+state.user.username);
-     if(state.visible&&state.tab==="account"&&!matchHistory.loaded)loadMatchHistory();
+     if(state.panel==="profile"&&!matchHistory.loaded)loadMatchHistory();
    }
-   if(state.visible&&state.tab==="boards")renderBoards();
+   if(state.panel==="rank")renderBoards();
  }
  let authMode="login";
  function setAuthMode(mode){
@@ -404,7 +382,7 @@
      passwordInput.removeAttribute("title");
    }
    text("rank-auth-submit",authMode==="register"?"Criar conta":"Entrar");
-   document.querySelectorAll("[data-auth-mode]").forEach(b=>b.classList.toggle("active",b.dataset.authMode===authMode));
+   $("profile-panel").querySelectorAll("[data-auth-mode]").forEach(b=>b.classList.toggle("active",b.dataset.authMode===authMode));
    if(authMode==="register")loadTurnstile();
  }
  async function loadTurnstile(){
