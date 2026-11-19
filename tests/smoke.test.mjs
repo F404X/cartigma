@@ -562,6 +562,25 @@ test("Dark national outlines keep contrast and obey the national borders toggle"
   assert.equal(visibility("boundary_2"),"none");
 });
 
+test("The dark OpenStreetMap fallback draws country outlines and removes them in light mode",async()=>{
+  const world=JSON.parse(readFileSync(new URL("../country-boundaries.geojson",import.meta.url),"utf8"));
+  const g=boot({map:true,countryData:world}),$=g.get;
+  let mode="dark";
+  g.document.documentElement.getAttribute=()=>mode;
+  $("mapOsmBtn").click();
+  await new Promise(resolve=>setImmediate(resolve));
+  const id="national-border-outline";
+  assert.equal(g.mapState.sources.get(id).data.features.length,195);
+  assert.equal(g.mapState.layers.get(id).paint["line-width"],1.2);
+  mode="light";
+  g.windowEvents["geodetective:themechange"]({detail:{previousColorMode:"dark"}});
+  assert.equal(g.mapState.layers.has(id),false);
+  mode="dark";
+  g.windowEvents["geodetective:themechange"]({detail:{previousColorMode:"light"}});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(g.mapState.layers.has(id),true);
+});
+
 test("About opens on the credits and switches to a separate How to play tab",()=>{
   const g=boot(),$=g.get;
   g.language("pt");

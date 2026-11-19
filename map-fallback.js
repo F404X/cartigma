@@ -77,7 +77,13 @@
       addLayer(layer){
         const data=this._sources.get(layer.source)?.data;
         const geo=data?.geometry;
-        if(layer.id==="case-hemisphere-arrows"&&layer.type==="symbol"
+        if(layer.id==="national-border-outline"&&data?.type==="FeatureCollection"){
+          const borders=L.geoJSON(data,{interactive:false,style:{
+            color:layer.paint["line-color"],weight:layer.paint["line-width"],
+            opacity:layer.paint["line-opacity"],fill:false
+          }}).addTo(this.root);
+          this._layers.set(layer.id,borders);
+        }else if(layer.id==="case-hemisphere-arrows"&&layer.type==="symbol"
           &&geo?.type==="LineString"){
           const group=L.layerGroup().addTo(this.root);
           const north=layer.layout?.["text-field"]!=="↓";

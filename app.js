@@ -32,6 +32,7 @@
   // Europe and North America are fully/almost entirely in the Northern
   // Hemisphere. The others have meaningful populations on BOTH sides of 0°.
   const COUNTRY_CODES=COUNTRIES.map(c=>c.code);
+  const NATIONAL_BORDER_LAYER="national-border-outline";
   const $ = id => document.getElementById(id);
   const hash = input => {let h=2166136261;for(const char of input){h ^=char.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0;};
   const norm = s => String(s).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
@@ -1782,8 +1783,11 @@
   }
 
   function applyMapFilters(){
-    if(!map||!mapStyleReady||activeMapStyle!=="vector"
-       ||typeof map.setLayoutProperty!=="function")return;
+    if(!map||!mapStyleReady||typeof map.setLayoutProperty!=="function")return;
+    if(activeMapStyle==="osm"){
+      configureRasterBorders();
+      return;
+    }
     for(const layer of map.getStyle?.()?.layers||[]){
       const category=mapFilterCategory(layer);
       if(!category)continue;
@@ -1796,12 +1800,33 @@
   }
 
   function configureNationalBorders(){
-    if(activeMapTheme()!=="dark"||typeof map.setPaintProperty!=="function")return;
+    if(activeMapStyle!=="vector"||activeMapTheme()!=="dark"||
+       typeof map.setPaintProperty!=="function")return;
     for(const layer of map.getStyle()?.layers||[]){
       if(mapFilterCategory(layer)!=="borders")continue;
       map.setPaintProperty(layer.id,"line-color","#8a94a0");
       map.setPaintProperty(layer.id,"line-blur",0);
       map.setPaintProperty(layer.id,"line-width",["interpolate",["linear"],["zoom"],1,1.1,5,1.6,12,2.3]);
+    }
+  }
+
+  async function configureRasterBorders(){
+    const current=map,id=NATIONAL_BORDER_LAYER;
+    const visible=()=>activeMapTheme()==="dark"&&mapFilterPrefs.borders;
+    if(!visible()){
+      if(current.getLayer(id))current.removeLayer(id);
+      if(current.getSource(id))current.removeSource(id);
+      return;
+    }
+    if(current.getLayer(id))return;
+    try{
+      const features=await rushCountryFeatures();
+      if(map!==current||!visible()||current.getLayer(id))return;
+      current.addSource(id,{type:"geojson",data:{type:"FeatureCollection",features}});
+      current.addLayer({id,source:id,type:"line",
+        paint:{"line-color":"#8a94a0","line-width":1.2,"line-opacity":.8}});
+    }catch(error){
+      console.warn("Could not draw country outlines:",error);
     }
   }
 
@@ -1933,9 +1958,9 @@
   }
   function updateMapTheme(event){
     if(!map)return;
-    // Raster tiles follow CSS. Repaint case overlays without changing the
-    // current tiles or camera when the new palette keeps the same mode.
+    // Keep the camera and tiles when a palette shares the same color mode.
     if(window.maplibregl?.isFallback||event?.detail?.previousColorMode===activeMapTheme()){
+      if(window.maplibregl?.isFallback)configureRasterBorders();
       if(game)renderMap();
       return;
     }
