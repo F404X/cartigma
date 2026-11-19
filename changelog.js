@@ -87,6 +87,7 @@
     $("cartigmaVersion").textContent=archive.current;
     $("changelogVersion").textContent=archive.current;
     $("changelogTab").addEventListener("click",()=>{translate();if(!visible)reset()});
+    $("changelogTab").addEventListener("focus",()=>{translate();if(!visible)reset()});
     $("changelogMore").addEventListener("click",more);
     $("changelogFilter").addEventListener("change",reset);
     $("langSelect")?.addEventListener("change",translate);
