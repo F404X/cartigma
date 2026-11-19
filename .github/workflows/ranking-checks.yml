@@ -5,6 +5,10 @@ on:
     paths:
       - "backend/**"
       - "ranking-client.js"
+      - "changelog.js"
+      - "changelog-data.js"
+      - "tests/changelog.test.mjs"
+      - "i18n.js"
       - "ranking-panel.html"
       - "ranking.css"
       - ".github/workflows/ranking-checks.yml"
@@ -12,6 +16,10 @@ on:
     paths:
       - "backend/**"
       - "ranking-client.js"
+      - "changelog.js"
+      - "changelog-data.js"
+      - "tests/changelog.test.mjs"
+      - "i18n.js"
       - "ranking-panel.html"
       - "ranking.css"
       - "app.js"
@@ -32,9 +40,13 @@ jobs:
         run: |
           node --check ranking-client.js
           node --check app.js
+          node --check changelog.js
+          node --check changelog-data.js
           for source in backend/src/*.js; do node --check "$source"; done
       - name: Run ranking unit tests
         run: node --test backend/tests/*.test.mjs
+      - name: Check changelog archive and version counters
+        run: node --test tests/changelog.test.mjs
       - name: Validate D1 schema and triggers
         run: |
           python3 - <<'PY'

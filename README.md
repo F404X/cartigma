@@ -92,3 +92,7 @@ node --test tests/*.test.mjs
 ```
 
 The GitHub Actions workflow tests and publishes the site to GitHub Pages, used by the custom domain [cartigma.f404x.net](https://cartigma.f404x.net/).
+
+## Beta version history
+
+The [complete changelog](CHANGELOG.md) is also available in **About → Changelog** in the game, with filters for general updates, bug fixes and technical activity. Versions use `v1.x.yb`: `x` is the cumulative count of general changes, `y` of bug fixes, and `b` denotes beta. Pure testing, documentation, deployment and merge commits do not increase either counter. The log includes retired features for historical accuracy.
