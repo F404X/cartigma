@@ -66,6 +66,7 @@ function boot({storage=new Map(),map=false,randomValue=0.42,mobile=false,clock=D
       {id:"label_city",type:"symbol",layout:{"text-field":["get","name"]}},
       {id:"road_shield",type:"symbol",layout:{"text-field":["get","ref"]}},
       {id:"boundary_country",type:"line",layout:{}},
+      {id:"boundary_2",type:"line","source-layer":"boundary",layout:{}},
       {id:"boundary_state",type:"line",layout:{}},
       {id:"park_green",type:"fill",layout:{}},
       {id:"waterway",type:"line",layout:{}},
@@ -73,6 +74,7 @@ function boot({storage=new Map(),map=false,randomValue=0.42,mobile=false,clock=D
       {id:"case-hemisphere-arrows",type:"symbol",layout:{"text-field":"↑"}}
     ]}},
     setStyle(style){mapState.currentStyle=style;},
+    setPaintProperty(id,key,expr){mapState.styles.push({id,key,expr})},
     setLayoutProperty(id,key,expr){mapState.styles.push({id,key,expr})},
     setLayerZoomRange(id,min,max){mapState.zoomRanges.push({id,min,max})},
     easeTo(options){mapState.eases.push(options);return this},
@@ -124,7 +126,7 @@ function boot({storage=new Map(),map=false,randomValue=0.42,mobile=false,clock=D
     window,document,localStorage,navigator:{},Math:math,Number,String,Array,Set,Map,JSON,Date:clock,Intl:intl,
     AbortController,console,setTimeout(){return 0},clearTimeout(){},
     setInterval(fn){clockCallbacks.push(fn);return clockCallbacks.length},clearInterval(){},
-    fetch:async url=>String(url).includes("admin_0_countries.geojson")
+    fetch:async url=>String(url).includes("country-boundaries.geojson")
       ?{ok:true,json:async()=>countryData||{features:[]}}
       :{ok:true,json:async()=>({results:[]})}
   };
@@ -517,7 +519,7 @@ test("A map click selects a country via real geographic polygons",async()=>{
   const polygon=(west,south,east,north)=>({type:"Polygon",coordinates:[
     [[west,south],[east,south],[east,north],[west,north],[west,south]]]});
   const data={features:[
-    ...Array.from({length:101},()=>({properties:{ISO_A2:"ZZ"},geometry:polygon(0,0,1,1)})),
+    ...Array.from({length:194},()=>({properties:{ISO_A2:"ZZ"},geometry:polygon(0,0,1,1)})),
     {properties:{ISO_A2:"BR"},geometry:polygon(-75,-35,-34,6)}
   ]};
   const g=boot({map:true,countryData:data}),$=g.get;
@@ -525,6 +527,90 @@ test("A map click selects a country via real geographic polygons",async()=>{
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal($("selectedText").textContent,"Brazil");
   assert.equal($("guessBtn").disabled,false);
+});
+test("All 195 map references select their own country, including wrapped Oceania longitudes",async()=>{
+  const world=JSON.parse(readFileSync(new URL("../country-boundaries.geojson",import.meta.url),"utf8"));
+  const g=boot({map:true,countryData:world}),$=g.get;
+  const countries=g.window.CartigmaCountries;
+  assert.deepEqual(world.features.map(f=>f.properties.ISO_A2).sort(),Array.from(countries,c=>c.code).sort());
+  const names=new Intl.DisplayNames(["en"],{type:"region"});
+  for(const country of countries){
+    g.mapState.events.click({lngLat:{
+      lat:country.mapLat??country.lat,lng:(country.mapLng??country.lng)+(country.code==="FJ"?360:0)
+    }});
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal($("selectedText").textContent,names.of(country.code),country.code);
+  }
+  g.select("Fiji");$("guessBtn").click();
+  g.mapState.events.click({lngLat:{lat:1.87,lng:202.6}});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal($("selectedText").textContent,"Kiribati");
+  assert.equal($("guessBtn").disabled,false);
+});
+
+test("Dark national outlines keep contrast and obey the national borders toggle",()=>{
+  const g=boot({map:true}),$=g.get;
+  for(const id of ["boundary_country","boundary_2"]){
+    assert.ok(g.mapState.styles.some(style=>style.id===id&&style.key==="line-color"&&style.expr==="#8a94a0"));
+  }
+  assert.ok(!g.mapState.styles.some(style=>style.id==="boundary_state"&&style.key==="line-color"));
+  $("mapFilterRegions").handlers.change({target:{checked:false}});
+  const visibility=id=>g.mapState.styles.findLast(style=>style.id===id&&style.key==="visibility").expr;
+  assert.equal(visibility("boundary_2"),"visible");
+  assert.equal(visibility("boundary_state"),"none");
+  $("mapFilterBorders").handlers.change({target:{checked:false}});
+  assert.equal(visibility("boundary_2"),"none");
+});
+
+test("About opens on the credits and switches to a separate How to play tab",()=>{
+  const g=boot(),$=g.get;
+  g.language("pt");
+  $("helpBtn").click();
+  assert.equal($("helpBtn").attributes["aria-label"],"Sobre");
+  assert.equal($("accountBtn").attributes["aria-label"],"Conta");
+  assert.equal($("helpDialog").open,true);
+  assert.equal($("aboutPanel").hidden,false);
+  $("howToPlayTab").click();
+  assert.equal($("aboutPanel").hidden,true);
+  assert.equal($("howToPlayPanel").hidden,false);
+  $("aboutTabs").handlers.keydown({key:"ArrowLeft",target:$("howToPlayTab"),preventDefault(){}});
+  assert.equal($("aboutTab").focused,true);
+  assert.equal($("howToPlayPanel").hidden,true);
+});
+
+test("API failure starts local play and a late ranked response cannot overwrite it",async()=>{
+  const unavailable=()=>Object.assign(Error("Unavailable"),{code:"rank_unavailable"});
+  let begin=async()=>{throw unavailable();};
+  const g=boot({autoStart:false,ranking:{
+    mayRank:()=>true,resumeRanked:async()=>null,beginRanked:()=>begin(),
+    gameAction:async()=>{throw unavailable();}
+  }}),$=g.get;
+  $("rushStartBtn").click();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.match($("modeCaption").textContent,/PRACTICE|Practice/);
+  assert.equal($("countrySearch").disabled,false);
+  $("freeBtn").click();
+  let resolveRanked;
+  begin=()=>new Promise(resolve=>{resolveRanked=resolve;});
+  $("rushStartBtn").click();
+  assert.equal($("offlineStartBtn").classList.contains("hidden"),false);
+  $("offlineStartBtn").click();
+  resolveRanked({id:"late-response"});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.match($("modeCaption").textContent,/Practice/);
+  assert.equal($("countrySearch").disabled,false);
+  $("freeBtn").click();
+  begin=async()=>({id:"ranked",startedAt:Date.now(),revealed:2,clues:[],clueCount:5});
+  $("rushStartBtn").click();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.match($("modeCaption").textContent,/RANKED/);
+  g.select("Brazil");$("guessBtn").click();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.match($("modeCaption").textContent,/Practice/);
+  assert.equal($("countrySearch").disabled,false);
+  assert.match($("toast").textContent,/new offline round/);
+  g.select("Brazil");$("guessBtn").click();
+  assert.match($("guessCounter").textContent,/^1\s*\//);
 });
 test("All localizations have country dossier labels and no 500-city count",()=>{
   const g=boot(),packs=g.window.CartigmaAtlasI18n;
@@ -543,7 +629,7 @@ test("Rush pins show selected names, map-click positions and numbered guess hist
     type:"Polygon",coordinates:[[[west,south],[east,south],[east,north],
       [west,north],[west,south]]]});
   const features={features:[
-    ...Array.from({length:101},()=>({
+    ...Array.from({length:194},()=>({
       properties:{ISO_A2:"ZZ"},geometry:poly(0,0,1,1)})),
     {properties:{ISO_A2:"BR"},geometry:poly(-74,-34,-34,6)}
   ]};
@@ -1093,7 +1179,7 @@ test("result marker appears for every country, not just Lesotho or Rush",()=>{
     assert.equal($("reportDialog").open,true);
     const pin=g.mapState.markers.find(m=>m.element.children[0]?.textContent==="★");
     assert.ok(pin,"Missing result pin for "+code);
-    assert.deepEqual(Array.from(pin.coordinate),[target.lng,target.lat]);
+    assert.deepEqual(Array.from(pin.coordinate),[target.mapLng??target.lng,target.mapLat??target.lat]);
   }
 });
 
@@ -1112,7 +1198,7 @@ test("Mobile Normal can return from View map to guesses, clues and the case file
   assert.equal($("mobileEvidencePanel").classList.contains("mobile-open"),false);
   $("reportMapBtn").click();
   assert.equal($("reportDialog").open,false);
-  assert.deepEqual(Array.from(g.mapState.eases.at(-1).center),[target.lng,target.lat]);
+  assert.deepEqual(Array.from(g.mapState.eases.at(-1).center),[target.mapLng??target.lng,target.mapLat??target.lat]);
   assert.equal($("mobileReportBtn").hidden,false);
   $("mobileGuessBtn").click();
   assert.equal($("mobileGuessPanel").classList.contains("mobile-open"),true);
@@ -1238,6 +1324,7 @@ test("the ranking opens all nine boards and refreshes an open panel after saving
   class Clock extends Date {static now(){return now}}
   const valueResponse=data=>({ok:true,json:async()=>data});
   const context={window,document,URL,Date:Clock,location:new URL("https://cartigma.workers.dev/"),
+    AbortSignal,
     setInterval(fn,ms){periodicRefresh=fn;refreshCheckMs=ms;},
     localStorage:{getItem:key=>cache.get(key),setItem:(key,value)=>cache.set(key,value),removeItem:key=>cache.delete(key)},
     fetch:async url=>{
@@ -1260,7 +1347,12 @@ test("the ranking opens all nine boards and refreshes an open panel after saving
   const code=readFileSync(new URL("../ranking-client.js",import.meta.url),"utf8");
   runInNewContext(code,context,{filename:"ranking-client.js"});
   await new Promise(resolve=>setImmediate(resolve));
+  await get("accountBtn").onclick();
+  assert.equal(get("rank-panel").dataset.view,"account");
+  assert.equal(get("accountBtn").attributes["aria-expanded"],"true");
+  assert.equal(requests,0,"Opening account does not fetch the leaderboards");
   await get("rank-launch").onclick();
+  await new Promise(resolve=>setImmediate(resolve));
   assert.equal(requests,1,"Opening ranking fetches immediately");
   assert.equal(refreshCheckMs,30000,"Periodic checks do not hit the API every 15 seconds");
   now+=4*60*1000+59000;

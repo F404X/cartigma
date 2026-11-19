@@ -1,10 +1,10 @@
 /* Cartigma — game engine · no framework, no account, no API key. */
 (() => {
   "use strict";
-  // One entry per country. Reference coordinates are geographic centroids,
-  // never hidden city answers or additional city database records.
+  // One entry per country, with optional land points for pins on the map.
   const COUNTRIES=window.CartigmaCountries||[];
   const COUNTRY_REFS=COUNTRIES.map(c=>[c.name,c.name,c.continent,c.lat,c.lng]);
+  const mapPoint=country=>({lat:country.mapLat??country.lat,lng:country.mapLng??country.lng});
   const TRANSLATIONS = window.GeoI18n?.PACKS || {};
   const CLUE_I18N = window.GeoCluesI18n || {};
   const COUNTRY_INSIGHTS = window.GeoCountryInsights || {};
@@ -201,6 +201,7 @@
       guessFeedback:"From your guess to the answer: {value}",
       alreadyGuessed:"You already tried this country.",
       playOffline:"Play offline",rankUnavailable:"Ranked play is unavailable. Try again or play offline.",
+      offlineStarted:"Ranking is unavailable. A new offline round started.",
       rankedAttempt:"Your best verified score of the UTC day counts per difficulty.",
       rankAdded:"+{points} pts to the ranking",
       rankBest:"Your best score for this difficulty today is kept.",
@@ -212,6 +213,7 @@
       guessFeedback:"Do seu palpite até a resposta: {value}",
       alreadyGuessed:"Você já tentou esse país.",
       playOffline:"Jogar offline",rankUnavailable:"Ranqueada indisponível. Tente de novo ou jogue offline.",
+      offlineStarted:"O ranking está indisponível. Uma nova partida offline começou.",
       rankedAttempt:"Vale sua melhor pontuação verificada do dia UTC em cada dificuldade.",
       rankAdded:"+{points} pts no ranking",
       rankBest:"Sua melhor pontuação do dia nesta dificuldade foi mantida.",
@@ -409,46 +411,50 @@
   }
   // All three modes use the existing Rush map start gate. A signed-in
   // player's first attempt is automatically verified and saved by the API.
+  function startOfflineCase(){
+    game.started=true;
+    game.pending=false;
+    game.rankError=null;
+    game.practice=Boolean(window.CartigmaRanking?.mayRank?.());
+    game.startedAt=Date.now();
+    game.revealed=DIFFICULTIES[difficulty].initial;
+    mobilePanel="clues";
+    rushCountryRequest++;
+    save();render();clockTick();
+  }
   function startCase(offline=false){
-    if(!game||game.finished||game.started||game.pending)return;
-    const current=game;
-    const startOffline=()=>{
-      current.started=true;
-      current.rankError=null;
-      current.practice=Boolean(window.CartigmaRanking?.mayRank?.());
-      current.startedAt=Date.now();
-      current.revealed=DIFFICULTIES[difficulty].initial;
-      mobilePanel="clues";
-      rushCountryRequest++;
-      save();render();clockTick();
-    };
+    if(!game||game.finished||game.started||(game.pending&&!offline))return;
     // Preserve instant offline play and existing Rush behavior; only a
     // remembered signed-in account needs a network round-trip.
     if(offline||!window.CartigmaRanking?.mayRank?.()){
-      startOffline();
+      startOfflineCase();
       return;
     }
+    const current=game;
     current.pending=true;
-    $("rushStartBtn").disabled=true;
-    $("offlineStartBtn").disabled=true;
+    render();
     window.CartigmaRanking.beginRanked({mode:game.mode,difficulty,caseNumber:current.serial}).then(ranked=>{
-      if(game!==current)return;
-      if(!ranked){startOffline();return;}
+      if(game!==current||!current.pending)return;
+      if(!ranked){startOfflineCase();return;}
       current.ranked=true;
       current.mode=ranked.mode||current.mode;
       applyRankedState(ranked);
       mobilePanel="clues";
       rushCountryRequest++;
-      save();render();clockTick();
+      clockTick();
     }).catch(error=>{
-      if(game===current){
+      if(game===current&&current.pending){
+        if(error.code==="rank_unavailable"){
+          startOfflineCase();
+          toast(deductionText("offlineStarted"));
+          return;
+        }
         toast(error.message||"Não foi possível iniciar.");
         current.rankError=error.message||deductionText("rankUnavailable");
       }
     }).finally(()=>{
-      if(game===current){
+      if(game===current&&current.pending){
         current.pending=false;
-        $("rushStartBtn").disabled=false;
         render();
       }
     });
@@ -457,7 +463,8 @@
     const guesses=response.guesses||[];
     return guesses.map((item,i)=>{
       const code=item.code,old=previous[i];
-      const coords=COUNTRIES[COUNTRY_CODES.indexOf(code)];
+      const country=COUNTRIES[COUNTRY_CODES.indexOf(code)];
+      const coords=country&&mapPoint(country);
       const point=old?.countryCode===code?old:
         i===guesses.length-1&&pendingPoint?.countryCode===code?pendingPoint:null;
       return {
@@ -528,6 +535,20 @@
       if(game.finished)showReport();
     }catch(error){
       if(game===current){
+        if(error.code==="rank_unavailable"||error.code==="login_required"||
+           error.code==="game_not_found"||error.code==="game_expired"){
+          // The ranked answer stays on the server. Begin a separate local round.
+          const daily=current.mode==="daily"&&otherDailyAvailable(difficulty);
+          game=daily?(savedDaily()||newGame("daily",dailyIndex())):newGame("free",chooseFree());
+          selected=null;
+          closeReport();
+          if(game.started){
+            mobilePanel="clues";
+            render();clockTick();
+          }else startOfflineCase();
+          toast(deductionText("offlineStarted"));
+          return;
+        }
         current.nextPollAt=Date.now()+(error.code==="cooldown"?error.retry*1000:5000);
         toast(error.message||deductionText("rankUnavailable"));
         if(error.code==="game_state_conflict"&&action!=="state"){
@@ -656,7 +677,10 @@
     syncMapFiltersUI();
     document.querySelectorAll("[data-i18n]").forEach(element=>{element.textContent=t(element.dataset.i18n)});
     $("countrySearch").placeholder=t(isCountryGame()?"rushSearchPlaceholder":"searchPlaceholder");
-    $("helpBtn").setAttribute("aria-label",t("help"));
+    $("helpBtn").setAttribute("aria-label",t("about"));
+    $("accountBtn").setAttribute("aria-label",t("account"));
+    $("accountBtn").title=t("account");
+    $("closeHelpBtn").setAttribute("aria-label",t("close"));
     syncAtlasLanguage();
     $("resetViewBtn").title=t("reset");
     $("difficultySelect").value=difficulty;
@@ -1266,8 +1290,7 @@
     rankNote.classList.toggle("hidden",!showRankNote);
     rankNote.textContent=showRankNote?deductionText("rankedAttempt"):"";
     $("offlineStartBtn").textContent=deductionText("playOffline");
-    $("offlineStartBtn").classList.toggle("hidden",!game.rankError);
-    $("offlineStartBtn").disabled=Boolean(game.pending);
+    $("offlineStartBtn").classList.toggle("hidden",!game.rankError&&!game.pending);
     updateClock();renderMap();
     syncMobilePanels();
   }
@@ -1446,7 +1469,7 @@
     // star marker only after a case ends, whether won or lost (including Rush).
     // Keep it separate from numbered guess pins across map/style redraws.
     if(game.finished&&!resultMarker){
-      const answer=COUNTRIES[game.index];
+      const answer=mapPoint(COUNTRIES[game.index]);
       resultMarker=addMarker(answer.lat,answer.lng,"★","target",countryName(game.index));
     }else if(!game.finished&&resultMarker){
       resultMarker.remove();
@@ -1477,28 +1500,16 @@
     if(map&&!game.finished)map.easeTo({center:[8,15],zoom:1.7,duration:350});
   }
 
-  // A country must be selected by its actual territory, not by the nearest
-  // catalogued city (which gives wrong results along borders and in large states).
-  // Natural Earth admin-0 boundaries are small enough to cache in one request.
-  const RUSH_BORDERS_URLS=Object.freeze([
-    "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson",
-    "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson"
-  ]);
+  // Use the same bundled polygons for each map engine and game mode.
   function rushCountryFeatures(){
     if(!countryShapesPromise){
       countryShapesPromise=(async()=>{
-        let error;
-        for(const url of RUSH_BORDERS_URLS){
-          try{
-            const response=await fetch(url,{cache:"force-cache"});
-            if(!response.ok)throw Error("Could not retrieve country boundaries");
-            const geojson=await response.json();
-            if(!Array.isArray(geojson?.features)||geojson.features.length<100)
-              throw Error("Invalid country boundary dataset");
-            return geojson.features;
-          }catch(failed){error=failed}
-        }
-        throw error||Error("Country boundary data unavailable");
+        const response=await fetch("country-boundaries.geojson?v=20261119");
+        if(!response.ok)throw Error("Could not retrieve country boundaries");
+        const geojson=await response.json();
+        if(!Array.isArray(geojson?.features)||geojson.features.length<COUNTRIES.length)
+          throw Error("Invalid country boundary dataset");
+        return geojson.features;
       })().catch(error=>{countryShapesPromise=null;throw error});
     }
     return countryShapesPromise;
@@ -1522,12 +1533,11 @@
       !rings.slice(1).some(hole=>pointInRing(lng,lat,hole)));
   }
   function codeForCountryFeature(feature){
-    const info=feature?.properties||{};
-    return [info.ISO_A2,info.ISO_A2_EH,info.POSTAL,info.WB_A2]
-      .find(code=>typeof code==="string"&&COUNTRY_INSIGHTS[code]&&
-        COUNTRY_CODES.includes(code))||null;
+    const code=feature.properties?.ISO_A2;
+    return COUNTRY_CODES.includes(code)?code:null;
   }
-  async function selectCountryPoint(lat,lng){
+  async function selectCountryPoint(lat,longitude){
+    const lng=((longitude+180)%360+360)%360-180;
     const session=game,request=++rushCountryRequest;
     selected=null;
     $("guessBtn").disabled=true;
@@ -1642,8 +1652,8 @@
       const name=displayRegion(code);
       if(!norm(name).includes(q)&&!norm(code).includes(q)&&
         !norm(COUNTRIES[COUNTRY_CODES.indexOf(code)].name).includes(q))continue;
-      const index=COUNTRY_CODES.indexOf(code),country=COUNTRIES[index];
-      results.push({name,description:code,lat:country.lat,lon:country.lng,
+      const point=mapPoint(COUNTRIES[COUNTRY_CODES.indexOf(code)]);
+      results.push({name,description:code,lat:point.lat,lon:point.lng,
         countryCode:code});
       if(results.length===7)break;
     }
@@ -1759,7 +1769,7 @@
     }
     if(layer.type==="line"){
       if(/(boundary|border|admin)/.test(id))
-        return /(country|national|admin[_ -]?0|level[_ -]?0|boundary_0)/.test(id)?"borders":"regions";
+        return /(?:country|national|admin[_ -]?0|level[_ -]?0|boundary_(?:0|2)(?!\d)|boundary_disputed)/.test(id)?"borders":"regions";
       if(/(road|transportation|highway|motorway|rail|route|path|track|street|bridge|tunnel)/.test(id))return "roads";
       if(/(river|stream|waterway|canal)/.test(id))return "water";
       return null;
@@ -1782,6 +1792,16 @@
       const visibility=mapFilterPrefs[category]?originalLayerVisibility.get(layer.id):"none";
       try{map.setLayoutProperty(layer.id,"visibility",visibility)}
       catch(error){console.warn("Could not filter map layer",layer.id,error)}
+    }
+  }
+
+  function configureNationalBorders(){
+    if(activeMapTheme()!=="dark"||typeof map.setPaintProperty!=="function")return;
+    for(const layer of map.getStyle()?.layers||[]){
+      if(mapFilterCategory(layer)!=="borders")continue;
+      map.setPaintProperty(layer.id,"line-color","#8a94a0");
+      map.setPaintProperty(layer.id,"line-blur",0);
+      map.setPaintProperty(layer.id,"line-width",["interpolate",["linear"],["zoom"],1,1.1,5,1.6,12,2.3]);
     }
   }
 
@@ -1922,7 +1942,7 @@
     if(typeof map.setStyle!=="function")return;
     mapStyleReady=false;
     originalLayerVisibility.clear();
-    try{map.setStyle(vectorMapStyle())}
+    try{map.setStyle(vectorMapStyle(),{diff:false})}
     catch(error){console.warn("Could not apply map theme:",error);}
   }
   function initMap(initialView={center:[8,15],zoom:1.7}){
@@ -1963,6 +1983,7 @@
     map.on("style.load",()=>{
       clearTimeout(mapStyleTimeout);
       mapStyleReady=true;
+      configureNationalBorders();
       configureMapLabelDensity();
       updateMapLanguage();
       applyMapFilters();
@@ -2003,7 +2024,7 @@
     },pointerOptions);
     map.on("click",event=>{
       // A drag release must never be interpreted as a fresh pin.
-      if(game.finished||!game.started||pointerMoved||Date.now()-lastDragAt<220)return;
+      if(game.finished||!game.started||game.pending||pointerMoved||Date.now()-lastDragAt<220)return;
       selectPoint(event.lngLat.lat,event.lngLat.lng,"");
     });
   }
@@ -2058,7 +2079,7 @@
       // Normal, Hard and Rush all reveal a country-answer marker. Make sure
       // 'View map' always takes the player to it, including tiny Lesotho.
       if(game.finished&&map){
-        const answer=COUNTRIES[game.index];
+        const answer=mapPoint(COUNTRIES[game.index]);
         map.easeTo({center:[answer.lng,answer.lat],
           zoom:Math.max(4,Math.min(map.getZoom(),6)),duration:450});
       }
@@ -2078,7 +2099,30 @@
     });
     $("reportShareBtn").addEventListener("click",share);
     initAtlas();
-    $("helpBtn").addEventListener("click",()=>$("helpDialog").showModal());
+    const aboutTabs=[$("aboutTab"),$("howToPlayTab")];
+    const aboutPanels=[$("aboutPanel"),$("howToPlayPanel")];
+    function selectAboutTab(index){
+      aboutTabs.forEach((tab,i)=>{
+        tab.setAttribute("aria-selected",String(index===i));
+        tab.tabIndex=index===i?0:-1;
+        aboutPanels[i].hidden=index!==i;
+      });
+    }
+    aboutTabs.forEach((tab,i)=>tab.addEventListener("click",()=>selectAboutTab(i)));
+    $("aboutTabs").addEventListener("keydown",event=>{
+      const key=event.key;
+      const current=aboutTabs.indexOf(event.target);
+      if(current===-1)return;
+      if(!["ArrowLeft","ArrowRight","Home","End"].includes(key))return;
+      event.preventDefault();
+      const next=key==="Home"?0:key==="End"?1:1-current;
+      selectAboutTab(next);
+      aboutTabs[next].focus();
+    });
+    $("helpBtn").addEventListener("click",()=>{
+      selectAboutTab(0);
+      $("helpDialog").showModal();
+    });
     $("closeHelpBtn").addEventListener("click",()=>$("helpDialog").close());
     $("startHelpBtn").addEventListener("click",()=>$("helpDialog").close());
     $("helpDialog").addEventListener("click",e=>{if(e.target===$("helpDialog"))$("helpDialog").close()});

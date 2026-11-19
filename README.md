@@ -10,7 +10,9 @@ Cartigma contains **195 playable countries**: the 193 UN member states and the t
 
 There is **no city/urban-place database**. The former 500-city catalogue, urban statistics, city references and city-specific facts have been deleted. Geographic reference coordinates are taken from country metadata and used only for map-sector calculations; they are not separate city answers. The searchable country dossier includes a flag, ISO code, geographic/latitude information, currency, country area, historical summary and any available dated population and GDP data. Absent source values are omitted instead of being invented.
 
-Country selection by map uses Natural Earth admin-0 polygons (50m with a 110m fallback). Tiny islands and micronations may be difficult to click on a world-scale map; selecting their name in search works regardless of geometry. Geographic boundaries are approximate and may follow Natural Earth's default de facto representation.
+Country selection uses the 195 Natural Earth admin-0 country polygons bundled in `country-boundaries.geojson`. The source is the [1:10m Natural Earth dataset](https://github.com/nvkelso/natural-earth-vector/blob/ca96624a56bd078437bca8184e78163e5039ad19/geojson/ne_10m_admin_0_countries.geojson), filtered to the country catalogue and simplified with Mapshaper (`-simplify 10% keep-shapes`, five decimal places). Zoom in or search by name for small islands and micronations. Boundaries follow Natural Earth's approximate de facto representation.
+
+When the ranking API is unavailable at the start of a match, Cartigma starts a local round. If the API goes down during ranked play, Cartigma opens a separate local round because the ranked answer is stored on the server. Local results are scored in the game.
 
 ## Game modes
 

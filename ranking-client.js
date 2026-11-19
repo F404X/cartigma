@@ -12,6 +12,7 @@
  const rankResumes=new Map();
  let accountRequest=null;
  const CACHE_TTL=5*60*1000; // Re-fetch only every 5 minutes while the board stays open.
+ const REQUEST_TIMEOUT=5000;
  const state={tab:"boards",boards:null,user:null,meChecked:false,loading:false,visible:false};
  let leaderboardRequest=null,leaderboardRevision=0,lastRefresh=0;
  const announcedGames=new Set();
@@ -25,13 +26,17 @@
  }
  function cached(){try{return JSON.parse(localStorage.getItem(CACHE_KEY)||"null");}catch{return null;}}
  function saveCache(data){try{localStorage.setItem(CACHE_KEY,JSON.stringify({data,at:Date.now()}));}catch{}}
+ function unavailable(){
+   return Object.assign(Error("Servidor indisponível"),{code:"rank_unavailable"});
+ }
  async function api(path,body){
    const options={method:body===undefined?"GET":"POST",credentials:"include",
-     headers:{"Accept":"application/json"}};
+     headers:{"Accept":"application/json"},signal:AbortSignal.timeout(REQUEST_TIMEOUT)};
    if(body!==undefined){options.headers["Content-Type"]="application/json";options.body=JSON.stringify(body);}
    let response;
-   try{response=await fetch(BASE+"/v1"+path,options);}catch{throw Error("Servidor indisponível");}
-   const result=await response.json().catch(()=>({}));
+   try{response=await fetch(BASE+"/v1"+path,options);}catch{throw unavailable();}
+   if(response.status>=500)throw unavailable();
+   const result=await response.json().catch(()=>{throw unavailable();});
    if(!response.ok){
      const err=Error({
        login_required:"Entre na sua conta para acessar suas partidas ranqueadas.",
@@ -55,21 +60,28 @@
  }
  async function build(){
    const panel=document.createElement("aside");panel.id="rank-panel";panel.className="rank-panel";
-   panel.hidden=true;panel.setAttribute("aria-label","Cartigma — ranking competitivo");
+   panel.hidden=true;panel.setAttribute("aria-labelledby","rank-title");
+   const account=$("accountBtn");
    try{
-     const response=await fetch("ranking-panel.html?v=20261118-case-history");
+     const response=await fetch("ranking-panel.html?v=20261119-account");
      if(!response.ok)throw Error("markup unavailable");
      panel.innerHTML=await response.text();
    }catch{console.warn("Cartigma ranking panel unavailable");return;}
    document.body.append(panel);
    const launch=document.createElement("button");
    launch.id="rank-launch";launch.className="header-button";launch.type="button";
-   launch.textContent="Ranking";launch.setAttribute("aria-label","Ranking e contas");
+   launch.textContent="Ranking";launch.setAttribute("aria-label","Ranking");
+   launch.setAttribute("aria-controls",panel.id);launch.setAttribute("aria-expanded","false");
    const sibling=$("helpBtn");
    if(sibling?.parentNode)sibling.parentNode.insertBefore(launch,sibling);
    else document.body.append(launch);
-   launch.onclick=()=>open();
+   launch.onclick=()=>togglePanel("boards",launch);
+   if(account){
+     account.onclick=()=>togglePanel("account",account);
+     account.disabled=false;
+   }
    $("rank-close").onclick=close;
+   panel.addEventListener("keydown",event=>{if(event.key==="Escape")close();});
    panel.querySelectorAll("[data-rank-tab]").forEach(b=>b.onclick=()=>setTab(b.dataset.rankTab));
    panel.querySelectorAll("[data-auth-mode]").forEach(b=>b.onclick=()=>setAuthMode(b.dataset.authMode));
    $("rank-form").onsubmit=authenticate;
@@ -80,10 +92,17 @@
    setInterval(refreshVisibleBoards,30000);
    document.addEventListener("visibilitychange",refreshVisibleBoards);
    const reset=new URL(location.href).searchParams.get("reset");
-   if(reset){open();setTab("account");setTimeout(()=>resetPassword(reset),0);}
+   if(reset){open("account");setTimeout(()=>resetPassword(reset),0);}
  }
- async function open(){
-   state.visible=true;$("rank-panel").hidden=false;setTab(state.tab);
+ let panelTrigger=null;
+ function togglePanel(tab,trigger){
+   if(state.visible&&state.tab===tab){close();return;}
+   panelTrigger=trigger;
+   return open(tab);
+ }
+ async function open(tab){
+   state.visible=true;$("rank-panel").hidden=false;setTab(tab);
+   $("rank-close").focus();
    if(!state.meChecked){
      state.meChecked=true;
      const previousUser=state.user;
@@ -93,14 +112,26 @@
        state.user=user;
        if(state.user)localStorage.setItem(ACCOUNT_MARKER,"1");
        else localStorage.removeItem(ACCOUNT_MARKER);
-     }catch{}
+     }catch(error){
+       state.meChecked=false;
+       if(state.visible&&state.tab==="account")message(error.message,true);
+     }
      renderAccount();
    }
  }
- function close(){state.visible=false;$("rank-panel").hidden=true;}
+ function close(){
+   state.visible=false;$("rank-panel").hidden=true;
+   $("rank-launch").setAttribute("aria-expanded","false");
+   $("accountBtn")?.setAttribute("aria-expanded","false");
+   panelTrigger?.focus();
+ }
  function setTab(tab){
    state.tab=TABS.includes(tab)?tab:"boards";
    $("rank-panel").dataset.view=state.tab;
+   text("rank-title",state.tab==="account"?$("accountBtn")?.title||"Conta":"Ranking");
+   $("rank-launch").setAttribute("aria-expanded",String(state.tab==="boards"));
+   $("accountBtn")?.setAttribute("aria-expanded",String(state.tab==="account"));
+   message("");
    for(const t of TABS)$("rank-"+t).hidden=t!==state.tab;
    document.querySelectorAll("[data-rank-tab]").forEach(b=>{
      b.classList.toggle("active",b.dataset.rankTab===state.tab);

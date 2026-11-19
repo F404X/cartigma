@@ -258,8 +258,14 @@ test("match history preserves complete dossiers privately, past live expiry and 
   assert.deepEqual((await get(path)).data,{games:[],nextCursor:null});
 
   const {target_code}=sql.prepare("SELECT target_code FROM game_sessions WHERE id=?").get(start.id);
-  await call("overlay",{id:start.id,key:"continent"});
-  await call("reveal",{id:start.id});
+  const overlayKey=start.clues.some(clue=>clue.key==="continent")?"continent":"longitude";
+  let latest=await call("reveal",{id:start.id});
+  assert.equal(latest.status,200);
+  while(!latest.data.clues.some(clue=>clue.key===overlayKey)&&latest.data.nextHintCost){
+    latest=await call("reveal",{id:start.id});
+    assert.equal(latest.status,200);
+  }
+  assert.equal((await call("overlay",{id:start.id,key:overlayKey})).status,200);
   const wrong=target_code==="BR"?"AR":"BR";
   await call("guess",{id:start.id,code:wrong});
   const {data:win}=await call("guess",{id:start.id,code:target_code});
@@ -280,9 +286,9 @@ test("match history preserves complete dossiers privately, past live expiry and 
   const {data:{game:archived}}=await get(detail);
   assert.deepEqual(archived.clues,win.clues);
   assert.deepEqual(archived.guesses,win.guesses);
-  assert.deepEqual(archived.overlays,["continent"]);
+  assert.deepEqual(archived.overlays,[overlayKey]);
   assert.equal(archived.caseNumber,17);
-  assert.equal(archived.hints,1);
+  assert.equal(archived.hints,latest.data.hints);
   assert.equal(archived.score,win.score);
   assert.equal(archived.elapsedMs,win.elapsedMs);
   assert.ok(archived.profile.details.history.pt);

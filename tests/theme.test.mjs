@@ -149,7 +149,7 @@ test("all palettes keep text, controls and ranking colors readable",()=>{
 test("vector map keeps the light and dark base styles and skips tile reloads within a mode",()=>{
   assert.match(game,/activeMapTheme\(\)==="light"\?"positron":"dark"/);
   assert.match(game,/previousColorMode===activeMapTheme\(\)/);
-  assert.match(game,/map\.setStyle\(vectorMapStyle\(\)\)/);
+  assert.match(game,/map\.setStyle\(vectorMapStyle\(\),\{diff:false\}\)/);
   assert.match(game,/window\.addEventListener\?\.\("geodetective:themechange",updateMapTheme\)/);
   assert.match(game,/style:vectorMapStyle\(\)/);
   assert.match(html,/id="themeToggle"[^>]+aria-haspopup="dialog"/);

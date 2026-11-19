@@ -132,5 +132,29 @@
     PACKS[language].latitudeOtherOne=one;
     PACKS[language].latitudeOtherMany=many;
   }
+  const ABOUT_LABELS={
+    en:["About","Account","Developer","Beta testers"],
+    pt:["Sobre","Conta","Desenvolvedor","Testadores beta"],
+    es:["Acerca de","Cuenta","Desarrollador","Probadores beta"],
+    zh:["关于","账户","开发者","测试人员"],
+    ja:["このゲームについて","アカウント","開発者","ベータテスター"],
+    ru:["Об игре","Аккаунт","Разработчик","Бета-тестировщики"],
+    fr:["À propos","Compte","Développeur","Bêta-testeurs"],
+    de:["Über das Spiel","Konto","Entwickler","Betatester"],
+    it:["Informazioni","Account","Sviluppatore","Beta tester"],
+    nl:["Over het spel","Account","Ontwikkelaar","Bètatesters"],
+    pl:["O grze","Konto","Twórca","Beta testerzy"],
+    sv:["Om spelet","Konto","Utvecklare","Betatestare"],
+    tr:["Hakkında","Hesap","Geliştirici","Beta testçileri"],
+    ar:["حول اللعبة","الحساب","المطور","مختبرو النسخة التجريبية"],
+    he:["על המשחק","חשבון","מפתח","בודקי בטא"],
+    ko:["게임 정보","계정","개발자","베타 테스터"],
+    th:["เกี่ยวกับเกม","บัญชี","ผู้พัฒนา","ผู้ทดสอบเบต้า"],
+    vi:["Giới thiệu","Tài khoản","Nhà phát triển","Người thử nghiệm beta"],
+    id:["Tentang","Akun","Pengembang","Penguji beta"]
+  };
+  for(const [language,[about,account,developer,betaTesters]] of Object.entries(ABOUT_LABELS)){
+    Object.assign(PACKS[language],{about,account,developer,betaTesters});
+  }
   window.GeoI18n = {PACKS,langNames,keys:KEYS};
 })();

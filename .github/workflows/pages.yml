@@ -32,7 +32,7 @@ jobs:
       - name: Preparar arquivos estáticos
         run: |
           mkdir -p dist
-          cp index.html styles.css themes.css mobile.css theme.js app.js shared-clues.js country-catalog.js continent-borders.js atlas-i18n.js country-insights.js country-clues-i18n.js currency-denominations.js country-profile-i18n.js map-filters-i18n.js map-bootstrap.js map-fallback.js language-picker.js i18n.js clues-i18n.js compass-i18n.js report-i18n.js favicon.svg sitemap.xml robots.txt ranking.css ranking-client.js ranking-panel.html dist/
+          cp index.html styles.css themes.css mobile.css theme.js app.js shared-clues.js country-catalog.js country-boundaries.geojson continent-borders.js atlas-i18n.js country-insights.js country-clues-i18n.js currency-denominations.js country-profile-i18n.js map-filters-i18n.js map-bootstrap.js map-fallback.js language-picker.js i18n.js clues-i18n.js compass-i18n.js report-i18n.js favicon.svg sitemap.xml robots.txt ranking.css ranking-client.js ranking-panel.html dist/
           # Refresh all versioned assets consistently after every release.
           sed -i -E "s|(\\?v=)[A-Za-z0-9_-]+|\\1${GITHUB_SHA}|g" dist/index.html
           touch dist/.nojekyll
