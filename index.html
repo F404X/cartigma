@@ -19,7 +19,7 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.18.0/dist/maplibre-gl.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=20261119-account-borders">
+  <link rel="stylesheet" href="styles.css?v=20261119-changelog">
   <link rel="stylesheet" href="themes.css?v=20261119-account-borders">
   <link rel="stylesheet" href="ranking.css?v=20261119-separate-profile">
   <link rel="stylesheet" href="mobile.css?v=20261118-deduction-feedback">
@@ -43,7 +43,9 @@
   <script defer src="theme.js?v=20261118-theme-catalog"></script>
   <script defer src="map-fallback.js?v=20261119-raster-borders"></script>
   <script defer src="language-picker.js"></script>
-  <script type="module" src="map-bootstrap.js?v=20261119-monaco"></script>
+  <script defer src="changelog-data.js?v=20261119-history"></script>
+  <script defer src="changelog.js?v=20261119-history"></script>
+  <script type="module" src="map-bootstrap.js?v=20261119-changelog"></script>
   <script defer src="ranking-client.js?v=20261119-separate-profile"></script>
 </head>
 <body>
@@ -358,11 +360,13 @@
   <div class="about-tabs" id="aboutTabs" role="tablist" aria-labelledby="helpTitle">
     <button type="button" class="header-button" id="aboutTab" role="tab" aria-selected="true" aria-controls="aboutPanel" data-i18n="about">About</button>
     <button type="button" class="header-button" id="howToPlayTab" role="tab" aria-selected="false" aria-controls="howToPlayPanel" tabindex="-1" data-i18n="help">How to play</button>
+    <button type="button" class="header-button" id="changelogTab" role="tab" aria-selected="false" aria-controls="changelogPanel" tabindex="-1" data-i18n="changelog">Changelog</button>
   </div>
   <section id="aboutPanel" role="tabpanel" aria-labelledby="aboutTab" tabindex="0">
     <p data-i18n="helpIntro">Find the hidden country from geographic clues.</p>
     <dl class="about-credits">
       <dt data-i18n="developer">Developer</dt><dd>F404X</dd>
+      <dt>Version / Versão</dt><dd><strong id="cartigmaVersion">v1.191.95b</strong></dd>
       <dt data-i18n="betaTesters">Beta testers</dt><dd>Mtzinn, KaiquePelado, Luiz Bizzio</dd>
     </dl>
     <a class="github-link" href="https://github.com/F404X/cartigma" target="_blank" rel="noopener noreferrer">GitHub</a>
@@ -377,6 +381,19 @@
       <li data-i18n="rushRule">Rush: identify the country in 60 seconds. A clue unlocks every 6 seconds; score falls as time passes.</li>
     </ol>
     <button id="startHelpBtn" type="button" class="primary-btn" data-i18n="gotIt">Got it</button>
+  </section>
+  <section id="changelogPanel" class="changelog-panel" role="tabpanel" aria-labelledby="changelogTab" tabindex="0" hidden>
+    <div class="changelog-topline"><span id="changelogHeading">Version history</span><strong id="changelogVersion">v1.191.95b</strong></div>
+    <p id="changelogIntro">Complete commit history.</p>
+    <p id="changelogSummary" class="changelog-summary"></p>
+    <label for="changelogFilter" class="changelog-filter-label">Filter / Filtro</label>
+    <select id="changelogFilter" class="changelog-filter" aria-label="Changelog filter">
+      <option value="all">All changes</option><option value="general">Updates</option><option value="fix">Bug fixes</option><option value="technical">Technical</option>
+    </select>
+    <p id="changelogNote" class="changelog-note"></p>
+    <p id="changelogCount" class="changelog-count" aria-live="polite"></p>
+    <ol id="changelogList" class="changelog-list"></ol>
+    <button id="changelogMore" class="header-button changelog-more" type="button">Show more</button>
   </section>
 </dialog>
 <dialog id="reportDialog" class="case-report" aria-labelledby="reportHeading">

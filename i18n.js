@@ -153,8 +153,9 @@
     vi:["Giới thiệu","Hồ sơ","Nhà phát triển","Người thử nghiệm beta"],
     id:["Tentang","Profil","Pengembang","Penguji beta"]
   };
+  const CHANGELOG_LABELS={en:"Changelog",pt:"Atualizações",es:"Cambios",zh:"更新日志",ja:"更新履歴",ru:"История версий",fr:"Modifications",de:"Änderungen",it:"Novità",nl:"Wijzigingen",pl:"Zmiany",sv:"Ändringar",tr:"Değişiklikler",ar:"سجل التغييرات",he:"יומן שינויים",ko:"변경 기록",th:"บันทึกการเปลี่ยนแปลง",vi:"Nhật ký thay đổi",id:"Riwayat perubahan"};
   for(const [language,[about,account,developer,betaTesters]] of Object.entries(ABOUT_LABELS)){
-    Object.assign(PACKS[language],{about,account,developer,betaTesters});
+    Object.assign(PACKS[language],{about,account,developer,betaTesters,changelog:CHANGELOG_LABELS[language]});
   }
   window.GeoI18n = {PACKS,langNames,keys:KEYS};
 })();

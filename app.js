@@ -2130,14 +2130,15 @@
     });
     $("reportShareBtn").addEventListener("click",share);
     initAtlas();
-    const aboutTabs=[$("aboutTab"),$("howToPlayTab")];
-    const aboutPanels=[$("aboutPanel"),$("howToPlayPanel")];
+    const aboutTabs=[$("aboutTab"),$("howToPlayTab"),$("changelogTab")];
+    const aboutPanels=[$("aboutPanel"),$("howToPlayPanel"),$("changelogPanel")];
     function selectAboutTab(index){
       aboutTabs.forEach((tab,i)=>{
         tab.setAttribute("aria-selected",String(index===i));
         tab.tabIndex=index===i?0:-1;
         aboutPanels[i].hidden=index!==i;
       });
+      $("helpDialog").classList.toggle("showing-changelog",index===2);
     }
     aboutTabs.forEach((tab,i)=>tab.addEventListener("click",()=>selectAboutTab(i)));
     $("aboutTabs").addEventListener("keydown",event=>{
@@ -2146,7 +2147,8 @@
       if(current===-1)return;
       if(!["ArrowLeft","ArrowRight","Home","End"].includes(key))return;
       event.preventDefault();
-      const next=key==="Home"?0:key==="End"?1:1-current;
+      const next=key==="Home"?0:key==="End"?aboutTabs.length-1:
+        (current+(key==="ArrowRight"?1:-1)+aboutTabs.length)%aboutTabs.length;
       selectAboutTab(next);
       aboutTabs[next].focus();
     });
