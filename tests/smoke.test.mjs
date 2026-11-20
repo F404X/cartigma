@@ -998,8 +998,10 @@ test("Rush has no purchasable evidence overlays, including on old saved cases",(
 });
 
 test("Normal and Hard still offer overlay buttons for available clues",()=>{
+  // Pin the daily case: rolling real-world dates can select a clue without an overlay.
+  const Clock=fakeClock("2026-11-19T12:00:00.000Z");
   for(const level of ["normal","hard"]){
-    const g=boot({map:true}),$=g.get;
+    const g=boot({map:true,clock:Clock}),$=g.get;
     g.difficulty(level);
     // Evidence starts with the continent/latitude, which can be mapped.
     assert.ok($("clueList").children.some(row=>
