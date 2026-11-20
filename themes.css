@@ -117,7 +117,6 @@ dialog.case-report,dialog.case-report[open]{background:var(--surface);color:var(
 .report-log-row.best{background:var(--accent-soft)}
 .report-section h3{color:var(--text);border-bottom-color:var(--border)}
 .report-log-row strong{color:var(--accent)}
-.report-stamp{color:var(--accent);border-color:var(--accent)}
 .report-heading,.report-topbar,.report-footer,.report-log-row,.report-evidence-row{border-color:var(--border)}
 .report-close{background:transparent;border-color:var(--border);color:var(--text)}
 .report-close:hover{color:var(--accent);border-color:var(--accent)}
