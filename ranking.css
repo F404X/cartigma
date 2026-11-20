@@ -4,7 +4,7 @@
   position:fixed;z-index:6000;right:14px;top:74px;width:min(930px,calc(100vw - 28px));
   max-height:min(790px,calc(100dvh - 88px));display:flex;flex-direction:column;
   background:var(--surface);color:var(--text);border:1px solid var(--border-strong);
-  box-shadow:0 16px 55px #0009;border-radius:9px;font:14px/1.45 "IBM Plex Sans",sans-serif;
+  box-shadow:0 16px 55px #0009;border-radius:9px;font:14px/1.45 var(--font);
 }
 #profile-panel{width:min(365px,calc(100vw - 28px))}
 .rank-panel [hidden],.rank-panel[hidden]{display:none!important}
@@ -13,7 +13,7 @@
 .rank-panel button:disabled{opacity:.5;cursor:not-allowed}
 .rank-panel button:focus-visible,.rank-panel input:focus-visible,.rank-panel select:focus-visible{
   outline:2px solid var(--accent);outline-offset:2px}
-.rank-top{padding:14px 16px 12px;display:flex;justify-content:space-between;align-items:center;
+.rank-top{font-family:var(--display);padding:14px 16px 12px;display:flex;justify-content:space-between;align-items:center;
   border-bottom:1px solid var(--border);color:var(--text);font-weight:700;letter-spacing:.015em}
 .rank-top button{background:transparent;color:var(--muted);border:0;font-size:24px;line-height:1}
 .rank-auth-tabs button{padding:8px 5px;background:transparent;color:var(--muted);
@@ -31,7 +31,7 @@
 .rank-panel .rank-secondary{background:var(--surface2);color:var(--text);border-color:var(--border-strong)}
 #rank-freshness{margin:0 0 12px;font-variant-numeric:tabular-nums}
 .rank-groups{display:grid;gap:16px;padding-bottom:8px}
-.rank-group h3{margin:0 0 6px;font-size:15px}
+.rank-group h3{margin:0 0 6px;font:600 15px var(--display)}
 .rank-group-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .rank-board{min-width:0;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px}
 .rank-board h4{margin:0 0 6px;color:var(--muted);font-size:12px;font-weight:600}
@@ -42,14 +42,14 @@
 .rank-list li.rank-self{box-shadow:inset 2px 0 var(--accent)}
 .rank-list .rank-position{font-size:11px;color:var(--muted);text-align:right}
 .rank-list .rank-player{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rank-player-stats{display:grid;justify-items:end;gap:2px;font:600 12px "IBM Plex Mono",monospace;white-space:nowrap}
+.rank-player-stats{display:grid;justify-items:end;gap:2px;font:600 12px var(--mono);white-space:nowrap}
 .rank-player-stats small{color:var(--muted);font-size:10px;font-weight:400}
 .rank-note{color:var(--muted);font-size:12px;margin:5px 0}
 .rank-result-note{color:var(--muted);font-size:12px}
 .rank-status{margin:6px 16px 14px;font-size:12px;min-height:1em;color:var(--accent)}
 .rank-status.rank-error{color:var(--danger)}
 .rank-gameinfo{display:flex;justify-content:space-between;margin:12px 0;
-  font:600 14px "IBM Plex Mono",monospace}
+  font:600 14px var(--mono)}
 .rank-clues{margin:7px 0 11px;border:1px solid var(--border);border-radius:6px;
   max-height:210px;overflow:auto;padding:7px 9px;background:var(--surface2)}
 .rank-clues p{margin:7px 0;font-size:12px}
