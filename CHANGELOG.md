@@ -1,6 +1,6 @@
 # Changelog — Cartigma
 
-**Versão beta atual: v1.191.95b**
+**Versão beta atual: v1.192.95b**
 
 Formato `v1.x.yb`: `x` representa a quantidade acumulada de atualizações gerais; `y`, a quantidade acumulada de correções de bugs. Os símbolos `v`, `1` e `b` permanecem fixos durante esta fase beta.
 
@@ -8,7 +8,18 @@ A contagem foi reconstruída a partir da história de commits da branch `feature
 
 **Atenção:** o changelog documenta o percurso do projeto. Recursos antigos podem ter sido substituídos (por exemplo, o antigo catálogo de cidades deu lugar aos países). As descrições originais dos commits permanecem em inglês para rastreabilidade.
 
-**Auditoria:** 489 commits históricos, 453 grupos históricos, 191 atualizações gerais e 95 correções, incluindo a atualização atual.
+**Auditoria inicial:** 489 commits verificados, organizados em 453 grupos de mudanças. Os commits posteriores continuam rastreados no histórico interativo. Versão atual: 192 atualizações gerais e 95 correções.
+
+### v1.192.95b — 2026-11-19 — Atualização geral
+
+- Tipografia renovada: Inter para textos, Space Grotesk para títulos e JetBrains Mono para números e códigos, também no ranking e no perfil.
+- Remoção do código do caso duplicado no topo; o código continua acessível na ficha do caso.
+- Título do mapa sem repetir a dificuldade já indicada pelo seletor.
+- Relatório sem nome do país e selo de resultado repetidos, sem coordenadas não aplicáveis e sem indicador de vitória redundante no campo de melhor palpite.
+- Arquivo de países sem repetir capital e acesso ao mar em duas seções.
+- Rodapé simplificado: o estado de partida ranqueada ou de prática só aparece quando pertinente.
+- Testes de tipografia e regressão adicionados; teste de overlays estabilizado com data fixa.
+
 
 ### v1.191.95b — 2026-11-19 — Atualização geral
 
