@@ -1,0 +1,43 @@
+<aside class="rank-panel" id="rank-panel" aria-labelledby="rank-title" hidden>
+<div class="rank-top"><strong id="rank-title">Ranking</strong>
+  <button type="button" id="rank-close" aria-label="Fechar">×</button></div>
+<section class="rank-body" id="rank-boards" aria-label="Rankings">
+  <p class="rank-note" id="rank-freshness" role="status">Carregando classificações…</p>
+  <p class="rank-note">Em caso de empate, vale o menor tempo total dos acertos que contam para o placar.</p>
+  <div id="rank-groups" class="rank-groups"></div>
+</section>
+</aside>
+<aside class="rank-panel" id="profile-panel" aria-labelledby="profile-title" hidden>
+<div class="rank-top"><strong id="profile-title">Perfil</strong>
+  <button type="button" id="profile-close" aria-label="Fechar">×</button></div>
+<section class="rank-body" id="rank-account" aria-label="Sua conta">
+  <div id="rank-user" hidden>
+    <p id="rank-username"></p>
+    <button type="button" class="rank-secondary" id="rank-logout">Sair da conta</button>
+    <section class="rank-history" aria-labelledby="rank-history-heading">
+      <h3 id="rank-history-heading">Histórico de partidas</h3>
+      <p id="rank-history-status" class="rank-note" role="status"></p>
+      <ul id="rank-history-list" class="rank-history-list"></ul>
+      <button type="button" id="rank-history-more" class="rank-secondary" hidden>Carregar mais partidas</button>
+    </section>
+  </div>
+  <div id="rank-auth">
+    <div class="rank-auth-tabs">
+      <button type="button" data-auth-mode="login">Entrar</button>
+      <button type="button" data-auth-mode="register">Cadastrar</button>
+    </div>
+    <form id="rank-form">
+      <label for="rank-username-input" id="rank-username-label" hidden>Nome de usuário</label>
+      <input id="rank-username-input" autocomplete="username" maxlength="20" placeholder="Usuário" hidden>
+      <label for="rank-email">E-mail</label>
+      <input id="rank-email" autocomplete="email" type="email" required maxlength="254">
+      <label for="rank-password">Senha</label>
+      <input id="rank-password" type="password" autocomplete="current-password" required minlength="8" maxlength="256">
+      <div id="rank-turnstile"></div>
+      <button type="submit" class="rank-primary" id="rank-auth-submit">Entrar</button>
+    </form>
+    <button type="button" class="rank-link" id="rank-forgot">Esqueci minha senha</button>
+  </div>
+</section>
+<p id="rank-status" class="rank-status" role="status" aria-live="polite"></p>
+</aside>

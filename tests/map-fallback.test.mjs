@@ -69,7 +69,7 @@ test("both keyless vector and fallback raster scripts are included in Pages",()=
   assert.match(app,/switchToFallback/);
   assert.match(app,/mapStyleTimeout/);
   assert.match(app,/typeof libre\.supported==="function"/);
-  assert.ok(html.includes('src="map-fallback.js?v=20261117-clean-overlays"'));
+  assert.match(html,/src="map-fallback\.js\?v=[\w-]+"/);
   assert.match(html,/leaflet@1\.9\.4\/dist\/leaflet\.css/);
   assert.match(workflow,/map-fallback\.js/);
 });
@@ -132,6 +132,15 @@ test("Leaflet fallback restores map, markers, line and click coordinates",async(
   map.addControl();
   assert.equal(state.tileUrl,"https://tile.openstreetmap.org/{z}/{x}/{y}.png");
   assert.equal(state.controls,1);
+  const outlines={type:"FeatureCollection",features:[]};
+  map.addSource("national-border-outline",{data:outlines});
+  map.addLayer({id:"national-border-outline",source:"national-border-outline",type:"line",
+    paint:{"line-color":"#8a94a0","line-width":1.2,"line-opacity":.8}});
+  assert.equal(state.polygons[0].feature,outlines);
+  assert.equal(state.polygons[0].options.interactive,false);
+  assert.equal(state.polygons[0].options.style.fill,false);
+  map.removeLayer("national-border-outline");
+  state.polygons.length=0;
   let ready=false;
   map.on("style.load",()=>{ready=true});
   await Promise.resolve();

@@ -1,0 +1,104 @@
+/* Optional ranked layer, visually aligned with the active Cartigma palette. */
+#rank-launch{white-space:nowrap}
+.rank-panel{
+  position:fixed;z-index:6000;right:14px;top:74px;width:min(930px,calc(100vw - 28px));
+  max-height:min(790px,calc(100dvh - 88px));display:flex;flex-direction:column;
+  background:var(--surface);color:var(--text);border:1px solid var(--border-strong);
+  box-shadow:0 16px 55px #0009;border-radius:9px;font:14px/1.45 var(--font);
+}
+#profile-panel{width:min(365px,calc(100vw - 28px))}
+.rank-panel [hidden],.rank-panel[hidden]{display:none!important}
+.rank-panel button,.rank-panel input,.rank-panel select{font:inherit}
+.rank-panel button{cursor:pointer}
+.rank-panel button:disabled{opacity:.5;cursor:not-allowed}
+.rank-panel button:focus-visible,.rank-panel input:focus-visible,.rank-panel select:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px}
+.rank-top{font-family:var(--display);padding:14px 16px 12px;display:flex;justify-content:space-between;align-items:center;
+  border-bottom:1px solid var(--border);color:var(--text);font-weight:700;letter-spacing:.015em}
+.rank-top button{background:transparent;color:var(--muted);border:0;font-size:24px;line-height:1}
+.rank-auth-tabs button{padding:8px 5px;background:transparent;color:var(--muted);
+  border:1px solid transparent;border-radius:5px;font-size:13px}
+.rank-auth-tabs button.active{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.rank-body{padding:14px 16px 6px;overflow:auto;overscroll-behavior:contain;min-height:0}
+.rank-panel label{display:block;color:var(--muted);font-size:12px;margin:9px 0 5px}
+.rank-panel input,.rank-panel select{background:var(--input-bg);color:var(--text);
+  border:1px solid var(--border-strong);border-radius:5px;padding:9px 10px;max-width:100%;min-width:0}
+.rank-panel select{min-width:145px}
+.rank-panel input{width:100%;display:block;margin-bottom:10px}
+.rank-panel .rank-primary,.rank-panel .rank-secondary{width:100%;border-radius:5px;
+  border:1px solid var(--border-strong);padding:9px 12px;margin:8px 0 2px;font-weight:600}
+.rank-panel .rank-primary{background:var(--accent-fill);color:var(--on-accent);border-color:var(--accent-fill)}
+.rank-panel .rank-secondary{background:var(--surface2);color:var(--text);border-color:var(--border-strong)}
+#rank-freshness{margin:0 0 12px;font-variant-numeric:tabular-nums}
+.rank-groups{display:grid;gap:16px;padding-bottom:8px}
+.rank-group h3{margin:0 0 6px;font:600 15px var(--display)}
+.rank-group-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.rank-board{min-width:0;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px}
+.rank-board h4{margin:0 0 6px;color:var(--muted);font-size:12px;font-weight:600}
+.rank-list{list-style:none;margin:0;padding:0;display:grid;gap:2px;max-height:178px;overflow:auto}
+.rank-list li{display:grid;grid-template-columns:2ch minmax(0,1fr) auto;gap:7px;align-items:center;
+  padding:5px 6px;background:var(--surface2);border-radius:4px;min-width:0}
+.rank-list li:first-child,.rank-list li.rank-self{color:var(--accent);background:var(--accent-soft)}
+.rank-list li.rank-self{box-shadow:inset 2px 0 var(--accent)}
+.rank-list .rank-position{font-size:11px;color:var(--muted);text-align:right}
+.rank-list .rank-player{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rank-player-stats{display:grid;justify-items:end;gap:2px;font:600 12px var(--mono);white-space:nowrap}
+.rank-player-stats small{color:var(--muted);font-size:10px;font-weight:400}
+.rank-note{color:var(--muted);font-size:12px;margin:5px 0}
+.rank-result-note{color:var(--muted);font-size:12px}
+.rank-status{margin:6px 16px 14px;font-size:12px;min-height:1em;color:var(--accent)}
+.rank-status.rank-error{color:var(--danger)}
+.rank-gameinfo{display:flex;justify-content:space-between;margin:12px 0;
+  font:600 14px var(--mono)}
+.rank-clues{margin:7px 0 11px;border:1px solid var(--border);border-radius:6px;
+  max-height:210px;overflow:auto;padding:7px 9px;background:var(--surface2)}
+.rank-clues p{margin:7px 0;font-size:12px}
+.rank-panel #rank-country{width:100%;margin:6px 0}
+.rank-panel #rank-result{margin:12px 0;padding:12px;background:var(--surface2);
+  border:1px solid var(--border);border-radius:5px;font-weight:600}
+.rank-auth-tabs{display:flex;gap:8px;margin-bottom:12px}
+.rank-auth-tabs button{flex:1}
+.rank-panel #rank-turnstile{margin:8px 0}
+.rank-panel .rank-link{padding:8px 0;border:0;color:var(--accent);background:none;text-decoration:underline}
+@media(max-width:760px){
+  #rank-launch{font-size:0}
+  #rank-launch::after{content:"🏆";font-size:18px}
+  .rank-panel,#profile-panel{right:8px;left:8px;top:auto;bottom:8px;width:auto;max-height:78dvh}
+  .rank-group-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))}
+  .rank-clues{max-height:18dvh}
+  .rank-panel select{min-width:120px}
+}
+
+/* The same Rush start card is used for every difficulty, without pink
+   Rush styling on Normal or Hard. */
+body:not(.rush-mode) .rush-intro{
+  inset:calc(38px + 32px) 0 31px;
+}
+body:not(.rush-mode) .rush-intro-card{border-color:var(--border-strong);}
+body:not(.rush-mode) .rush-intro-eyebrow{color:var(--accent);}
+body:not(.rush-mode) .rush-intro-card .primary-btn{
+  background:var(--accent-fill);border-color:var(--accent-fill);color:var(--on-accent);
+}
+@media(max-width:760px){
+ body:not(.rush-mode) .rush-intro{inset:calc(36px + 32px) 0 35px;}
+}
+@media(max-width:760px) and (pointer:coarse){
+ body:not(.rush-mode) .rush-intro{inset:82px 0 calc(146px + env(safe-area-inset-bottom));}
+}
+
+.rank-history{border-top:1px solid var(--border);margin-top:16px;padding-top:12px}
+.rank-history h3{margin:0 0 8px;font-size:15px}
+.rank-history-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.rank-history-case{
+  width:100%;display:grid;gap:2px;padding:8px 10px;min-height:44px;
+  background:var(--surface2);color:var(--text);text-align:start;border:1px solid var(--border);border-radius:5px;
+}
+.rank-history-case:hover,.rank-history-case:focus-visible{border-color:var(--accent)}
+.rank-history-case span{color:var(--muted);font-size:12px}
+dialog.case-report[data-archive][open]{
+  position:fixed;inset:0;margin:auto;width:min(700px,96vw);height:min(88dvh,760px);
+  max-width:96vw;max-height:88dvh;border:1px solid var(--border-strong);border-radius:10px;
+}
+dialog.case-report[data-archive] .report-body{flex:1 1 0;overflow-y:auto;overscroll-behavior:contain}
+dialog.case-report[data-archive] .report-footer{display:flex;justify-content:flex-end}
+dialog.case-report[data-archive] :is(#reportMapBtn,#reportAlternateBtn,#reportNextBtn){display:none!important}

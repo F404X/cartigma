@@ -132,5 +132,30 @@
     PACKS[language].latitudeOtherOne=one;
     PACKS[language].latitudeOtherMany=many;
   }
+  const ABOUT_LABELS={
+    en:["About","Profile","Developer","Beta testers"],
+    pt:["Sobre","Perfil","Desenvolvedor","Testadores beta"],
+    es:["Acerca de","Perfil","Desarrollador","Probadores beta"],
+    zh:["关于","个人资料","开发者","测试人员"],
+    ja:["このゲームについて","プロフィール","開発者","ベータテスター"],
+    ru:["Об игре","Профиль","Разработчик","Бета-тестировщики"],
+    fr:["À propos","Profil","Développeur","Bêta-testeurs"],
+    de:["Über das Spiel","Profil","Entwickler","Betatester"],
+    it:["Informazioni","Profilo","Sviluppatore","Beta tester"],
+    nl:["Over het spel","Profiel","Ontwikkelaar","Bètatesters"],
+    pl:["O grze","Profil","Twórca","Beta testerzy"],
+    sv:["Om spelet","Profil","Utvecklare","Betatestare"],
+    tr:["Hakkında","Profil","Geliştirici","Beta testçileri"],
+    ar:["حول اللعبة","الملف الشخصي","المطور","مختبرو النسخة التجريبية"],
+    he:["על המשחק","פרופיל","מפתח","בודקי בטא"],
+    ko:["게임 정보","프로필","개발자","베타 테스터"],
+    th:["เกี่ยวกับเกม","โปรไฟล์","ผู้พัฒนา","ผู้ทดสอบเบต้า"],
+    vi:["Giới thiệu","Hồ sơ","Nhà phát triển","Người thử nghiệm beta"],
+    id:["Tentang","Profil","Pengembang","Penguji beta"]
+  };
+  const CHANGELOG_LABELS={en:"Changelog",pt:"Atualizações",es:"Cambios",zh:"更新日志",ja:"更新履歴",ru:"История версий",fr:"Modifications",de:"Änderungen",it:"Novità",nl:"Wijzigingen",pl:"Zmiany",sv:"Ändringar",tr:"Değişiklikler",ar:"سجل التغييرات",he:"יומן שינויים",ko:"변경 기록",th:"บันทึกการเปลี่ยนแปลง",vi:"Nhật ký thay đổi",id:"Riwayat perubahan"};
+  for(const [language,[about,account,developer,betaTesters]] of Object.entries(ABOUT_LABELS)){
+    Object.assign(PACKS[language],{about,account,developer,betaTesters,changelog:CHANGELOG_LABELS[language]});
+  }
   window.GeoI18n = {PACKS,langNames,keys:KEYS};
 })();

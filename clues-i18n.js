@@ -160,6 +160,138 @@
       throw new Error("Incomplete continent translation for " + language);
     localeData[language].continents = Object.fromEntries(continentKeys.map((key,i) => [key,labels[i]]));
   }
+  // The Caribbean is a region, not a seventh continent. The same labels
+  // are used by offline gameplay, verified ranked games and the case archive.
+  const regionLabels={
+  "en": [
+    "North/Central America",
+    "Caribbean"
+  ],
+  "pt": [
+    "América do Norte/Central",
+    "Caribe"
+  ],
+  "es": [
+    "América del Norte/Central",
+    "Caribe"
+  ],
+  "zh": [
+    "北美洲／中美洲",
+    "加勒比地区"
+  ],
+  "ja": [
+    "北アメリカ／中央アメリカ",
+    "カリブ海地域"
+  ],
+  "ru": [
+    "Северная/Центральная Америка",
+    "Карибский бассейн"
+  ],
+  "fr": [
+    "Amérique du Nord/Centrale",
+    "Caraïbes"
+  ],
+  "de": [
+    "Nord-/Mittelamerika",
+    "Karibik"
+  ],
+  "it": [
+    "America settentrionale/centrale",
+    "Caraibi"
+  ],
+  "nl": [
+    "Noord-/Centraal-Amerika",
+    "Cariben"
+  ],
+  "pl": [
+    "Ameryka Północna/Środkowa",
+    "Karaiby"
+  ],
+  "sv": [
+    "Nord-/Centralamerika",
+    "Karibien"
+  ],
+  "tr": [
+    "Kuzey/Orta Amerika",
+    "Karayipler"
+  ],
+  "ar": [
+    "أمريكا الشمالية/الوسطى",
+    "منطقة البحر الكاريبي"
+  ],
+  "he": [
+    "אמריקה הצפונית/המרכזית",
+    "האיים הקריביים"
+  ],
+  "ko": [
+    "북아메리카/중앙아메리카",
+    "카리브 지역"
+  ],
+  "th": [
+    "อเมริกาเหนือ/กลาง",
+    "แคริบเบียน"
+  ],
+  "vi": [
+    "Bắc/Trung Mỹ",
+    "Caribe"
+  ],
+  "id": [
+    "Amerika Utara/Tengah",
+    "Karibia"
+  ]
+};
+  const americasLabels={
+  "en": "Americas",
+  "pt": "América",
+  "es": "América",
+  "zh": "美洲",
+  "ja": "アメリカ大陸",
+  "ru": "Америка",
+  "fr": "Amérique",
+  "de": "Amerika",
+  "it": "America",
+  "nl": "Amerika",
+  "pl": "Ameryka",
+  "sv": "Amerika",
+  "tr": "Amerika",
+  "ar": "الأمريكتان",
+  "he": "אמריקה",
+  "ko": "아메리카",
+  "th": "ทวีปอเมริกา",
+  "vi": "Châu Mỹ",
+  "id": "Amerika"
+};
+  const regionTemplates={
+  "en": "Region: {value}",
+  "pt": "Região: {value}",
+  "es": "Región: {value}",
+  "zh": "地区：{value}",
+  "ja": "地域：{value}",
+  "ru": "Регион: {value}",
+  "fr": "Région : {value}",
+  "de": "Region: {value}",
+  "it": "Regione: {value}",
+  "nl": "Regio: {value}",
+  "pl": "Region: {value}",
+  "sv": "Region: {value}",
+  "tr": "Bölge: {value}",
+  "ar": "المنطقة: {value}",
+  "he": "אזור: {value}",
+  "ko": "지역: {value}",
+  "th": "ภูมิภาค: {value}",
+  "vi": "Khu vực: {value}",
+  "id": "Wilayah: {value}"
+};
+  for(const language of Object.keys(localeData)){
+    const labels=regionLabels[language];
+    if(!labels||!regionTemplates[language])
+      throw new Error("Missing geographic-region localization for "+language);
+    localeData[language].regions={
+      northCentralAmerica:labels[0],caribbean:labels[1]
+    };
+    localeData[language].templates.countryRegion=regionTemplates[language];
+    localeData[language].continents.americas=americasLabels[language];
+  }
   const sectorButtonKeys=["sectorMapButton","sectorMapped","sectorMapPurchased"];
   const sectorButtonText={"en":"Map −{cost}|On map ✓|Sector displayed · −{cost} points","pt":"Mapa −{cost}|No mapa ✓|Setor exibido · −{cost} pontos","es":"Mapa −{cost}|En mapa ✓|Sector mostrado · −{cost} puntos","zh":"地图 −{cost}|已显示 ✓|已显示区域 · −{cost} 分","ja":"地図 −{cost}|表示済み ✓|範囲を表示 · −{cost} 点","ru":"Карта −{cost}|На карте ✓|Сектор показан · −{cost} очков","fr":"Carte −{cost}|Sur carte ✓|Secteur affiché · −{cost} points","de":"Karte −{cost}|Auf Karte ✓|Sektor angezeigt · −{cost} Punkte","it":"Mappa −{cost}|Su mappa ✓|Settore mostrato · −{cost} punti","nl":"Kaart −{cost}|Op kaart ✓|Sector getoond · −{cost} punten","pl":"Mapa −{cost}|Na mapie ✓|Sektor pokazany · −{cost} pkt","sv":"Karta −{cost}|På karta ✓|Sektor visad · −{cost} poäng","tr":"Harita −{cost}|Haritada ✓|Bölge gösterildi · −{cost} puan","ar":"الخريطة −{cost}|على الخريطة ✓|تم عرض القطاع · −{cost} نقطة","he":"מפה −{cost}|במפה ✓|האזור מוצג · −{cost} נקודות","ko":"지도 −{cost}|지도 표시 ✓|영역 표시 · −{cost}점","th":"แผนที่ −{cost}|แสดงแล้ว ✓|แสดงพื้นที่แล้ว · −{cost} คะแนน","vi":"Bản đồ −{cost}|Trên bản đồ ✓|Đã hiện khu vực · −{cost} điểm","id":"Peta −{cost}|Di peta ✓|Sektor ditampilkan · −{cost} poin"};
   for(const language of Object.keys(localeData)){

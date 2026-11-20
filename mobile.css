@@ -909,3 +909,14 @@
   }
   .mobile-panel-tabs.finished .mobile-tab-copy strong{font-size:9px}
 }
+
+.mobile-guess-feedback{display:none}
+@media(max-width:760px){
+  .mobile-guess-feedback:not(.hidden){
+    display:block;
+    margin:0;
+    padding:4px 8px;
+    color:var(--accent);
+    font:500 11px/1.35 var(--mono);
+  }
+}
