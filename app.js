@@ -883,7 +883,8 @@
     const localized=CLUE_I18N[lang]?.regions||CLUE_I18N.en?.regions||{};
     add("region",region?localized[region]||CLUE_I18N.en?.regions?.[region]:
       continentName(index,profile?.continent));
-    add("capital",profile?.capital??COUNTRIES[index]?.capital??"—");
+    // The archive geography section already displays the capital.
+    if(targets.list!=="atlasCountryStats")add("capital",profile?.capital??COUNTRIES[index]?.capital??"—");
     add("currency",currencyName(info?.currency,info?.currencyName));
     if(info?.languageFamily)add("language",lang==="pt"
       ?COUNTRY_FAMILIES_PT[info.languageFamily]||info.languageFamily:info.languageFamily);
@@ -895,7 +896,7 @@
     if(info?.gdpPerCapita)add("gdp","US$ "+fmt(info.gdpPerCapita)+
       (info.gdpYear?" ("+info.gdpYear+")":""));
     if(info?.area)add("area",fmt(info.area)+" km²");
-    if(typeof info?.landlocked==="boolean"){
+    if(targets.list!=="atlasCountryStats"&&typeof info?.landlocked==="boolean"){
       // One natural sentence, not a confusing "landlocked: Yes/No" pair.
       const sentence=tc(info.landlocked?"countryLandlockedYes":"countryLandlockedNo");
       const cell=document.createElement("div");
@@ -1089,7 +1090,6 @@
     $("reportCode").textContent=caseCode(record);
     $("reportVerdict").textContent=t(record.won?"caseSolved":"caseClosed");
     $("reportHeading").textContent=countryName(record.index);
-    $("reportCountry").textContent=countryName(record.index);
     const iso=COUNTRY_CODES[record.index],details=record.profile?.details??COUNTRY_INSIGHTS[iso];
     const flagImage=$("reportFlag"),flagFallback=$("reportFlagFallback");
     flagFallback.textContent=details?.flag||"";
@@ -1108,12 +1108,12 @@
       details?.history?.en||"";
     $("reportHistorySource").textContent=COUNTRY_CLUE_I18N[lang]?.countryHistorySource||
       COUNTRY_CLUE_I18N.en?.countryHistorySource||"CIA World Factbook";
-    $("reportStamp").textContent=t(record.won?"reportSuccess":"reportFailure");
     $("reportMode").textContent=t(record.mode==="daily"?"daily":"free");
     $("reportDifficulty").textContent=t(record.difficulty);
     $("reportAttempts").textContent=record.difficulty==="rush"?String(record.guesses.length):
       record.guesses.length+" / "+DIFFICULTIES[record.difficulty].attempts;
     $("reportBest").textContent=record.won?"✓":best?.feedback?distanceText(best.feedback):"—";
+    $("reportBestRow").classList.toggle("hidden",record.won);
     $("reportHints").textContent=number(Number.isInteger(record.paidHints)
       ?record.paidHints:Math.round(record.penalty/HINT_COST));
     $("reportScore").textContent=number(record.score)+" / 5,000";
@@ -1249,12 +1249,13 @@
     $("mapToolbar").classList.toggle("is-hard",difficulty==="hard");
     $("mapToolbar").classList.toggle("is-rush",isRush());
     document.body.classList.toggle("rush-mode",isRush());
-    $("mapTitle").textContent=t("map")+" - "+t(difficulty);
+    $("mapTitle").textContent=t("map");
     const code=caseCode();
     $("caseCode").textContent=code;
     $("caseNumber").textContent=t("caseWord")+" "+code;
     const playLabel=game.ranked?" / RANKED":game.practice?" / "+deductionText("practice"):"";
-    $("modeCaption").textContent=t(daily?"modeDaily":"modeFree")+playLabel;
+    $("modeCaption").textContent=game.ranked?"RANKED":game.practice?deductionText("practice"):"";
+    $("statusBar").classList.toggle("hidden",!(game.ranked||game.practice));
     $("caseTitle").textContent=game.finished?countryName(game.index):t("unknown");
     $("caseStatus").textContent=t(game.finished?(game.won?"solved":"closed"):"active");
     $("caseStatus").classList.toggle("closed",game.finished);
