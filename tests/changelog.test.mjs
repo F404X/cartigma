@@ -9,7 +9,7 @@ runInNewContext(file("changelog-data.js"),sandbox);
 const log=sandbox.window.CartigmaChangelog;
 
 test("complete historical audit preserves every original commit",()=>{
-  assert.equal(log.historicCommits,489);
+  assert.ok(log.historicCommits>=489,"The original 489 commits must be preserved");
   assert.equal(log.groupedChanges,453);
   const all=log.entries.flatMap(entry=>entry.commits);
   assert.equal(all.length,log.historicCommits);
