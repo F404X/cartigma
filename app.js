@@ -1253,7 +1253,6 @@
     const code=caseCode();
     $("caseCode").textContent=code;
     $("caseNumber").textContent=t("caseWord")+" "+code;
-    const playLabel=game.ranked?" / RANKED":game.practice?" / "+deductionText("practice"):"";
     $("modeCaption").textContent=game.ranked?"RANKED":game.practice?deductionText("practice"):"";
     $("statusBar").classList.toggle("hidden",!(game.ranked||game.practice));
     $("caseTitle").textContent=game.finished?countryName(game.index):t("unknown");
