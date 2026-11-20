@@ -1,17 +1,44 @@
-/* Cartigma historic changelog, based on GitHub commit history. */
+/* Cartigma historical changelog, updated for subsequent beta releases. */
 window.CartigmaChangelog = {
-  "current": "v1.191.95b",
-  "general": 191,
+  "current": "v1.192.95b",
+  "general": 192,
   "fixes": 95,
-  "historicCommits": 489,
+  "historicCommits": 507,
   "groupedChanges": 453,
   "entries": [
+    {
+      "version": "v1.192.95b",
+      "kind": "general",
+      "date": "2026-11-19",
+      "title": "Refresh all interface fonts, remove repeated case and report details, and simplify country profiles",
+      "commits": [
+        "2ad2418ce6df04d73e27953c46c1fc869ec51334",
+        "b6111407b3c45ddfe1dfa88c9fb07ae3c4787d44",
+        "488f547cc81d390ebeb47cf4c2bf09c660e1cfc0",
+        "5ed0906d5519b21204efa9ba84a89cd1e2c110f2",
+        "a9cab9a887b7e0dc9823da5a0c53c89a78908a44",
+        "2c3245a861e9a868feabecacf1aeb12c3528e2b4",
+        "9aa0187d3ba7fafd98a57212e9758ce3c03d25f0",
+        "3c5b433ab98d806341509759d86a207c19f014c9",
+        "f28354b1e22e8a2b6c1753b6d688c28b2fb752e0",
+        "5fde73d2085bc8e4959ebfa96b62960c992379fa",
+        "69c8b3f8d86cc1755202973483dcb0a7bcad7412"
+      ]
+    },
     {
       "version": "v1.191.95b",
       "kind": "general",
       "date": "2026-11-19",
       "title": "Add complete historical changelog and cumulative beta versioning",
-      "commits": []
+      "commits": [
+        "28b28db8be70cc92748b3d349c215ba69c05fca9",
+        "9c5ab2e262ce2d2c751628887af3fb3f19ae479f",
+        "4e64787f6c568e47a2760b883a009d59cd7fb6fd",
+        "a72c2ac30de5e138c2f857a0f6256df659e0e1ec",
+        "7cb05f7ed0250ef8dd7a01e7d99ebbec6d1e278f",
+        "ed9286b1a69e1f513120293ef2d94aa1950cf5d6",
+        "b4ece5e4fea31c5146390701aa3c5e53582a4c87"
+      ]
     },
     {
       "version": "v1.190.95b",
