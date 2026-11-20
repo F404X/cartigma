@@ -16,12 +16,12 @@
   <link rel="preconnect" href="https://flagcdn.com" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.18.0/dist/maplibre-gl.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=20261119-changelog">
+  <link rel="stylesheet" href="styles.css?v=20261119-type-refresh">
   <link rel="stylesheet" href="themes.css?v=20261119-account-borders">
-  <link rel="stylesheet" href="ranking.css?v=20261119-separate-profile">
+  <link rel="stylesheet" href="ranking.css?v=20261119-type-refresh">
   <link rel="stylesheet" href="mobile.css?v=20261118-deduction-feedback">
 
   <script defer src="shared-clues.js?v=20261118-caribbean-region-v9"></script>
@@ -45,7 +45,7 @@
   <script defer src="language-picker.js"></script>
   <script defer src="changelog-data.js?v=20261119-history"></script>
   <script defer src="changelog.js?v=20261119-history"></script>
-  <script type="module" src="map-bootstrap.js?v=20261119-changelog"></script>
+  <script type="module" src="map-bootstrap.js?v=20261119-type-refresh"></script>
   <script defer src="ranking-client.js?v=20261119-separate-profile"></script>
 </head>
 <body>
@@ -113,7 +113,7 @@
           <option value="rush" data-i18n="rush">Rush</option>
         </select>
         <span class="toolbar-separator" aria-hidden="true"></span>
-        <span class="case-code" id="caseCode">CASE #000</span>
+        <span class="case-code" id="caseCode" hidden aria-hidden="true">CASE #000</span>
       </div>
     </div>
 
@@ -276,7 +276,7 @@
         </div>
       </div>
     </section>
-    <div class="status-bar"><span id="modeCaption">Same case worldwide · UTC</span><span><span id="placeCount">195</span> <span id="countryCountLabel">countries</span></span></div>
+    <div class="status-bar hidden" id="statusBar"><span id="modeCaption"></span><span hidden><span id="placeCount">195</span> <span id="countryCountLabel">countries</span></span></div>
   </main>
 </div>
 
@@ -406,13 +406,11 @@
     <div>
       <span id="reportVerdict" class="report-verdict">CASE CLOSED</span>
       <h2 id="reportHeading">Unknown location</h2>
-      <p id="reportCountry"></p>
     </div>
     <div class="report-flag" role="group" aria-label="Country flag">
       <img id="reportFlag" alt="" loading="lazy" referrerpolicy="no-referrer">
       <span id="reportFlagFallback" class="hidden" aria-hidden="true"></span>
     </div>
-    <div class="report-stamp" id="reportStamp" aria-hidden="true">CLOSED</div>
   </div>
   <div class="report-body" id="caseReportBody">
     <section class="report-section">
@@ -421,11 +419,11 @@
         <div><dt data-i18n="reportMode">Mode</dt><dd id="reportMode"></dd></div>
         <div><dt data-i18n="difficulty">Difficulty</dt><dd id="reportDifficulty"></dd></div>
         <div><dt data-i18n="reportAttempts">Guesses</dt><dd id="reportAttempts"></dd></div>
-        <div><dt data-i18n="reportBest">Closest guess</dt><dd id="reportBest"></dd></div>
+        <div id="reportBestRow"><dt data-i18n="reportBest">Closest guess</dt><dd id="reportBest"></dd></div>
         <div><dt data-i18n="elapsedTime">Elapsed time</dt><dd id="reportDuration"></dd></div>
         <div><dt data-i18n="reportHints">Extra hints</dt><dd id="reportHints"></dd></div>
         <div><dt data-i18n="score">Score</dt><dd id="reportScore"></dd><small class="rank-result-note" id="reportRanking"></small></div>
-        <div><dt data-i18n="reportCoordinates">Coordinates</dt><dd id="reportCoordinates"></dd></div>
+        <div hidden><dt data-i18n="reportCoordinates">Coordinates</dt><dd id="reportCoordinates"></dd></div>
         <div><dt data-i18n="reportContinent">Continent</dt><dd id="reportContinent"></dd></div>
       </dl>
     </section>
