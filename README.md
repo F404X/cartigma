@@ -70,7 +70,7 @@ A country may span multiple geographical zones, and its area/currency/history ma
 
 ## Technical details
 
-The site uses plain HTML, CSS and JavaScript without an account, a server-side API or a build step.
+The casual game uses plain HTML, CSS and JavaScript and works offline without an account. Optional login and competitive ranking use a separate Cloudflare Worker and D1 backend; the static frontend does not require the backend to play.
 
 | File | Purpose |
 | --- | --- |
@@ -91,7 +91,7 @@ python -m http.server 8000
 node --test tests/*.test.mjs
 ```
 
-The GitHub Actions workflow tests and publishes the site to GitHub Pages, used by the custom domain [cartigma.f404x.net](https://cartigma.f404x.net/).
+GitHub Actions publishes the static site to GitHub Pages, used by [cartigma.f404x.net](https://cartigma.f404x.net/). The optional ranking API is deployed independently from `main` using [the production workflow](.github/workflows/ranking-production.yml), to `https://api.cartigma.f404x.net`. See [backend/README.md](backend/README.md) for Cloudflare credentials, D1, custom-domain setup and health checks. A merged feature branch alone does not activate production infrastructure.
 
 ## Beta version history
 
