@@ -1,8 +1,7 @@
-# Cartigma Ranking API (staging)
+# Cartigma Ranking API (production and staging)
 
 Independent Cloudflare Worker + D1 backend for registered leaderboard players.
-No production Cloudflare resources are provisioned by committing these files.
-The existing casual game remains entirely local.
+The casual game remains fully local when this API is offline. Production and staging use **different Workers, D1 databases and secrets**; merging code alone does not configure Cloudflare.
 
 ## Secrets
 Set these with `wrangler secret put`, never in source control:
@@ -13,13 +12,32 @@ Set these with `wrangler secret put`, never in source control:
 - `RESEND_API_KEY` and `RESET_FROM_EMAIL` (optional): password reset email.
   Password recovery is disabled until both values exist.
 
-## Provisioning (explicit separate operation)
-1. Create `cartigma-ranking-staging` with `wrangler d1 create`.
-2. Replace the placeholder D1 UUID in `wrangler.toml` with the actual UUID.
-3. Apply `schema.sql` using `wrangler d1 execute ... --remote --file schema.sql`.
-4. Set secrets. Deploy to a staging workers.dev URL; use a custom `api.cartigma.f404x.net` hostname only after review.
-5. Configure `APP_ORIGIN` to the exact frontend origin. API cookies work best on the custom subdomain, not across the workers.dev site.
-6. Test login hash CPU use on Workers Free (10ms CPU cap). If this limit is exceeded, do **not** weaken password security; migrate authentication to a suitable service or a paid Worker.
+## Production deployment from main
+
+The public site at `https://cartigma.f404x.net` calls `https://api.cartigma.f404x.net`.
+The Worker domain is a **Cloudflare Worker Custom Domain**, not the GitHub Pages hostname. It is attached automatically by Wrangler only when Cloudflare credentials have the required permissions and the `f404x.net` zone is in the same account.
+
+The workflow [`ranking-production.yml`](../.github/workflows/ranking-production.yml) runs on relevant changes to `main` and on manual dispatch. It:
+1. Runs tests before deploying.
+2. Reuses (or creates once) the `cartigma-ranking` production D1 database and applies the idempotent SQL schema. It never deletes a production D1 database.
+3. Deploys `cartigma-ranking` on the custom domain using `wrangler.production.toml` and `APP_ORIGIN=https://cartigma.f404x.net`.
+4. Creates independent `AUTH_PEPPER` and `GAME_SECRET` Worker secrets **only if missing**, never overwriting valid existing values. Rotating `AUTH_PEPPER` without rehashing existing passwords makes accounts inaccessible.
+5. Checks `/v1/health`, leaderboard JSON, anonymous session endpoint and browser CORS preflight. An incomplete D1 schema or missing secrets returns HTTP 503 rather than an incorrectly healthy response.
+
+### One-time GitHub/Cloudflare requirements
+
+- Add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as secrets in GitHub repository settings or its `ranking-production` environment. If these secrets exist only in `ranking-staging`, they are **not automatically visible** to the production environment.
+- Scope the token to the correct Cloudflare account/zone and give it Workers edit/deploy, D1 edit, and zone/Workers Routes permissions needed to attach the custom domain. Ensure `f404x.net` is active in that account and no conflicting DNS or Worker routing blocks `api.cartigma.f404x.net`.
+- Optional but recommended: create a Turnstile widget for `cartigma.f404x.net`, configure GitHub variable `CARTIGMA_TURNSTILE_SITE_KEY` and secret `CARTIGMA_TURNSTILE_SECRET` together. The workflow fails if only one is set. The site key is public; never commit the secret. If a secret already exists on the Worker, the workflow preserves it; rotate intentionally through Wrangler if necessary. Turnstile is not automatically provisioned by GitHub.
+- Set WAF/rate protections for `api.cartigma.f404x.net` on Cloudflare. Authentication/game endpoints already have Worker-side rate limits, but the public leaderboard deliberately has no per-IP cooldown.
+- Run the GitHub Action **Deploy Cartigma ranking API (production)** and verify its summary. A green static Pages deploy does not prove the API has been deployed.
+- Benchmark the PBKDF2 authentication on the actual Cloudflare plan. If account registration/login exceeds CPU limits on Workers Free, use an appropriate paid plan or auth service; **do not weaken password hashing** to hide the issue.
+
+Diagnostics: `GET https://api.cartigma.f404x.net/v1/health` must return HTTP 200 with all checks true, and `/v1/leaderboards` must return a JSON object with `boards.normal.week`. `/v1/auth/me` must return `{"user":null}` to an unauthenticated request, with `Access-Control-Allow-Origin: https://cartigma.f404x.net` when that origin is supplied. HTTP 503 means a missing binding, secret or schema. A DNS/SSL failure points to an unconfigured custom domain; a browser CORS failure usually means the Worker is on staging or `APP_ORIGIN` is wrong.
+
+### Staging (separate from production)
+
+`wrangler.toml` and [`ranking-deploy.yml`](../.github/workflows/ranking-deploy.yml) configure the isolated staging Worker at `cartigma-ranking-staging.foxythefox2017xd.workers.dev`. It does **not** serve the production API domain; its `APP_ORIGIN` intentionally matches the staging preview.
 
 ### Public routes
 - GET `/v1/health`
@@ -67,4 +85,4 @@ work factors difficult; benchmark on the actual runtime and upgrade before
 enabling public account registration if needed. Sessions store only SHA-256
 token hashes, are HttpOnly/Secure/SameSite=Lax, and expire after 14 days.
 
-This is an integration branch; there is no automatic deploy to the main site.
+Production deploys independently from the static site after credentials and Cloudflare zone permissions are configured.
