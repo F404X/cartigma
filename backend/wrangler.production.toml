@@ -1,0 +1,29 @@
+# Production ranking backend: separate Worker, database and secrets from staging.
+# The deploy workflow resolves database_id at runtime; do not commit an account UUID.
+name = "cartigma-ranking"
+main = "src/index.js"
+compatibility_date = "2026-11-17"
+workers_dev = false
+routes = [{ pattern = "api.cartigma.f404x.net", custom_domain = true }]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "cartigma-ranking"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[[ratelimits]]
+name = "AUTH_LIMIT"
+namespace_id = "609104"
+[ratelimits.simple]
+limit = 8
+period = 60
+
+[[ratelimits]]
+name = "GAME_LIMIT"
+namespace_id = "609105"
+[ratelimits.simple]
+limit = 30
+period = 60
+
+[vars]
+APP_ORIGIN = "https://cartigma.f404x.net"
