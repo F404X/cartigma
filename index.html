@@ -16,17 +16,19 @@
   <link rel="preconnect" href="https://flagcdn.com" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.18.0/dist/maplibre-gl.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=20261117-country195">
-  <link rel="stylesheet" href="themes.css?v=20261117-rush-ready-v2">
-  <link rel="stylesheet" href="mobile.css?v=20261117-mobile-popovers">
+  <link rel="stylesheet" href="styles.css?v=20261119-type-refresh">
+  <link rel="stylesheet" href="themes.css?v=20261119-account-borders">
+  <link rel="stylesheet" href="ranking.css?v=20261119-type-refresh">
+  <link rel="stylesheet" href="mobile.css?v=20261118-deduction-feedback">
 
-  <script defer src="country-catalog.js?v=20261117-country195"></script>
+  <script defer src="shared-clues.js?v=20261118-caribbean-region-v9"></script>
+  <script defer src="country-catalog.js?v=20261119-map-points"></script>
   <script defer src="continent-borders.js?v=20261116-profile-diversity"></script>
-  <script defer src="i18n.js?v=20261117-country195"></script>
-  <script defer src="clues-i18n.js?v=20261116-profile-diversity"></script>
+  <script defer src="i18n.js?v=20261119-changelog"></script>
+  <script defer src="clues-i18n.js?v=20261118-caribbean-region-v9"></script>
   <script defer src="map-filters-i18n.js?v=20261116-profile-diversity"></script>
   <script defer src="report-i18n.js?v=20261116-daily-navigation"></script>
 
@@ -38,10 +40,13 @@
   <script defer src="country-profile-i18n.js?v=20261116-area-scope"></script>
 
   <script defer src="compass-i18n.js"></script>
-  <script defer src="theme.js"></script>
-  <script defer src="map-fallback.js?v=20261117-clean-overlays"></script>
+  <script defer src="theme.js?v=20261118-theme-catalog"></script>
+  <script defer src="map-fallback.js?v=20261119-raster-borders"></script>
   <script defer src="language-picker.js"></script>
-  <script type="module" src="map-bootstrap.js?v=20261117-mobile-popovers"></script>
+  <script defer src="changelog-data.js?v=20261120-type-refresh"></script>
+  <script defer src="changelog.js?v=20261119-history"></script>
+  <script type="module" src="map-bootstrap.js?v=20261119-type-refresh"></script>
+  <script defer src="ranking-client.js?v=20261119-separate-profile"></script>
 </head>
 <body>
 <div class="app">
@@ -76,20 +81,21 @@
           <option value="id">Bahasa Indonesia</option>
         </select>
       </div>
-      <button type="button" class="theme-toggle" id="themeToggle" aria-label="Switch to light mode" aria-pressed="false" title="Switch to light mode">
-        <svg class="theme-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
-        <svg class="theme-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.1 15.6A8.4 8.4 0 0 1 8.4 3.9 8.5 8.5 0 1 0 20.1 15.6Z"/></svg>
-        <span id="themeLabel">Light mode</span>
+      <button type="button" class="theme-toggle" id="themeToggle" aria-label="Themes" aria-haspopup="dialog" aria-controls="themeCatalog">
+        <span class="theme-trigger-icon" aria-hidden="true"></span>
+        <span id="themeLabel">Themes</span>
       </button>
       <button type="button" class="header-button atlas-trigger" id="atlasBtn" aria-label="Country archive" title="Country archive" aria-haspopup="dialog">
         <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r=".8" fill="currentColor"/><circle cx="3.5" cy="12" r=".8" fill="currentColor"/><circle cx="3.5" cy="18" r=".8" fill="currentColor"/>
         </svg>
       </button>
-      <button type="button" class="header-button" id="helpBtn" data-i18n="help" aria-label="How to play">How to play</button>
-      <a class="github-link" href="https://github.com/F404X/cartigma" target="_blank" rel="noopener noreferrer" aria-label="Cartigma on GitHub" title="View source on GitHub">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="currentColor"><path d="M12 .297a12 12 0 0 0-3.793 23.386c.6.111.82-.261.82-.577v-2.234c-3.338.726-4.043-1.416-4.043-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.09-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.108-.775.418-1.305.762-1.605-2.665-.304-5.467-1.333-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.536-1.524.117-3.176 0 0 1.008-.323 3.3 1.23a11.53 11.53 0 0 1 6.006 0c2.291-1.553 3.297-1.23 3.297-1.23.655 1.652.243 2.873.12 3.176.77.84 1.235 1.91 1.235 3.221 0 4.61-2.807 5.624-5.48 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.216.694.825.576A12.001 12.001 0 0 0 12 .297Z"/></svg>
-      </a>
+      <button type="button" class="header-button" id="helpBtn" data-i18n="about" aria-label="About" aria-haspopup="dialog" aria-controls="helpDialog">About</button>
+      <button type="button" class="header-button account-trigger" id="accountBtn" aria-label="Profile" title="Profile" aria-controls="profile-panel" aria-expanded="false" disabled>
+        <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <circle cx="12" cy="8" r="3.3"/><path d="M5 20v-1.5A4.5 4.5 0 0 1 9.5 14h5a4.5 4.5 0 0 1 4.5 4.5V20"/>
+        </svg>
+      </button>
     </div>
   </header>
 
@@ -107,7 +113,7 @@
           <option value="rush" data-i18n="rush">Rush</option>
         </select>
         <span class="toolbar-separator" aria-hidden="true"></span>
-        <span class="case-code" id="caseCode">CASE #000</span>
+        <span class="case-code" id="caseCode" hidden aria-hidden="true">CASE #000</span>
       </div>
     </div>
 
@@ -126,10 +132,12 @@
         <div id="map" role="application" aria-label="Interactive map for placing your guess"></div>
         <div id="rushIntro" class="rush-intro hidden" aria-hidden="true">
           <div class="rush-intro-card">
-            <span class="rush-intro-eyebrow">CARTIGMA / RUSH</span>
+            <span id="rushIntroEyebrow" class="rush-intro-eyebrow">CARTIGMA</span>
             <h2 id="rushIntroTitle">Rush</h2>
             <p id="rushIntroText">Find the country in 60 seconds. New hints appear automatically.</p>
+            <p id="rankStartNote" class="hidden"></p>
             <button id="rushStartBtn" type="button" class="primary-btn">Start</button>
+            <button id="offlineStartBtn" type="button" class="primary-btn hidden">Play offline</button>
           </div>
         </div>
         <div class="compass-rose" id="compassRose" role="img" aria-label="Compass rose">
@@ -170,7 +178,7 @@
                     <button type="button" id="mapFiltersReset" class="map-filter-reset">Reset</button>
                   </div>
                   <label class="map-filter-row" for="mapFilterBorders"><span data-map-filter-label="borders">Country borders</span><input type="checkbox" id="mapFilterBorders" checked></label>
-                  <label class="map-filter-row" for="mapFilterRegions"><span data-map-filter-label="regions">Regions / states</span><input type="checkbox" id="mapFilterRegions" checked></label>
+                  <label class="map-filter-row" for="mapFilterRegions"><span data-map-filter-label="regions">Regions / states</span><input type="checkbox" id="mapFilterRegions"></label>
                   <div class="map-filter-section"><span id="mapFiltersDetails">Details</span></div>
                   <label class="map-filter-row" for="mapFilterCountryNames"><span data-map-filter-label="countryNames">Country names</span><input type="checkbox" id="mapFilterCountryNames" checked></label>
                   <label class="map-filter-row" for="mapFilterCityNames"><span data-map-filter-label="cityNames">City names</span><input type="checkbox" id="mapFilterCityNames" checked></label>
@@ -230,6 +238,7 @@
               <h2 id="evidenceHeading"><span class="section-index">01</span> <span data-i18n="evidence">Evidence</span></h2>
               <span id="hintCount">2 / 10</span>
             </div>
+            <p id="mobileGuessFeedback" class="mobile-guess-feedback hidden" role="status"></p>
             <ol class="clue-list" id="clueList" aria-live="polite"></ol>
             <button type="button" id="revealBtn" class="reveal-btn"><span data-i18n="reveal">Reveal a hint</span><small id="revealCost">−300</small></button>
           </section>
@@ -257,6 +266,7 @@
               <h3 id="resultTitle"></h3>
               <p id="resultDetail"></p>
               <div class="score-box"><span data-i18n="score">Score</span><strong id="finalScore">0</strong><small>/ 5,000</small></div>
+              <p class="rank-result-note" id="resultRanking"></p>
               <div class="result-actions">
                 <button id="newCaseBtn" type="button" class="secondary-btn" data-i18n="newCase">New case</button>
                 <button id="reportOpenBtn" type="button" class="primary-btn" data-i18n="openReport">View case file</button>
@@ -266,7 +276,7 @@
         </div>
       </div>
     </section>
-    <div class="status-bar"><span id="modeCaption">Same case worldwide · UTC</span><span><span id="placeCount">195</span> <span id="countryCountLabel">countries</span></span></div>
+    <div class="status-bar hidden" id="statusBar"><span id="modeCaption"></span><span hidden><span id="placeCount">195</span> <span id="countryCountLabel">countries</span></span></div>
   </main>
 </div>
 
@@ -329,18 +339,62 @@
     </div>
   </div>
 </dialog>
+<dialog id="themeCatalog" class="theme-catalog" aria-labelledby="themeCatalogTitle">
+  <header class="theme-catalog-header">
+    <h2 id="themeCatalogTitle">Themes</h2>
+    <button type="button" class="theme-close" id="themeClose" aria-label="Close">×</button>
+  </header>
+  <div class="theme-catalog-body">
+    <section aria-labelledby="darkThemesTitle">
+      <h3 id="darkThemesTitle">Dark themes</h3>
+      <div class="theme-options" id="darkThemeOptions"></div>
+    </section>
+    <section aria-labelledby="lightThemesTitle">
+      <h3 id="lightThemesTitle">Light themes</h3>
+      <div class="theme-options" id="lightThemeOptions"></div>
+    </section>
+  </div>
+</dialog>
 <dialog id="helpDialog" aria-labelledby="helpTitle">
-  <div class="dialog-head"><h2 id="helpTitle" data-i18n="helpTitle">How to play</h2><button id="closeHelpBtn" type="button" aria-label="Close">×</button></div>
-  <p data-i18n="helpIntro">Find the hidden country from geographic clues.</p>
-  <ol>
-    <li data-i18n="rule1">Read the clues, then select a country on the map or by name.</li>
-    <li data-i18n="rule2">Wrong countries reveal more clues. Normal allows 6 guesses; Hard allows 4.</li>
-    <li data-i18n="rule3">Guess the correct country. Optional hints cost points.</li>
-    <li data-i18n="rule4">Normal: 6 country guesses. Hard: 4 country guesses and costlier hints.</li>
-    <li data-i18n="rule5">Daily cases are shared worldwide per difficulty and reset at 00:00 UTC.</li>
-    <li data-i18n="rushRule">Rush: identify the country in 60 seconds. A clue unlocks every 6 seconds; score falls as time passes.</li>
-  </ol>
-  <button id="startHelpBtn" type="button" class="primary-btn" data-i18n="gotIt">Got it</button>
+  <div class="dialog-head"><h2 id="helpTitle" data-i18n="about">About</h2><button id="closeHelpBtn" type="button" aria-label="Close">×</button></div>
+  <div class="about-tabs" id="aboutTabs" role="tablist" aria-labelledby="helpTitle">
+    <button type="button" class="header-button" id="aboutTab" role="tab" aria-selected="true" aria-controls="aboutPanel" data-i18n="about">About</button>
+    <button type="button" class="header-button" id="howToPlayTab" role="tab" aria-selected="false" aria-controls="howToPlayPanel" tabindex="-1" data-i18n="help">How to play</button>
+    <button type="button" class="header-button" id="changelogTab" role="tab" aria-selected="false" aria-controls="changelogPanel" tabindex="-1" data-i18n="changelog">Changelog</button>
+  </div>
+  <section id="aboutPanel" role="tabpanel" aria-labelledby="aboutTab" tabindex="0">
+    <p data-i18n="helpIntro">Find the hidden country from geographic clues.</p>
+    <dl class="about-credits">
+      <dt data-i18n="developer">Developer</dt><dd>F404X</dd>
+      <dt>Version / Versão</dt><dd><strong id="cartigmaVersion">v1.192.95b</strong></dd>
+      <dt data-i18n="betaTesters">Beta testers</dt><dd>Mtzinn, KaiquePelado, Luiz Bizzio</dd>
+    </dl>
+    <a class="github-link" href="https://github.com/F404X/cartigma" target="_blank" rel="noopener noreferrer">GitHub</a>
+  </section>
+  <section id="howToPlayPanel" role="tabpanel" aria-labelledby="howToPlayTab" hidden>
+    <ol>
+      <li data-i18n="rule1">Read the clues, then select a country on the map or by name.</li>
+      <li data-i18n="rule2">Wrong guesses reveal more clues.</li>
+      <li data-i18n="rule3">Guess the correct country. Optional hints cost points.</li>
+      <li data-i18n="rule4">Normal: 6 country guesses. Hard: 4 country guesses and costlier hints.</li>
+      <li data-i18n="rule5">Daily cases are shared worldwide per difficulty and reset at 00:00 UTC.</li>
+      <li data-i18n="rushRule">Rush: identify the country in 60 seconds. A clue unlocks every 6 seconds; score falls as time passes.</li>
+    </ol>
+    <button id="startHelpBtn" type="button" class="primary-btn" data-i18n="gotIt">Got it</button>
+  </section>
+  <section id="changelogPanel" class="changelog-panel" role="tabpanel" aria-labelledby="changelogTab" tabindex="0" hidden>
+    <div class="changelog-topline"><span id="changelogHeading">Version history</span><strong id="changelogVersion">v1.192.95b</strong></div>
+    <p id="changelogIntro">Complete commit history.</p>
+    <p id="changelogSummary" class="changelog-summary"></p>
+    <label for="changelogFilter" class="changelog-filter-label">Filter / Filtro</label>
+    <select id="changelogFilter" class="changelog-filter" aria-label="Changelog filter">
+      <option value="all">All changes</option><option value="general">Updates</option><option value="fix">Bug fixes</option><option value="technical">Technical</option>
+    </select>
+    <p id="changelogNote" class="changelog-note"></p>
+    <p id="changelogCount" class="changelog-count" aria-live="polite"></p>
+    <ol id="changelogList" class="changelog-list"></ol>
+    <button id="changelogMore" class="header-button changelog-more" type="button">Show more</button>
+  </section>
 </dialog>
 <dialog id="reportDialog" class="case-report" aria-labelledby="reportHeading">
   <div class="report-topbar">
@@ -352,25 +406,24 @@
     <div>
       <span id="reportVerdict" class="report-verdict">CASE CLOSED</span>
       <h2 id="reportHeading">Unknown location</h2>
-      <p id="reportCountry"></p>
     </div>
     <div class="report-flag" role="group" aria-label="Country flag">
       <img id="reportFlag" alt="" loading="lazy" referrerpolicy="no-referrer">
       <span id="reportFlagFallback" class="hidden" aria-hidden="true"></span>
     </div>
-    <div class="report-stamp" id="reportStamp" aria-hidden="true">CLOSED</div>
   </div>
-  <div class="report-body">
+  <div class="report-body" id="caseReportBody">
     <section class="report-section">
       <h3 data-i18n="investigationRecord">Investigation record</h3>
       <dl class="report-grid">
         <div><dt data-i18n="reportMode">Mode</dt><dd id="reportMode"></dd></div>
         <div><dt data-i18n="difficulty">Difficulty</dt><dd id="reportDifficulty"></dd></div>
         <div><dt data-i18n="reportAttempts">Guesses</dt><dd id="reportAttempts"></dd></div>
-        <div><dt data-i18n="reportBest">Closest guess</dt><dd id="reportBest"></dd></div>
+        <div id="reportBestRow"><dt data-i18n="reportBest">Closest guess</dt><dd id="reportBest"></dd></div>
+        <div><dt data-i18n="elapsedTime">Elapsed time</dt><dd id="reportDuration"></dd></div>
         <div><dt data-i18n="reportHints">Extra hints</dt><dd id="reportHints"></dd></div>
-        <div><dt data-i18n="score">Score</dt><dd id="reportScore"></dd></div>
-        <div><dt data-i18n="reportCoordinates">Coordinates</dt><dd id="reportCoordinates"></dd></div>
+        <div><dt data-i18n="score">Score</dt><dd id="reportScore"></dd><small class="rank-result-note" id="reportRanking"></small></div>
+        <div hidden><dt data-i18n="reportCoordinates">Coordinates</dt><dd id="reportCoordinates"></dd></div>
         <div><dt data-i18n="reportContinent">Continent</dt><dd id="reportContinent"></dd></div>
       </dl>
     </section>

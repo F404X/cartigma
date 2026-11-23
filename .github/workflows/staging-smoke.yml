@@ -1,0 +1,113 @@
+name: Test public staging ranking flow
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Smoke test preview, API and account lifecycle
+        env:
+          URL: https://cartigma-ranking-staging.foxythefox2017xd.workers.dev
+        run: |
+          node <<'JS'
+          const assert=require('node:assert/strict');
+          const origin=process.env.URL;
+          let cookie="";
+          async function req(path,body){
+            const r=await fetch(origin+path,{method:body===undefined?'GET':'POST',
+              headers:{Origin:origin,...(body===undefined?{}:{'Content-Type':'application/json'}),
+                ...(cookie?{Cookie:cookie}:{})},
+              ...(body===undefined?{}:{body:JSON.stringify(body)})});
+            const c=r.headers.get('set-cookie');
+            if(c?.startsWith('__Host-cartigma_session='))cookie=c.split(';')[0];
+            const data=(r.headers.get('content-type')||'').includes('application/json')?
+              await r.json():await r.text();
+            return {status:r.status,data,retryAfter:r.headers.get('retry-after')};
+          }
+          async function ok(path,body,status=200){
+            const x=await req(path,body);
+            assert.equal(x.status,status,path+": "+JSON.stringify(x.data).slice(0,220));
+            return x.data;
+          }
+          (async()=>{
+            assert.equal((await ok('/v1/health')).ok,true);
+            const home=await ok('/');
+            assert.match(home,/Cartigma/);
+            assert.match(home,/ranking-client.js/);
+            const stamp=Date.now().toString().slice(-11);
+            assert.match(home,/rushStartBtn/);
+            assert.match(home,/ranking-panel.html|ranking-client.js/);
+            const username='stage'+stamp;
+            const email=username+'@example.invalid';
+            const password='Aa'+stamp.slice(-6); // exactly 8 chars, compliant
+            let created=false;
+            try{
+              const invalid=await req('/v1/auth/register',{
+                username,email,password:'Ab12345!' // symbols forbidden for new passwords
+              });
+              assert.equal(invalid.status,400);
+              assert.equal(invalid.data.error,'weak_password');
+              const reg=await ok('/v1/auth/register',{username,email,password},201);
+              created=true;
+              assert.equal(reg.user.username,username);
+              assert.equal((await ok('/v1/auth/me')).user.username,username);
+              const start=await ok('/v1/games/start',{difficulty:'normal',mode:'free'},201);
+              assert.equal(start.mode,'free');
+              assert.equal(start.finished,false);
+              assert.equal(start.clues.length,2);
+              assert.ok(start.clueCount>=6&&start.clueCount<=10);
+              assert.equal(['continent','hemisphere'].includes(start.clues[0].key),true);
+              assert.equal(start.clues.some(c=>['utmZone','utmBand','zone','latitude'].includes(c.key)),false);
+              assert.equal('target' in start,false);
+              const initialCost=start.nextHintCost;
+              assert.ok(initialCost>0);
+              const revealed=await ok('/v1/games/reveal',{id:start.id,playToken:start.playToken});
+              assert.equal(revealed.clues.length,3);
+              assert.equal(revealed.penalty,initialCost);
+              assert.equal(revealed.nextHintCost>0,true);
+              // The map overlay cost is validated by the same price engine as offline.
+              const locationKey=start.clues[0].key;
+              const overlay=await ok('/v1/games/overlay',{
+                id:start.id,playToken:start.playToken,key:locationKey
+              });
+              assert.ok(overlay.overlays.includes(locationKey));
+              assert.equal(overlay.sectorMapPenalty,locationKey==='continent'?500:250);
+              assert.equal((await req('/v1/games/overlay',{
+                id:start.id,playToken:start.playToken,key:locationKey
+              })).status,409);
+              const state=await ok('/v1/games/state',{id:start.id,playToken:start.playToken});
+              assert.equal(state.finished,false);
+              assert.equal('target' in state,false);
+              const daily=await ok('/v1/games/start',{difficulty:'normal',mode:'daily'},201);
+              assert.notEqual(daily.id,start.id);
+              assert.equal((await req('/v1/games/start',{difficulty:'normal',mode:'free'})).status,409);
+              const finish=await ok('/v1/games/finish',{id:start.id,playToken:start.playToken});
+              assert.equal(finish.finished,true);
+              assert.equal(finish.score,0);
+              const saved=await ok('/v1/games/save',{id:start.id,playToken:start.playToken});
+              assert.equal(saved.saved,true);
+              assert.equal(saved.rankingPoints,0);
+              const next=await ok('/v1/games/start',{difficulty:'normal',mode:'free'},201);
+              assert.notEqual(next.id,start.id);
+              const board=await ok('/v1/leaderboards');
+              assert.ok(board.boards.normal.week);
+              const repeated=await ok('/v1/leaderboards');
+              assert.ok(repeated.boards.normal.week);
+              await ok('/v1/auth/logout',{});
+              const login=await ok('/v1/auth/login',{email,password});
+              assert.equal(login.user.username,username);
+              console.log("PASS: 8-character password, repeated leaderboard requests (200), login, match and save");
+            }finally{
+              if(created){
+                const deletion=await req('/v1/auth/delete',{password});
+                console.log('Cleanup temporary test account:',deletion.status);
+              }
+            }
+          })().catch(e=>{console.error(e);process.exitCode=1;});
+          JS
