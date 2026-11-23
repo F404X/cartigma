@@ -18,7 +18,25 @@ export default {
           "Access-Control-Allow-Headers":"Content-Type",
           "Access-Control-Max-Age":"600"}});
       }else if(path==="/v1/health"&&request.method==="GET"){
-        response=json({ok:true,service:"cartigma-ranking"});
+        // A successful Worker response alone does not mean ranking/login works.
+        // Check bindings and the migrated D1 schema before reporting healthy.
+        const checks={
+          database:false,
+          auth:Boolean(env.AUTH_PEPPER&&env.AUTH_PEPPER.length>=32),
+          games:Boolean(env.GAME_SECRET&&env.GAME_SECRET.length>=32),
+          turnstile:Boolean(env.TURNSTILE_SITE_KEY)===Boolean(env.TURNSTILE_SECRET)
+        };
+        if(env.DB){
+          try{
+            await env.DB.prepare("SELECT id FROM users LIMIT 1").first();
+            await env.DB.prepare("SELECT user_id FROM player_stats LIMIT 1").first();
+            checks.database=true;
+          }catch(error){
+            console.error("Cartigma API D1 health check failed",String(error?.message||error));
+          }
+        }
+        const ready=Object.values(checks).every(Boolean);
+        response=json({ok:ready,service:"cartigma-ranking",checks},ready?200:503);
       }else if(path==="/v1/config"&&request.method==="GET"){
         response=json({turnstileSiteKey:env.TURNSTILE_SITE_KEY||null});
       }else if(path==="/v1/leaderboards"&&request.method==="GET"){
