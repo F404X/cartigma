@@ -165,7 +165,7 @@ jobs:
             return {response,data:await response.json()};
           }
           let healthy=false;
-          for(let attempt=0;attempt<6;attempt++){
+          for(let attempt=0;attempt<15;attempt++){
             try{
               const {response,data}=await get("/v1/health");
               if(response.ok&&data.ok&&Object.values(data.checks||{}).every(Boolean)){
@@ -174,9 +174,11 @@ jobs:
               }
               console.log("Health check returned",response.status,JSON.stringify(data));
             }catch(error){
-              console.log("Health check not ready",String(error.message));
+              console.log("Health check not ready",String(error.message),
+                String(error.cause?.code||""),String(error.cause?.message||"").slice(0,180));
             }
-            await pause(10000);
+            // Custom-domain DNS and TLS activation may lag the initial Worker deploy.
+            await pause(15000);
           }
           assert.ok(healthy,"Production API /v1/health failed: check DNS, Worker routes, D1 and secrets");
           const board=await get("/v1/leaderboards");
@@ -197,6 +199,52 @@ jobs:
           assert.equal(preflight.headers.get("access-control-allow-origin"),origin);
           const config=await get("/v1/config");
           assert.equal(config.response.status,200,"Turnstile config endpoint unavailable");
+
+          // Exercise signup and password login when a CAPTCHA isn't configured.
+          // CAPTCHA-protected registration requires an interactive challenge.
+          if(!process.env.TURNSTILE_SITE_KEY){
+            const stamp=crypto.randomUUID().replace(/-/g,"").slice(0,12);
+            const username="smoke"+stamp.slice(0,9);
+            const email=username+"@example.invalid";
+            const password="Aa1"+stamp.slice(0,9);
+            let cookie="",created=false;
+            async function auth(path,body){
+              const response=await fetch(api+path,{
+                method:"POST",
+                headers:{Origin:origin,"content-type":"application/json",
+                  ...(cookie?{Cookie:cookie}:{})},
+                body:JSON.stringify(body),
+                signal:AbortSignal.timeout(20000)
+              });
+              const setCookie=response.headers.get("set-cookie");
+              if(setCookie?.startsWith("__Host-cartigma_session="))
+                cookie=setCookie.split(";")[0];
+              return {response,payload:await response.json()};
+            }
+            try{
+              const register=await auth("/v1/auth/register",{username,email,password});
+              assert.equal(register.response.status,201,
+                "Registration failed: "+JSON.stringify(register.payload));
+              created=true;
+              assert.equal(register.payload.user.username,username);
+              const logout=await auth("/v1/auth/logout",{});
+              assert.equal(logout.response.status,200,"Logout failed");
+              cookie="";
+              const login=await auth("/v1/auth/login",{email,password});
+              assert.equal(login.response.status,200,
+                "Password login failed: "+JSON.stringify(login.payload));
+              assert.equal(login.payload.user.username,username);
+              console.log("PASS: production account registration and password login");
+            }finally{
+              if(created&&cookie){
+                const deleted=await auth("/v1/auth/delete",{password});
+                assert.equal(deleted.response.status,200,
+                  "Temporary test account cleanup failed");
+              }
+            }
+          }else{
+            console.log("Turnstile enabled: registration requires an interactive test");
+          }
           console.log("PASS: production Worker, D1, leaderboard, login CORS and preflight");
           JS
 
