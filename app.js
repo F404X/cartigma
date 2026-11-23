@@ -1712,6 +1712,7 @@
       desc.textContent=item.description;
       button.append(desc);
       button.addEventListener("click",()=>chooseSuggestion(item));
+      button.addEventListener("mouseenter",()=>setActiveSuggestion(i));
       list.append(button);
       suggestionOptions.push({item,button});
     }
@@ -2161,6 +2162,13 @@
     $("helpDialog").addEventListener("click",e=>{if(e.target===$("helpDialog"))$("helpDialog").close()});
     $("countrySearch").addEventListener("input",e=>{
       const term=e.target.value.trim();
+      // Do not keep a stale guess selected when the search text changes.
+      if(selected&&norm(term)!==norm(selected.label)){
+        selected=null;
+        $("guessBtn").disabled=true;
+        $("selectedText").textContent=t("noSelection");
+        renderMap();
+      }
       if(term.length<1){hideSuggestions();suggestionOptions=[];return}
       suggestions(searchLocal(term));
       // Local country catalogue only; no city geocoder or network search.
@@ -2184,6 +2192,7 @@
         return;
       }
       if(e.key!=="Enter")return;
+      if(e.repeat){e.preventDefault();return;}
       const term=$("countrySearch").value.trim();
       if(!term)return;
       e.preventDefault();
