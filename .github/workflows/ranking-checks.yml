@@ -1,7 +1,7 @@
 name: Ranking API checks
 on:
   push:
-    branches: ["feature/ranking"]
+    branches: ["main", "feature/ranking"]
     paths:
       - "backend/**"
       - "ranking-client.js"
