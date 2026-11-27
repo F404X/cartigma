@@ -6,6 +6,7 @@ import "../../shared-clues.js";
 import "../../country-insights.js";
 const EVIDENCE=globalThis.CartigmaClueEngine;
 const {DIFFICULTIES,RULES_VERSION,RUSH_DURATION_MS,RUSH_CLUE_INTERVAL_MS}=EVIDENCE;
+export const FREE_ROUNDS_PER_DAY=6;
 const decks=new Map();
 const pickCountry=EVIDENCE.countryPicker(countries);
 const randomWord=()=>crypto.getRandomValues(new Uint32Array(1))[0];
@@ -200,6 +201,18 @@ export async function gameRoute(request,env,path){
       await settle(env,existing);
       const game=state(existing);
       return json(mode==="free"&&game.finished?{game:null,claimed:false}:{game,claimed:true});
+    }
+    if(mode==="free"){
+      // Giving up a round with /finish scores 0 and costs nothing, so an
+      // unlimited supply of rounds would let players re-draw until the
+      // country is an easy one. Bound the number of draws per day and level.
+      // An unfinished round is left to the unique slot below, so the client
+      // still receives ranked_attempt_already_started and resumes it.
+      const used=await env.DB.prepare(`SELECT COUNT(*) AS total,
+          COALESCE(SUM(duration_ms IS NULL),0) AS active FROM ranked_matches
+        WHERE user_id=? AND challenge_day=? AND difficulty=? AND mode='free'`)
+        .bind(user.id,day,level).first();
+      if(used.total>=FREE_ROUNDS_PER_DAY&&!used.active)fail(409,"free_daily_limit");
     }
     const code=mode==="daily"?await targetFor(env,day,level):pickCountry(randomWord).code;
     const playToken=randomToken();

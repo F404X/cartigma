@@ -25,5 +25,12 @@ namespace_id = "609105"
 limit = 30
 period = 60
 
+[[ratelimits]]
+name = "READ_LIMIT"
+namespace_id = "609107"
+[ratelimits.simple]
+limit = 60
+period = 60
+
 [vars]
 APP_ORIGIN = "https://cartigma.f404x.net"

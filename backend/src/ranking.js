@@ -1,8 +1,32 @@
-import {dayUTC,periodKeys,json} from "./lib.js";
+import {dayUTC,periodKeys,json,ipOf,rate} from "./lib.js";
 import {requireUser} from "./auth.js";
 const DIFFICULTIES=["normal","hard","rush"];
 const PERIODS=["week","month","total"];
-export async function leaderboard(request,env){
+// The public board costs nine D1 queries. Serve one shared copy from the
+// edge cache so anonymous traffic cannot multiply those reads. (The Cache
+// API is a no-op on workers.dev, where only the per-IP limit applies.)
+const BOARD_CACHE_SECONDS=15;
+export async function leaderboard(request,env,ctx){
+  await rate(env,"READ_LIMIT","board:"+ipOf(request));
+  const cache=globalThis.caches?.default;
+  const cacheKey=new Request(new URL("/v1/leaderboards",request.url).href);
+  const hit=await cache?.match(cacheKey);
+  if(hit){
+    const cached=new Response(hit.body,hit);
+    cached.headers.set("cache-control","no-store");
+    return cached;
+  }
+  const response=await buildLeaderboard(env);
+  if(cache){
+    const shared=response.clone();
+    const stored=new Response(shared.body,shared);
+    stored.headers.set("cache-control","public, max-age="+BOARD_CACHE_SECONDS);
+    const write=cache.put(cacheKey,stored).catch(()=>{});
+    if(ctx?.waitUntil)ctx.waitUntil(write);else await write;
+  }
+  return response;
+}
+async function buildLeaderboard(env){
   const keys=periodKeys(dayUTC());
   const boards={};
   const queries=[];

@@ -23,6 +23,13 @@ namespace_id = "609103"
 limit = 30
 period = 60
 
+[[ratelimits]]
+name = "READ_LIMIT"
+namespace_id = "609106"
+[ratelimits.simple]
+limit = 60
+period = 60
+
 [vars]
 APP_ORIGIN = "https://cartigma-ranking-staging.foxythefox2017xd.workers.dev"
 

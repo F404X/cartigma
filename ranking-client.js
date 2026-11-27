@@ -44,6 +44,7 @@
        game_state_conflict:"Partida alterada em outra aba. Tente novamente.",
        country_already_guessed:"Você já tentou esse país.",
        cooldown:"Muitas ações em sequência. Aguarde um instante.",
+       free_daily_limit:"Limite diário de partidas livres ranqueadas atingido para esta dificuldade. Volte amanhã ou jogue no modo diário.",
        auth_not_configured:"Autenticação ainda não configurada.",
        game_not_configured:"Partidas competitivas ainda não configuradas.",
        invalid_credentials:"E-mail ou senha incorretos.",

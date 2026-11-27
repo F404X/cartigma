@@ -7,7 +7,7 @@ const authPaths=new Set(["/v1/auth/register","/v1/auth/login","/v1/auth/logout",
 const gamePaths=new Set(["/v1/games/start","/v1/games/resume","/v1/games/guess",
   "/v1/games/reveal","/v1/games/overlay","/v1/games/finish","/v1/games/save","/v1/games/state"]);
 export default {
-  async fetch(request,env){
+  async fetch(request,env,ctx){
     let response;
     const path=new URL(request.url).pathname;
     try {
@@ -40,7 +40,7 @@ export default {
       }else if(path==="/v1/config"&&request.method==="GET"){
         response=json({turnstileSiteKey:env.TURNSTILE_SITE_KEY||null});
       }else if(path==="/v1/leaderboards"&&request.method==="GET"){
-        response=await leaderboard(request,env);
+        response=await leaderboard(request,env,ctx);
       }else if(request.method==="GET"&&(path==="/v1/me/games"||path.startsWith("/v1/me/games/"))){
         response=await matchHistory(request,env,path==="/v1/me/games"?undefined:path.slice("/v1/me/games/".length));
       }else if(path==="/v1/me/stats"&&request.method==="GET"){
@@ -48,7 +48,7 @@ export default {
       }else if(authPaths.has(path)&&
         (request.method==="POST"||(path==="/v1/auth/me"&&request.method==="GET"))){
         if(request.method==="POST")csrf(request,env);
-        response=await authRoute(request,env,path);
+        response=await authRoute(request,env,path,ctx);
       }else if(gamePaths.has(path)&&request.method==="POST"){
         csrf(request,env);
         response=await gameRoute(request,env,path);

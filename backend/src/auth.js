@@ -55,7 +55,38 @@ async function validateTurnstile(body,request,env){
     {method:"POST",body:form,signal:AbortSignal.timeout(8000)});
   if(!response.ok||(await response.json()).success!==true)fail(403,"bot_check_failed");
 }
-export async function authRoute(request,env,path){
+const RESET_LIFETIME=900;
+const RESET_RESEND_COOLDOWN=120;
+// Same salt for every unknown address, so a missing account costs one real
+// PBKDF2 derivation just like a wrong password does.
+const DUMMY_SALT="AAAAAAAAAAAAAAAAAAAAAA";
+// Run work after the response is sent so existing and unknown accounts take
+// the same time to answer; without a Worker context (tests) just await it.
+function defer(ctx,task){
+  const run=task().catch(error=>console.error("Deferred auth task failed",String(error?.message||error)));
+  if(ctx?.waitUntil){ctx.waitUntil(run);return Promise.resolve();}
+  return run;
+}
+async function sendResetEmail(env,user,email){
+  // At most one link per account every RESET_RESEND_COOLDOWN seconds, so the
+  // endpoint cannot be used to flood someone's inbox or burn email quota.
+  const recent=await env.DB.prepare("SELECT 1 AS found FROM password_resets WHERE user_id=? AND expires_at>?")
+    .bind(user.id,now()+RESET_LIFETIME-RESET_RESEND_COOLDOWN).first();
+  if(recent)return;
+  const raw=randomToken();
+  await env.DB.prepare("INSERT INTO password_resets(token_hash,user_id,expires_at) VALUES(?,?,?)")
+    .bind(await sha256(raw),user.id,now()+RESET_LIFETIME).run();
+  const url=env.APP_ORIGIN+"/?reset="+encodeURIComponent(raw);
+  const response=await fetch("https://api.resend.com/emails",{
+    method:"POST",headers:{"Authorization":"Bearer "+env.RESEND_API_KEY,
+    "Content-Type":"application/json"},
+    body:JSON.stringify({from:env.RESET_FROM_EMAIL,to:[email],
+      subject:"Recuperação de senha — Cartigma",
+      text:"Use este link nos próximos 15 minutos: "+url})
+  });
+  if(!response.ok)console.error("Password reset email delivery failed");
+}
+export async function authRoute(request,env,path,ctx){
   if(path==="/v1/auth/me"){
     const user=await currentUser(request,env);
     return json({user:user?{id:user.id,username:user.username,email:user.email}:null});
@@ -89,7 +120,11 @@ export async function authRoute(request,env,path){
     if(email.length>254||typeof password!=="string"||password.length>256||!password)
       fail(401,"invalid_credentials");
     const user=await env.DB.prepare("SELECT * FROM users WHERE email=? AND deleted_at IS NULL").bind(email).first();
-    if(!user||!await verifyPassword(password,user,env))fail(401,"invalid_credentials");
+    if(!user){
+      await hashPassword(password,DUMMY_SALT,env.AUTH_PEPPER);
+      fail(401,"invalid_credentials");
+    }
+    if(!await verifyPassword(password,user,env))fail(401,"invalid_credentials");
     return json({user:{id:user.id,username:user.username,email:user.email}},
       200,{"set-cookie":await issueSession(env,user)});
   }
@@ -103,20 +138,7 @@ export async function authRoute(request,env,path){
     const configured=Boolean(env.RESEND_API_KEY&&env.RESET_FROM_EMAIL);
     if(configured&&email.length<=254){
       const user=await env.DB.prepare("SELECT id FROM users WHERE email=? AND deleted_at IS NULL").bind(email).first();
-      if(user){
-        const raw=randomToken();
-        await env.DB.prepare("INSERT INTO password_resets(token_hash,user_id,expires_at) VALUES(?,?,?)")
-          .bind(await sha256(raw),user.id,now()+900).run();
-        const url=env.APP_ORIGIN+"/?reset="+encodeURIComponent(raw);
-        const response=await fetch("https://api.resend.com/emails",{
-          method:"POST",headers:{"Authorization":"Bearer "+env.RESEND_API_KEY,
-          "Content-Type":"application/json"},
-          body:JSON.stringify({from:env.RESET_FROM_EMAIL,to:[email],
-            subject:"Recuperação de senha — Cartigma",
-            text:"Use este link nos próximos 15 minutos: "+url})
-        });
-        if(!response.ok)console.error("Password reset email delivery failed");
-      }
+      if(user)await defer(ctx,()=>sendResetEmail(env,user,email));
     }
     return json({ok:true,enabled:configured},202);
   }
